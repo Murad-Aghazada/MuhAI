@@ -45,7 +45,7 @@ Full detail: `RECOVERY.md`.
 ```bash
 docker compose up -d                                  # 4 services
 curl http://localhost:8000/health                     # -> {"status":"healthy"}
-docker compose exec backend python -m pytest          # 103 pass, 1 xfail
+docker compose exec backend python -m pytest          # 106 pass
 npm install && npm run dev                            # web frontend :5173
 ```
 
@@ -61,8 +61,8 @@ API docs at http://localhost:8000/docs · Postgres `:5432` (muhai/muhai_secret)
 - **15 routers**, **14 services**, **11 models**, **8 migrations**, **50 endpoints**
 - Tesseract 5 + `tesseract-ocr-tur` installed in the image; `OcrEngine` ABC,
   per-field confidence, `CONFIDENCE_THRESHOLD = 0.7`
-- Prophet 1.1.5 declared with a moving-average fallback under 10 points
-  (**but see F1 — it does not actually run**)
+- Prophet 1.1.5 forecasting, with a moving-average fallback under 10 points
+  and on any Prophet failure (fixed 2026-09-01, see F1)
 - `chat_service.py` has a Gemini backend *and* a deterministic offline fallback
 - Muhai Score engine: 8 weighted categories, pure and explainable
 - Tax engine: 2026 KDV / income / corporate / stopaj / SGK / stamp rates, pure functions
@@ -81,7 +81,7 @@ and has never talked to the backend.
 (`localhost:8081`, `localhost:19006`, `exp://127.0.0.1:19000`) proves an Expo app
 existed. A search across `C:` and `D:` found no surviving copy.
 
-**Tests** — `backend/tests/`, 103 passing / 1 xfail. Covers the pure service
+**Tests** — `backend/tests/`, 106 passing. Covers the pure service
 layer (tax, OCR parsing, expense classification, Muhai Score, tax calendar,
 payroll, forecasting) plus API wiring smoke tests. Dev deps in
 `backend/requirements-dev.txt`.
@@ -92,7 +92,7 @@ Ordered by severity. Update the status column as these are resolved.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
-| F1 | **Prophet does not run.** CmdStan bundled with `prophet==1.1.5` is incomplete — `stan_model/cmdstan-2.33.1` missing its makefile — so `Prophet()` raises `AttributeError: 'Prophet' object has no attribute 'stan_backend'`. `forecast_cashflow()` (`backend/app/services/forecast_service.py:59`) only catches `ImportError`, so **any history ≥10 points raises**; `/api/cashflow/forecast` and `/api/transactions/forecast` return 500. Masked today only because the DB is nearly empty — appears as soon as real data is seeded. Fix: `cmdstanpy.install_cmdstan()` in the Dockerfile, and/or widen the except clause. | **Critical** | Open (xfail in `test_forecast_service.py`) |
+| F1 | ~~**Prophet does not run.**~~ Cause: `requirements.txt` pinned `prophet==1.1.5` but left **cmdstanpy unpinned**, resolving to 1.3.0. Prophet ships a precompiled `prophet_model.bin` with a deliberately stripped `stan_model/cmdstan-2.33.1` (`bin/` + `stan/`, no makefile) and calls `set_cmdstan_path()` on it; from cmdstanpy 1.3.0 that path is validated strictly, every Stan backend fails to load, and `Prophet()` raises `AttributeError: 'Prophet' object has no attribute 'stan_backend'`. Fixed by pinning `cmdstanpy==1.2.4` (no full CmdStan install needed) and widening `forecast_cashflow()` to fall back on any Prophet failure instead of only `ImportError`. Guarded by `test_prophet_backend_actually_loads` and `test_forecast_degrades_instead_of_raising`. | **Critical** | **Fixed 2026-09-01** |
 | F2 | **Frontend and backend are disconnected.** Every number in the UI is a constant in `mockData.js`. The demo shows nothing the backend computes. | **Critical** | Open |
 | F3 | **Gemini API key was public.** Hardcoded in `src/lib/gemini.js` and shipped in the browser bundle. Now in `backend/.env` (git-ignored), but the old value was exposed — **rotate it**. | High | Partially done — needs rotation |
 | F4 | **`SECRET_KEY` was `change_me_in_production`.** That is what the containers were actually running with. Local `.env` now has a generated key; check anywhere else it was deployed. | High | Fixed locally |
@@ -122,7 +122,7 @@ steps are ordered too.
 ### Phase 2 — Surface backend features that have no UI
 Each has a working route and service with nothing rendering it:
 1. Muhai Score card + history
-2. Cash-flow forecast chart with the confidence band (**blocked on F1**)
+2. Cash-flow forecast chart with the confidence band (unblocked — F1 fixed)
 3. Compliance alerts list
 4. Bank transactions feed + reconciliation
 5. Reminders
@@ -142,7 +142,7 @@ Each has a working route and service with nothing rendering it:
 ### Phase 4 — Data and demo state
 1. Seed a realistic multi-month dataset.
 2. Populate the four empty tables (F10).
-3. Ensure seeded history exceeds 10 points so the Prophet path actually runs (**needs F1 fixed first**).
+3. Ensure seeded history exceeds 10 points so the Prophet path actually runs — it now does, but nothing has exercised it against real data yet.
 4. Verify the assistant's offline fallback with `GEMINI_API_KEY` empty.
 5. Resolve or remove the dead controls (F11).
 
@@ -171,7 +171,7 @@ up. These are the ones to settle before the final.
 | S5 Tesseract 5 + Turkish pack, swappable `OcrEngine` | **True** | none |
 | S7 Gemini 2.5 Flash + RAG | **True** (backend); frontend RAG is dead (F7) | fix or drop Firebase |
 | S9 per-field confidence, 0.7 threshold | **True** in backend; no UI (Phase 3) | build the review queue |
-| S6 Prophet forecasting | Dependency real, **does not run** (F1); fallback is moving-average, speech says **OLS** | fix F1; correct "OLS" wording |
+| S6 Prophet forecasting | **True** — runs and predicts since F1 was fixed. But the sub-10-point fallback is a **moving average**; the speech says **OLS regression** | correct the "OLS" wording |
 | S18 / Slide 13 "13 servis geliştirildi ve test edildi" | Understated — **15 routers / 50 endpoints**. But "test edildi" was false until 2026-09-01; tests exist now | pick the number you defend |
 | Slide 4 says **Django**; S1 says **FastAPI** | Code is FastAPI. The team slide also says Django | fix the deck + team slide |
 | S14 Expo / React Native shipped | Client **lost** (F5) | rebuild, or restate as responsive web |
@@ -185,9 +185,14 @@ Cheaper than being caught on a falsifiable claim.
 
 ## 8. Conventions and gotchas
 
-- **N1 — Do not force a rebuild.** `docker-compose.yml` declares `image:`
-  alongside `build:` so the existing images are reused. A rebuild recompiles
-  prophet/pandas/numpy and takes many minutes.
+- **N1 — Avoid unnecessary rebuilds.** `docker-compose.yml` declares `image:`
+  alongside `build:` so the existing images are reused. Rebuild only when
+  `requirements.txt` or the `Dockerfile` changes (as the F1 fix required), then
+  run `docker compose build backend celery_worker && docker compose up -d` so
+  both images carry the change.
+- **N1b — Pins in `requirements.txt` carry comments explaining why.** Do not
+  bump `cmdstanpy` without re-running `tests/test_forecast_service.py`; the
+  pin is load-bearing (see F1).
 - **N2 — The compose project name is pinned** (`name: muhai`) so the volume key
   `postgres_data` resolves to the existing `muhai_postgres_data`. Changing it
   orphans the database.

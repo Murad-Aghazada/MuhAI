@@ -43,21 +43,39 @@ def test_confidence_band_brackets_the_prediction():
         assert p.yhat_lower <= p.yhat <= p.yhat_upper
 
 
-@pytest.mark.xfail(
-    reason=(
-        "BROKEN IN IMAGE: the CmdStan install bundled with prophet 1.1.5 is "
-        "incomplete (missing makefile in stan_model/cmdstan-2.33.1), so "
-        "Prophet() raises AttributeError: 'Prophet' object has no attribute "
-        "'stan_backend'. forecast_cashflow only catches ImportError, so any "
-        "history with >= MIN_POINTS_FOR_PROPHET points raises instead of "
-        "forecasting. Fix the image (cmdstanpy.install_cmdstan) or widen the "
-        "except clause; this test flips to xpass once resolved."
-    ),
-    strict=False,
-)
 def test_prophet_path_returns_requested_horizon():
-    # Enough points to cross the Prophet threshold.
+    """The real Prophet path, not the fallback.
+
+    Regression guard for the cmdstanpy pin: prophet 1.1.5 ships a stripped
+    cmdstan (no makefile) and cmdstanpy >= 1.3.0 rejects it, which made
+    Prophet() raise and took every forecast with >= MIN_POINTS_FOR_PROPHET
+    points down with it. requirements.txt pins cmdstanpy==1.2.4.
+    """
     out = forecast_cashflow(_history(MIN_POINTS_FOR_PROPHET + 40), horizon=10)
     assert len(out) == 10
     for p in out:
         assert p.yhat_lower <= p.yhat <= p.yhat_upper
+
+
+def test_prophet_backend_actually_loads():
+    """Prophet must construct with a working Stan backend.
+
+    Asserted directly so a bad cmdstanpy bump fails loudly here rather than
+    silently degrading every forecast to the moving-average fallback.
+    """
+    from prophet import Prophet
+
+    assert Prophet().stan_backend.get_type() == "CMDSTANPY"
+
+
+def test_forecast_degrades_instead_of_raising(monkeypatch):
+    """A broken Prophet must fall back, not 500."""
+    import prophet
+
+    class Exploding:
+        def __init__(self, *a, **kw):
+            raise RuntimeError("simulated stan backend failure")
+
+    monkeypatch.setattr(prophet, "Prophet", Exploding)
+    out = forecast_cashflow(_history(MIN_POINTS_FOR_PROPHET + 5), horizon=12)
+    assert len(out) == 12

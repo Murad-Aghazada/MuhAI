@@ -6,9 +6,12 @@ for Prophet (which needs at least a couple of data points to be meaningful).
 """
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from app.schemas.transaction import ForecastPoint
+
+logger = logging.getLogger(__name__)
 
 FORECAST_HORIZON_DAYS = 30
 MIN_POINTS_FOR_PROPHET = 10
@@ -61,27 +64,37 @@ def forecast_cashflow(
     except ImportError:
         return _moving_average_forecast(history, horizon)
 
-    df = pd.DataFrame(history, columns=["ds", "y"])
-    df["ds"] = pd.to_datetime(df["ds"])
+    # Anything Prophet raises degrades to the moving-average projection rather
+    # than failing the request. A forecast is an advisory number: a coarser one
+    # beats a 500. Logged at exception level so the cause is never silent.
+    try:
+        df = pd.DataFrame(history, columns=["ds", "y"])
+        df["ds"] = pd.to_datetime(df["ds"])
 
-    model = Prophet(
-        daily_seasonality=False,
-        weekly_seasonality=True,
-        yearly_seasonality=False,
-        interval_width=0.8,
-    )
-    model.fit(df)
-
-    future = model.make_future_dataframe(periods=horizon)
-    forecast = model.predict(future)
-
-    tail = forecast.tail(horizon)
-    return [
-        ForecastPoint(
-            ds=row["ds"].date(),
-            yhat=round(float(row["yhat"]), 2),
-            yhat_lower=round(float(row["yhat_lower"]), 2),
-            yhat_upper=round(float(row["yhat_upper"]), 2),
+        model = Prophet(
+            daily_seasonality=False,
+            weekly_seasonality=True,
+            yearly_seasonality=False,
+            interval_width=0.8,
         )
-        for _, row in tail.iterrows()
-    ]
+        model.fit(df)
+
+        future = model.make_future_dataframe(periods=horizon)
+        forecast = model.predict(future)
+
+        tail = forecast.tail(horizon)
+        return [
+            ForecastPoint(
+                ds=row["ds"].date(),
+                yhat=round(float(row["yhat"]), 2),
+                yhat_lower=round(float(row["yhat_lower"]), 2),
+                yhat_upper=round(float(row["yhat_upper"]), 2),
+            )
+            for _, row in tail.iterrows()
+        ]
+    except Exception:
+        logger.exception(
+            "Prophet forecast failed; falling back to moving average. "
+            "Check the cmdstanpy/prophet pairing in requirements.txt."
+        )
+        return _moving_average_forecast(history, horizon)
