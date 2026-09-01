@@ -1,0 +1,89 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import (
+    auth,
+    bank,
+    cashflow,
+    chat,
+    compliance,
+    dashboard,
+    expenses,
+    inventory,
+    invoices,
+    muhai_score,
+    payroll,
+    predictions,
+    reminders,
+    tax,
+    transactions,
+)
+from app.core.config import settings
+from app.db.migrate import run_upgrade_to_head
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Bring the DB schema up to head before serving requests.
+
+    Run in a worker thread because Alembic's env.py drives an async engine via
+    ``asyncio.run`` — which cannot be nested inside the running event loop.
+    """
+    try:
+        await asyncio.to_thread(run_upgrade_to_head)
+    except Exception as exc:  # pragma: no cover - depends on live DB
+        logger.error("Startup migration failed: %s", exc)
+    yield
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description="AI-powered accounting & SME finance assistant.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/", tags=["health"])
+async def root() -> dict[str, str]:
+    return {"status": "ok", "service": settings.PROJECT_NAME}
+
+
+@app.get("/health", tags=["health"])
+async def health() -> dict[str, str]:
+    return {"status": "healthy"}
+
+
+# Mount all routers under /api
+for router in (
+    auth,
+    invoices,
+    transactions,
+    payroll,
+    tax,
+    inventory,
+    muhai_score,
+    dashboard,
+    compliance,
+    cashflow,
+    bank,
+    reminders,
+    predictions,
+    expenses,
+    chat,
+):
+    app.include_router(router.router, prefix=settings.API_PREFIX)
