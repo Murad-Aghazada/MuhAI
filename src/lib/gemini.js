@@ -6,9 +6,13 @@
 import { fetchKnowledgeBase, seedKnowledgeBase } from './firebase.js'
 import { KNOWLEDGE_DOCS, retrieve } from './ragKnowledge.js'
 
-// NOTE: For a production app this key belongs on a server. Exposed here
-// per the demo brief so the in-browser assistant works out of the box.
-const GEMINI_API_KEY = 'REDACTED_ROTATED_KEY'
+// Read from the environment at build time — never hardcode the key here, it
+// ships in the browser bundle and gets scraped. Copy .env.example to .env.local
+// and set VITE_GEMINI_API_KEY for local development.
+//
+// This whole client-side call is temporary: Phase 1 routes the assistant
+// through the backend's /api/chat endpoint, which holds the key server-side.
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const MODEL = 'gemini-2.5-flash'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`
 

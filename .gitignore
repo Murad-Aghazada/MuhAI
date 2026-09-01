@@ -21,3 +21,6 @@ venv/
 
 # --- recovery scratch ---
 _recovery/
+
+# stale duplicate of the frontend, embeds the old API key
+MuhAI.zip
