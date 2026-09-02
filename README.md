@@ -8,7 +8,6 @@ TEKNOFEST 2026 Financial Technologies · Team Nasimi BHOS · Baku Higher Oil Sch
 ```
 backend/     FastAPI + SQLAlchemy 2 + Celery API (15 routers, 50 endpoints)
 web/         Vite + React 18 frontend (TR/EN)
-docs/        RECOVERY.md, TEKNOFEST material, reference PDFs
 db_backup/   pg_dump of the development database
 docker-compose.yml
 CLAUDE.md    working handoff — project state, open findings, roadmap
