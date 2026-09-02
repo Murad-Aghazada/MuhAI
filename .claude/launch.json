@@ -4,7 +4,7 @@
     {
       "name": "muhai-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["--prefix", "web", "run", "dev"],
       "port": 5173
     }
   ]

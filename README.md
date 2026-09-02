@@ -1,63 +1,47 @@
-# Muhai · Akıllı Muhasebe
+# Muhai
 
-AI-powered accounting & financial management platform for Turkish SMEs. Clean
-white "Precision Ledger" UI with emerald signature, animated analytics, a
-dual-language (TR/EN) interface, and a Gemini-powered RAG assistant.
+AI-powered accounting & finance OS for Turkish SMEs.
+TEKNOFEST 2026 Financial Technologies · Team Nasimi BHOS · Baku Higher Oil School.
 
-![stack](https://img.shields.io/badge/Vite-React_18-0E9F6E) ![lang](https://img.shields.io/badge/i18n-TR%20%2F%20EN-0A7D56)
+## Layout
 
-## Modules
-
-1. **Fatura Yönetimi (Invoices)** — animated OCR scan demo (Tesseract 5.0 + CNN), auto-parsed line items, confidence scoring.
-2. **Vergi & e-Beyanname (Tax)** — live VAT calculator, filing calendar, tax-burden donut, declaration history.
-3. **Stok Yönetimi (Inventory)** — real-time movement bars, top-movers, stock table with status.
-4. **Bordro & SGK (Payroll)** — one-click payroll run synced with SGK, cost-breakdown donut, employee table.
-5. **Finansal Asistan (AI)** — Gemini 2.5 Flash chatbot grounded with RAG over a Firebase RTDB knowledge base; cites its sources.
-6. **Akıllı Analitik (Dashboard)** — animated cash-flow area chart, KPI cards with count-up + sparklines, expense breakdown.
-
-## Stack
-
-- **Vite + React 18** (JSX), **react-router-dom** routing
-- **Framer Motion** — page transitions, staggered reveals, animated counters
-- **Custom SVG charts** — area, grouped bar, donut, sparkline (all self-animating)
-- **Firebase RTDB** — RAG knowledge base (`muhai/knowledgeBase`)
-- **Gemini 2.5 Flash** via REST — grounded answers in TR/EN
-- Fonts: **Clash Display** + **Satoshi** (Fontshare)
+```
+backend/     FastAPI + SQLAlchemy 2 + Celery API (15 routers, 50 endpoints)
+web/         Vite + React 18 frontend (TR/EN)
+docs/        RECOVERY.md, TEKNOFEST material, reference PDFs
+db_backup/   pg_dump of the development database
+docker-compose.yml
+CLAUDE.md    working handoff — project state, open findings, roadmap
+```
 
 ## Run
 
+Backend stack (Postgres, Redis, API, Celery worker):
+
 ```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build    # production bundle in dist/
+docker compose up -d
 ```
 
-## How RAG works
+Then `curl http://localhost:8000/health` → `{"status":"healthy"}`.
+API docs at http://localhost:8000/docs.
 
-`src/lib/gemini.js` → fetches the knowledge base from Firebase RTDB
-(`src/lib/firebase.js`, seeded once from `src/lib/ragKnowledge.js`), retrieves the
-top-3 most relevant docs for the question (Turkish-aware keyword/tag scoring in
-`ragKnowledge.js → retrieve()`), injects them plus a live business summary into the
-Gemini system prompt, and returns the answer with the source documents.
+Backend tests:
 
-## Structure
-
-```
-src/
-  i18n/            LanguageContext + TR/EN dictionary
-  lib/             firebase, gemini, ragKnowledge, format
-  data/            mockData (business figures powering the UI)
-  components/
-    layout/        Sidebar, Topbar, AppLayout, LanguageToggle
-    charts/        AreaChart, BarChart, DonutChart, Sparkline
-    ui/            StatCard, Badge, AnimatedNumber
-    chatbot/       ChatWidget, ChatMessages, ChatComposer, useChat
-  pages/           Landing, Dashboard, Invoices, Tax, Inventory, Payroll, Assistant
-  styles/          components, layout, pages, landing, chat
+```bash
+docker compose exec backend python -m pytest
 ```
 
-## Note on secrets
+Web frontend:
 
-The Gemini key and Firebase config are embedded in the client per the demo brief so
-the in-browser assistant works out of the box. For production, move the Gemini key
-behind a server proxy and lock down Firebase rules.
+```bash
+npm --prefix web install && npm --prefix web run dev
+```
+
+Serves on http://localhost:5173. See `web/README.md` for frontend detail.
+
+## Where to start
+
+Read `CLAUDE.md` first — it carries the verified project state, the numbered
+open findings (F1–F12), and the phased roadmap. `docs/RECOVERY.md` records how
+the backend was recovered from Docker images after the original working tree
+was lost.
