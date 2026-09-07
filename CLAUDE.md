@@ -94,7 +94,12 @@ Full detail: `docs/RECOVERY.md`.
 ```bash
 docker compose up -d                                  # API only, :8000
 curl http://localhost:8000/health                     # -> {"status":"healthy"}
+
+# Dev deps are deliberately not in the runtime image, so install them once
+# per container before the first test run (see N11).
+docker compose exec backend pip install -r requirements-dev.txt
 docker compose exec backend python -m pytest          # 122 pass
+
 npm --prefix web install && npm --prefix web run dev  # web frontend :5173
 ```
 
@@ -256,6 +261,11 @@ Reminder #5 in the team's own notes gives the honest escape hatch:
   identifies the project; it grants nothing. Access is decided by Firebase Auth
   plus `firestore.rules`. Real secrets (Gemini key, JWT secret) live only in
   `backend/.env`.
+- **N11 — `pytest` is not in the runtime image.** `requirements-dev.txt` is
+  excluded on purpose, so a freshly recreated container has no pytest and the
+  documented test command fails with "No module named pytest". Run
+  `docker compose exec backend pip install -r requirements-dev.txt` once after
+  any `docker compose down` / rebuild.
 - **N10 — `web/public/sample-invoice.png`** is a synthetic Turkish invoice for
   exercising the OCR path (vendor, no `AND-2026-8842`, net 12.350, KDV 2.470,
   total 14.820). Useful for demos and for checking OCR regressions.

@@ -46,7 +46,12 @@ npm --prefix web install && npm --prefix web run dev
 
 Serves the web app on `http://localhost:5173`.
 
-Tests:
+Tests — dev dependencies are not baked into the runtime image, so install
+them once per container:
+
+```bash
+docker compose exec backend pip install -r requirements-dev.txt
+```
 
 ```bash
 docker compose exec backend python -m pytest

@@ -1,9 +1,33 @@
 import { motion } from 'framer-motion'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingDown, TrendingUp } from 'lucide-react'
 import AnimatedNumber from './AnimatedNumber.jsx'
 import Sparkline from '../charts/Sparkline.jsx'
 
-export default function StatCard({ icon: Icon, label, value, format, delta, deltaPositive = true, spark, sparkColor, index = 0 }) {
+/**
+ * A headline figure with its trend.
+ *
+ * Two independent signals, deliberately not conflated:
+ *   - the arrow follows the *sign* of the change (did it go up or down?)
+ *   - the colour follows `deltaPositive` (is that good or bad?)
+ * Expenses falling is a green down-arrow; tax accruing is a red up-arrow.
+ */
+export default function StatCard({
+  icon: Icon,
+  label,
+  value,
+  format,
+  delta,
+  deltaValue,
+  deltaPositive = true,
+  spark,
+  sparkColor,
+  index = 0,
+}) {
+  // Fall back to parsing the label when no numeric delta is supplied.
+  const numeric = deltaValue ?? parseFloat(String(delta ?? '').replace(/[^\d.-]/g, ''))
+  const rising = Number.isFinite(numeric) ? numeric >= 0 : deltaPositive
+  const Arrow = rising ? TrendingUp : TrendingDown
+
   return (
     <motion.div
       className="stat-card"
@@ -22,7 +46,7 @@ export default function StatCard({ icon: Icon, label, value, format, delta, delt
       {delta != null && (
         <div className="stat-card__foot">
           <span className={`delta ${deltaPositive ? 'delta--pos' : 'delta--neg'}`}>
-            {deltaPositive ? <TrendingUp size={13} strokeWidth={2.6} /> : <TrendingDown size={13} strokeWidth={2.6} />}
+            <Arrow size={13} strokeWidth={2.6} />
             {delta}
           </span>
         </div>

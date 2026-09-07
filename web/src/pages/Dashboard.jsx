@@ -64,10 +64,10 @@ export default function Dashboard() {
     const expense = monthly.map((m) => m.expense)
     const profit = monthly.map((m) => m.profit)
     return [
-      { icon: Wallet, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: `${kpis.revenue_delta}%`, deltaPositive: kpis.revenue_delta >= 0, spark: income, sparkColor: 'var(--c-emerald)' },
-      { icon: CreditCard, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: `${kpis.expense_delta}%`, deltaPositive: kpis.expense_delta <= 0, spark: expense, sparkColor: 'var(--c-coral)' },
-      { icon: TrendingUp, label: t('dashboard.kpiProfit'), value: kpis.profit, delta: `${kpis.profit_delta}%`, deltaPositive: kpis.profit_delta >= 0, spark: profit, sparkColor: 'var(--c-sky)' },
-      { icon: Landmark, label: t('dashboard.kpiTax'), value: kpis.tax, delta: `${kpis.tax_delta}%`, deltaPositive: kpis.tax_delta <= 0, spark: monthly.map((m) => Math.max(m.income - m.expense, 0) * 0.167), sparkColor: 'var(--c-amber)' },
+      { icon: Wallet, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: `${kpis.revenue_delta}%`, deltaValue: kpis.revenue_delta, deltaPositive: kpis.revenue_delta >= 0, spark: income, sparkColor: 'var(--c-emerald)' },
+      { icon: CreditCard, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: `${kpis.expense_delta}%`, deltaValue: kpis.expense_delta, deltaPositive: kpis.expense_delta <= 0, spark: expense, sparkColor: 'var(--c-coral)' },
+      { icon: TrendingUp, label: t('dashboard.kpiProfit'), value: kpis.profit, delta: `${kpis.profit_delta}%`, deltaValue: kpis.profit_delta, deltaPositive: kpis.profit_delta >= 0, spark: profit, sparkColor: 'var(--c-sky)' },
+      { icon: Landmark, label: t('dashboard.kpiTax'), value: kpis.tax, delta: `${kpis.tax_delta}%`, deltaValue: kpis.tax_delta, deltaPositive: kpis.tax_delta <= 0, spark: monthly.map((m) => Math.max(m.income - m.expense, 0) * 0.167), sparkColor: 'var(--c-amber)' },
     ]
   }, [kpis, monthly, t])
 
