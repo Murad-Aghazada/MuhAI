@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { useReveal } from '../../lib/useReveal.js'
 
 /**
  * Animated donut. Segments sweep in clockwise; hovering a segment
  * lifts it and shows its share in the center.
  */
 export default function DonutChart({ data, size = 200, thickness = 26, centerLabel, formatValue = (v) => v }) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-40px' })
+  const [ref, inView] = useReveal({ once: true, margin: '-40px' })
   const [hover, setHover] = useState(null)
 
   const total = data.reduce((s, d) => s + d.value, 0)

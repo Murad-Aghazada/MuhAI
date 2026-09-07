@@ -1,11 +1,11 @@
-import { useId, useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useId } from 'react'
+import { motion } from 'framer-motion'
+import { useReveal } from '../../lib/useReveal.js'
 
 /** Tiny animated sparkline used inside stat cards. */
 export default function Sparkline({ data, color = 'var(--c-emerald)', width = 120, height = 38 }) {
   const gid = useId().replace(/:/g, '')
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true })
+  const [ref, inView] = useReveal({ once: true })
 
   const max = Math.max(...data)
   const min = Math.min(...data)

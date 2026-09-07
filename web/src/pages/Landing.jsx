@@ -9,7 +9,6 @@ import LanguageToggle from '../components/layout/LanguageToggle.jsx'
 import AnimatedNumber from '../components/ui/AnimatedNumber.jsx'
 import AreaChart from '../components/charts/AreaChart.jsx'
 import DonutChart from '../components/charts/DonutChart.jsx'
-import { cashflow } from '../data/mockData.js'
 import { MONTHS } from '../lib/format.js'
 
 const fadeUp = {
@@ -24,6 +23,19 @@ const FEATURES = [
   { icon: Users, key: 'f4', color: '#ef6b53', to: '/app/payroll' },
   { icon: Sparkles, key: 'f5', color: '#7b71d6', to: '/app/assistant' },
   { icon: LineChart, key: 'f6', color: '#0e9f6e', to: '/app' },
+]
+
+// Illustrative series for the marketing hero mock only. Real figures come
+// from Firestore + the compute API once you are signed in.
+const PREVIEW_CASHFLOW = [
+  { income: 183000, expense: 118000 },
+  { income: 176000, expense: 109000 },
+  { income: 198000, expense: 124000 },
+  { income: 211000, expense: 131000 },
+  { income: 205000, expense: 127000 },
+  { income: 228000, expense: 138000 },
+  { income: 241000, expense: 142000 },
+  { income: 263000, expense: 151000 },
 ]
 
 export default function Landing() {
@@ -56,8 +68,8 @@ export default function Landing() {
         </div>
         <div className="lp-nav__right">
           <LanguageToggle />
-          <Link to="/app" className="lp-nav__login">{t('nav.login')}</Link>
-          <Link to="/app" className="btn btn--primary btn--sm">{t('nav.launch')} <ArrowRight size={15} /></Link>
+          <Link to="/login" className="lp-nav__login">{t('nav.login')}</Link>
+          <Link to="/register" className="btn btn--primary btn--sm">{t('nav.launch')} <ArrowRight size={15} /></Link>
         </div>
       </nav>
 
@@ -77,7 +89,7 @@ export default function Landing() {
               {t('landing.heroSub')}
             </motion.p>
             <motion.div className="lp-hero__cta" variants={fadeUp} initial="hidden" animate="show" custom={3}>
-              <Link to="/app" className="btn btn--brand">{t('landing.ctaPrimary')} <ArrowRight size={17} /></Link>
+              <Link to="/register" className="btn btn--brand">{t('landing.ctaPrimary')} <ArrowRight size={17} /></Link>
               <a href="#assistant" className="btn btn--ghost">{t('landing.ctaSecondary')}</a>
             </motion.div>
             <motion.div className="lp-hero__stats" variants={fadeUp} initial="hidden" animate="show" custom={4}>
@@ -116,7 +128,7 @@ export default function Landing() {
               </div>
               <div className="lp-mock__chart">
                 <div className="lp-mock__chart-label">{t('dashboard.cashflowTitle')}</div>
-                <AreaChart data={cashflow.slice(4)} labels={MONTHS[lang].slice(4)} keys={['income', 'expense']} colors={['var(--c-emerald)', 'var(--c-coral)']} height={150} formatValue={(v) => `₺${Math.round(v / 1000)}K`} seriesNames={[t('dashboard.income'), t('dashboard.expense')]} />
+                <AreaChart data={PREVIEW_CASHFLOW} labels={MONTHS[lang].slice(4)} keys={['income', 'expense']} colors={['var(--c-emerald)', 'var(--c-coral)']} height={150} formatValue={(v) => `₺${Math.round(v / 1000)}K`} seriesNames={[t('dashboard.income'), t('dashboard.expense')]} />
               </div>
             </div>
 
@@ -220,7 +232,7 @@ export default function Landing() {
           <div className="lp-cta__glow" />
           <h2>{t('landing.ctaTitle')}</h2>
           <p>{t('landing.ctaSub')}</p>
-          <Link to="/app" className="btn btn--brand">{t('landing.ctaButton')} <ArrowRight size={17} /></Link>
+          <Link to="/register" className="btn btn--brand">{t('landing.ctaButton')} <ArrowRight size={17} /></Link>
         </motion.div>
       </section>
 

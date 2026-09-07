@@ -11,6 +11,7 @@ from app.api.routes import (
     cashflow,
     chat,
     compliance,
+    compute,
     dashboard,
     expenses,
     inventory,
@@ -85,5 +86,6 @@ for router in (
     predictions,
     expenses,
     chat,
+    compute,
 ):
     app.include_router(router.router, prefix=settings.API_PREFIX)

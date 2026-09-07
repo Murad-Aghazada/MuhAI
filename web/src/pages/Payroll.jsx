@@ -1,117 +1,333 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Wallet, ShieldCheck, BadgeDollarSign, CheckCircle2, Play } from 'lucide-react'
+import { Loader2, Plus, Trash2, Users, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
-import { formatCurrency } from '../lib/format.js'
-import { payrollKpis, payrollBreakdown, employees } from '../data/mockData.js'
-import StatCard from '../components/ui/StatCard.jsx'
-import Badge from '../components/ui/Badge.jsx'
+import { useData } from '../context/DataContext.jsx'
+import { formatCurrency, formatDate } from '../lib/format.js'
+import { COLLECTIONS, addItem, removeItem } from '../lib/db.js'
 import DonutChart from '../components/charts/DonutChart.jsx'
+import PageSkeleton from '../components/ui/PageSkeleton.jsx'
+import EmptyState from '../components/ui/EmptyState.jsx'
+
+const emptyEmployee = () => ({
+  name: '',
+  role: '',
+  grossSalary: 0,
+  startDate: new Date().toISOString().slice(0, 10),
+  sgkNo: '',
+})
 
 export default function Payroll() {
   const { t, lang } = useLang()
-  const cur = (v, o) => formatCurrency(v, lang, o)
-  const [run, setRun] = useState(false)
+  const { companyId, employees, payroll, loading, isEmpty, apiOnline } = useData()
+  const cur = (v) => formatCurrency(v, lang)
+  const compact = (v) => formatCurrency(v, lang, { compact: true })
 
-  const stats = [
-    { icon: Users, label: t('payroll.kpiEmployees'), value: payrollKpis.employees, format: (v) => Math.round(v).toString() },
-    { icon: Wallet, label: t('payroll.kpiGross'), value: payrollKpis.gross, format: (v) => cur(v, { compact: true }), sparkColor: 'var(--c-emerald)' },
-    { icon: ShieldCheck, label: t('payroll.kpiSgk'), value: payrollKpis.sgk, format: (v) => cur(v, { compact: true }), sparkColor: 'var(--c-amber)' },
-    { icon: BadgeDollarSign, label: t('payroll.kpiNet'), value: payrollKpis.net, format: (v) => cur(v, { compact: true }), sparkColor: 'var(--c-sky)' },
-  ]
+  const [modal, setModal] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
-  const donut = payrollBreakdown.map((d) => ({ ...d, label: t(`payroll.${d.key}`) }))
+  // The API returns payslips in the order employees were sent, so joining by
+  // index would break the moment Firestore reorders. Match on name instead.
+  const rows = useMemo(() => {
+    const slips = new Map((payroll?.payslips ?? []).map((p) => [p.name, p]))
+    return employees.map((e) => ({ employee: e, slip: slips.get(e.name) || null }))
+  }, [employees, payroll])
+
+  const costSplit = useMemo(() => {
+    if (!payroll) return []
+    const net = payroll.total_net
+    const sgkEmployee = payroll.payslips.reduce((s, p) => s + p.sgk_employee + p.unemployment_employee, 0)
+    const sgkEmployer = payroll.payslips.reduce((s, p) => s + p.sgk_employer + p.unemployment_employer, 0)
+    const incomeTax = payroll.payslips.reduce((s, p) => s + p.income_tax, 0)
+    const stamp = payroll.payslips.reduce((s, p) => s + p.stamp_tax, 0)
+    return [
+      { key: 'net', label: t('payroll.net'), value: Math.round(net), color: 'var(--c-emerald)' },
+      { key: 'sgkE', label: t('payroll.sgkEmployee'), value: Math.round(sgkEmployee), color: 'var(--c-sky)' },
+      { key: 'sgkR', label: t('payroll.sgkEmployer'), value: Math.round(sgkEmployer), color: 'var(--c-violet)' },
+      { key: 'tax', label: t('payroll.incomeTax'), value: Math.round(incomeTax), color: 'var(--c-amber)' },
+      { key: 'stamp', label: t('payroll.stampTax'), value: Math.round(stamp), color: 'var(--c-coral)' },
+    ].filter((d) => d.value > 0)
+  }, [payroll, t])
+
+  async function handleDelete(employee) {
+    if (!window.confirm(`${employee.name} — ${t('common.delete')}?`)) return
+    setBusyId(employee.id)
+    try {
+      await removeItem(companyId, COLLECTIONS.employees, employee.id)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (loading) return <PageSkeleton />
+  if (isEmpty) return <EmptyState />
 
   return (
     <div className="page">
-      <div className="page-head">
-        <span className="eyebrow">{t('nav.groupMain')}</span>
-        <h1 className="page-title" style={{ marginTop: 8 }}>{t('payroll.title')}</h1>
-        <p className="page-sub">{t('payroll.subtitle')}</p>
+      <div className="page-head page-head-row">
+        <div>
+          <h1 className="page-title">{t('payroll.title')}</h1>
+          <p className="page-sub">{t('payroll.subtitle')}</p>
+        </div>
+        <button className="btn btn--brand btn--sm" onClick={() => setModal(emptyEmployee())}>
+          <Plus size={14} strokeWidth={2.6} /> {lang === 'en' ? 'Add employee' : 'Çalışan ekle'}
+        </button>
       </div>
 
-      <div className="kpi-grid">
-        {stats.map((s, i) => <StatCard key={s.label} {...s} index={i} />)}
+      {!apiOnline && (
+        <div className="notice notice--warn" style={{ marginBottom: 18 }}>
+          <strong>{t('common.offline')}</strong> — {t('common.offlineHint')}
+        </div>
+      )}
+
+      <div className="mini-stats" style={{ marginBottom: 20 }}>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('payroll.kpiEmployees')}</div>
+          <div className="mini-stats__value tnum">{employees.length}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('payroll.kpiGross')}</div>
+          <div className="mini-stats__value tnum">{payroll ? cur(payroll.total_gross) : '—'}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('payroll.kpiNet')}</div>
+          <div className="mini-stats__value tnum mini-stats__value--pos">{payroll ? cur(payroll.total_net) : '—'}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{lang === 'en' ? 'Employer cost' : 'İşveren maliyeti'}</div>
+          <div className="mini-stats__value tnum">{payroll ? cur(payroll.total_employer_cost) : '—'}</div>
+        </div>
       </div>
 
-      <div className="pay-grid">
-        {/* Run payroll */}
-        <motion.section className="run-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <div className="run-card__glow" />
-          <div className="run-card__top">
-            <Badge tone="green"><span className="live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />{t('payroll.runStatus')}</Badge>
+      <div className="dash-grid">
+        <motion.section className="panel dash-cashflow" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+          <div className="panel-head">
+            <div>
+              <div className="panel-title">{t('payroll.tableTitle')}</div>
+              <div className="panel-sub">
+                {lang === 'en'
+                  ? 'Computed by the backend payroll engine (2026 SGK, income tax, stamp duty)'
+                  : 'Backend bordro motoruyla hesaplandı (2026 SGK, gelir vergisi, damga)'}
+              </div>
+            </div>
+            <Users size={20} color="var(--ink-4)" />
           </div>
-          <h3 className="run-card__title">{t('payroll.runTitle')}</h3>
-          <p className="run-card__sub">{t('payroll.runSub')}</p>
-          <div className="run-card__meta">
-            <div><span className="run-card__meta-label">{t('payroll.kpiEmployees')}</span><span className="run-card__meta-val tnum">{payrollKpis.employees}</span></div>
-            <div><span className="run-card__meta-label">{t('payroll.kpiNet')}</span><span className="run-card__meta-val tnum">{cur(payrollKpis.net, { compact: true })}</span></div>
-          </div>
-          <button className={`btn ${run ? 'btn--ghost' : 'btn--brand'}`} style={{ width: '100%', marginTop: 18 }} onClick={() => setRun(true)} disabled={run}>
-            {run ? <><CheckCircle2 size={16} /> SGK ✓</> : <><Play size={15} /> {t('payroll.runButton')}</>}
-          </button>
+
+          {employees.length ? (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>{t('payroll.colName')}</th>
+                  <th>{t('payroll.colRole')}</th>
+                  <th className="num">{t('payroll.colGross')}</th>
+                  <th className="num">{t('payroll.colDeductions')}</th>
+                  <th className="num">{t('payroll.colNet')}</th>
+                  <th className="num">{lang === 'en' ? 'Leave' : 'İzin'}</th>
+                  <th style={{ textAlign: 'right' }}>{t('common.action')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ employee, slip }) => (
+                  <tr key={employee.id}>
+                    <td className="strong">
+                      {employee.name}
+                      <div style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>
+                        {employee.startDate ? formatDate(employee.startDate, lang) : ''}
+                      </div>
+                    </td>
+                    <td>{employee.role || '—'}</td>
+                    <td className="num tnum">{cur(employee.grossSalary)}</td>
+                    <td className="num tnum" style={{ color: 'var(--neg)' }}>
+                      {slip ? `−${cur(slip.total_deductions)}` : '—'}
+                    </td>
+                    <td className="num tnum strong">{slip ? cur(slip.net_salary) : '—'}</td>
+                    <td className="num tnum">{slip ? `${slip.annual_leave_days} ${lang === 'en' ? 'd' : 'gün'}` : '—'}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          className="icon-btn icon-btn--danger"
+                          onClick={() => handleDelete(employee)}
+                          disabled={busyId === employee.id}
+                          title={t('common.delete')}
+                        >
+                          <Trash2 size={14} strokeWidth={2.2} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="chart-empty" style={{ height: 180 }}>{t('common.none')}</div>
+          )}
         </motion.section>
 
-        {/* Cost breakdown */}
-        <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+        <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.1 }}>
           <div className="panel-head">
             <div>
               <div className="panel-title">{t('payroll.breakdownTitle')}</div>
               <div className="panel-sub">{t('payroll.breakdownSub')}</div>
             </div>
           </div>
-          <div className="pay-breakdown">
-            <DonutChart data={donut} centerLabel={t('payroll.kpiGross')} formatValue={(v) => cur(v, { compact: true })} size={184} />
-            <div className="legend" style={{ flex: 1 }}>
-              {donut.map((d) => (
-                <div className="legend__row" key={d.key}>
-                  <span className="legend__left"><span className="legend__swatch" style={{ background: d.color }} />{d.label}</span>
-                  <span className="legend__val">{cur(d.value)}</span>
+          {costSplit.length ? (
+            <>
+              <DonutChart
+                data={costSplit}
+                centerLabel={lang === 'en' ? 'Employer cost' : 'İşveren maliyeti'}
+                formatValue={compact}
+              />
+              <div className="legend" style={{ marginTop: 22 }}>
+                {costSplit.map((d) => (
+                  <div className="legend__row" key={d.key}>
+                    <span className="legend__left">
+                      <span className="legend__swatch" style={{ background: d.color }} />
+                      {d.label}
+                    </span>
+                    <span className="legend__val">{cur(d.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="chart-empty" style={{ height: 220 }}>{t('common.offline')}</div>
+          )}
+        </motion.section>
+
+        {payroll?.payslips?.length > 0 && (
+          <motion.section className="panel dash-forecast" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.16 }}>
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">{lang === 'en' ? 'Severance provision' : 'Kıdem tazminatı karşılığı'}</div>
+                <div className="panel-sub">
+                  {lang === 'en'
+                    ? 'Accrued liability if every contract ended today'
+                    : 'Tüm sözleşmeler bugün sona erseydi doğacak yükümlülük'}
+                </div>
+              </div>
+              <strong className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 22 }}>
+                {cur(payroll.payslips.reduce((s, p) => s + p.severance_estimate, 0))}
+              </strong>
+            </div>
+            <div className="legend">
+              {payroll.payslips.map((p) => (
+                <div className="legend__row" key={p.name}>
+                  <span className="legend__left">
+                    {p.name}
+                    <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>
+                      · {p.tenure_years.toFixed(1)} {lang === 'en' ? 'yrs' : 'yıl'}
+                    </span>
+                  </span>
+                  <span className="legend__val">{cur(p.severance_estimate)}</span>
                 </div>
               ))}
             </div>
-          </div>
-        </motion.section>
+          </motion.section>
+        )}
       </div>
 
-      {/* Employee table */}
-      <section className="panel" style={{ marginTop: 18, padding: '22px 0 8px' }}>
-        <div className="panel-head" style={{ padding: '0 22px' }}>
-          <div className="panel-title">{t('payroll.tableTitle')}</div>
-          <button className="btn btn--ghost btn--sm">{t('common.export')}</button>
+      {modal && (
+        <EmployeeModal
+          employee={modal}
+          onClose={() => setModal(null)}
+          onSave={async (data) => {
+            await addItem(companyId, COLLECTIONS.employees, data)
+            setModal(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function EmployeeModal({ employee, onClose, onSave }) {
+  const { t, lang } = useLang()
+  const [form, setForm] = useState(employee)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!form.name.trim()) {
+      setError(t('auth.required'))
+      return
+    }
+    setBusy(true)
+    try {
+      await onSave({
+        ...form,
+        name: form.name.trim(),
+        role: form.role.trim(),
+        grossSalary: Number(form.grossSalary) || 0,
+      })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <motion.div className="modal" initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25 }}>
+        <div className="modal__head">
+          <div className="modal__title">{lang === 'en' ? 'Add employee' : 'Çalışan ekle'}</div>
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
+            <X size={16} strokeWidth={2.2} />
+          </button>
         </div>
-        <div style={{ padding: '0 6px' }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>{t('payroll.colName')}</th>
-                <th>{t('payroll.colRole')}</th>
-                <th className="num">{t('payroll.colGross')}</th>
-                <th className="num">{t('payroll.colDeductions')}</th>
-                <th className="num">{t('payroll.colNet')}</th>
-                <th>{t('payroll.colStatus')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((e) => (
-                <tr key={e.name}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span className="emp-av">{e.name.split(' ').map((n) => n[0]).join('')}</span>
-                      <span className="strong">{e.name}</span>
-                    </div>
-                  </td>
-                  <td>{lang === 'en' ? e.roleEn : e.role}</td>
-                  <td className="num">{cur(e.gross)}</td>
-                  <td className="num" style={{ color: 'var(--neg)' }}>−{cur(e.deductions)}</td>
-                  <td className="num strong">{cur(e.net)}</td>
-                  <td><Badge tone={run || e.status === 'paid' ? 'green' : 'amber'}>{run || e.status === 'paid' ? t('payroll.stPaid') : t('payroll.stPending')}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <form onSubmit={submit}>
+          <div className="modal__body">
+            <div className="field-row">
+              <label className="field">
+                <span className="field__label">{t('payroll.colName')}</span>
+                <span className="field__wrap">
+                  <input value={form.name} onChange={set('name')} required />
+                </span>
+              </label>
+              <label className="field">
+                <span className="field__label">{t('payroll.colRole')}</span>
+                <span className="field__wrap">
+                  <input value={form.role} onChange={set('role')} />
+                </span>
+              </label>
+            </div>
+            <div className="field-row">
+              <label className="field">
+                <span className="field__label">{t('payroll.colGross')}</span>
+                <span className="field__wrap">
+                  <input type="number" min="0" step="100" value={form.grossSalary} onChange={set('grossSalary')} required />
+                  <span style={{ color: 'var(--ink-3)' }}>₺</span>
+                </span>
+              </label>
+              <label className="field">
+                <span className="field__label">{lang === 'en' ? 'Start date' : 'İşe giriş'}</span>
+                <span className="field__wrap">
+                  <input type="date" value={form.startDate} onChange={set('startDate')} />
+                </span>
+              </label>
+            </div>
+            <label className="field">
+              <span className="field__label">SGK No</span>
+              <span className="field__wrap">
+                <input value={form.sgkNo} onChange={set('sgkNo')} inputMode="numeric" />
+              </span>
+            </label>
+            {error && <div className="auth-alert auth-alert--error">{error}</div>}
+          </div>
+          <div className="modal__foot">
+            <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn btn--brand" disabled={busy}>
+              {busy && <Loader2 size={15} className="spin" />}
+              {t('common.save')}
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   )
 }

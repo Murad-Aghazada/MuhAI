@@ -34,8 +34,10 @@ _RULES: list[tuple[str, tuple[str, ...]]] = [
     ("utilities", ("elektrik", "su faturası", "doğalgaz", "dogalgaz", "internet", "telefon", "telekom", "fatura")),
     ("payroll", ("maaş", "bordro", "ücret", "sgk", "personel")),
     ("tax_payments", ("vergi", "kdv", "muhtasar", "gib", "stopaj")),
-    ("software", ("yazılım", "software", "lisans", "abonelik", "saas", "microsoft", "google", "adobe", "hosting")),
+    # Spend *intent* is checked before vendor brands: "Google reklam" is
+    # marketing, not software, even though "google" is a software keyword (F12).
     ("marketing", ("reklam", "pazarlama", "marketing", "ilan", "sosyal medya", "ads")),
+    ("software", ("yazılım", "software", "lisans", "abonelik", "saas", "microsoft", "google", "adobe", "hosting")),
     ("shipping", ("kargo", "nakliye", "gönderi", "shipping", "aras", "yurtiçi", "mng", "ptt")),
     ("travel", ("uçak", "otel", "konaklama", "bilet", "seyahat", "thy", "pegasus", "taksi")),
     ("bank_fees", ("banka", "komisyon", "havale", "eft", "masraf", "bsmv")),
@@ -47,10 +49,32 @@ _RULES: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+# Turkish letters that OCR routinely strips to their ASCII base. Matching is
+# done on the folded form of both sides so "bakim" still hits "bakım" (F9).
+_FOLD = str.maketrans(
+    {
+        "ı": "i", "İ": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g",
+        "ü": "u", "Ü": "u", "ö": "o", "Ö": "o", "ç": "c", "Ç": "c",
+        "â": "a", "î": "i", "û": "u",
+    }
+)
+
+
+def _fold(text: str) -> str:
+    """Lowercase and strip Turkish diacritics for diacritic-insensitive matching."""
+    return text.lower().translate(_FOLD)
+
+
+# Pre-folded keyword table so folding happens once at import, not per call.
+_FOLDED_RULES: list[tuple[str, tuple[str, ...]]] = [
+    (category, tuple(_fold(k) for k in keywords)) for category, keywords in _RULES
+]
+
+
 def classify_expense(description: str | None, vendor: str | None = None) -> str:
     """Rule-based classification. Returns a category key (never raises)."""
-    text = f"{vendor or ''} {description or ''}".lower()
-    for category, keywords in _RULES:
+    text = _fold(f"{vendor or ''} {description or ''}")
+    for category, keywords in _FOLDED_RULES:
         if any(k in text for k in keywords):
             return category
     return "other"

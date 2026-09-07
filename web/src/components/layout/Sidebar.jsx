@@ -1,18 +1,11 @@
 import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, ReceiptText, Landmark, Boxes, Users, Sparkles, X } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Landmark, Boxes, Users, Sparkles, Settings, X } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
+import { useData } from '../../context/DataContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 
-const MAIN = [
-  { to: '/app', id: 'dashboard', icon: LayoutDashboard, end: true },
-  { to: '/app/invoices', id: 'invoices', icon: ReceiptText, badge: 23 },
-  { to: '/app/tax', id: 'tax', icon: Landmark },
-  { to: '/app/inventory', id: 'inventory', icon: Boxes },
-  { to: '/app/payroll', id: 'payroll', icon: Users },
-]
-const AI = [{ to: '/app/assistant', id: 'assistant', icon: Sparkles, badgeText: 'AI' }]
-
-function Item({ to, end, icon: Icon, label, badge, badgeText, onClick }) {
+function Item({ to, end, icon: Icon, label, badge, onClick }) {
   return (
     <NavLink to={to} end={end} onClick={onClick} className={({ isActive }) => `nav-item ${isActive ? 'nav-item--active' : ''}`}>
       {({ isActive }) => (
@@ -22,8 +15,7 @@ function Item({ to, end, icon: Icon, label, badge, badgeText, onClick }) {
             <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
           </span>
           <span className="nav-item__text">{label}</span>
-          {badge != null && <span className="nav-item__badge">{badge}</span>}
-          {badgeText && <span className="nav-item__badge">{badgeText}</span>}
+          {badge ? <span className="nav-item__badge">{badge}</span> : null}
         </>
       )}
     </NavLink>
@@ -32,6 +24,21 @@ function Item({ to, end, icon: Icon, label, badge, badgeText, onClick }) {
 
 export default function Sidebar({ open, onClose }) {
   const { t } = useLang()
+  const { company } = useAuth()
+  const { invoices, products, score } = useData()
+
+  // Badges count real, actionable things — unpaid invoices and low stock.
+  const unpaid = invoices.filter((i) => i.status !== 'paid').length
+  const lowStock = products.filter((p) => (p.stock ?? 0) <= (p.minStock ?? 0)).length
+
+  const MAIN = [
+    { to: '/app', id: 'dashboard', icon: LayoutDashboard, end: true },
+    { to: '/app/invoices', id: 'invoices', icon: ReceiptText, badge: unpaid || null },
+    { to: '/app/tax', id: 'tax', icon: Landmark },
+    { to: '/app/inventory', id: 'inventory', icon: Boxes, badge: lowStock || null },
+    { to: '/app/payroll', id: 'payroll', icon: Users },
+  ]
+
   return (
     <>
       {open && <div className="sidebar-scrim" onClick={onClose} />}
@@ -60,16 +67,20 @@ export default function Sidebar({ open, onClose }) {
             <Item key={it.to} {...it} label={t(`nav.${it.id}`)} onClick={onClose} />
           ))}
           <div className="sidebar__group-label">{t('nav.groupAi')}</div>
-          {AI.map((it) => (
-            <Item key={it.to} {...it} label={t(`nav.${it.id}`)} onClick={onClose} />
-          ))}
+          <Item to="/app/assistant" icon={Sparkles} label={t('nav.assistant')} badge="AI" onClick={onClose} />
+          <Item to="/app/settings" icon={Settings} label={t('nav.settings')} onClick={onClose} />
         </nav>
 
         <div className="sidebar__foot">
-          <div className="sidebar__upsell">
-            <h4>Muhai Pro</h4>
-            <p>{t('landing.ctaSub')}</p>
-            <button>{t('landing.ctaPrimary')}</button>
+          <div className="sidebar__company">
+            <div className="sidebar__company-name">{company?.name || '—'}</div>
+            {company?.taxId && <div className="sidebar__company-meta mono">VKN {company.taxId}</div>}
+            {score && (
+              <div className={`sidebar__score sidebar__score--${score.rating}`}>
+                <span>Muhai Score</span>
+                <strong className="tnum">{score.total_score}</strong>
+              </div>
+            )}
           </div>
         </div>
       </aside>

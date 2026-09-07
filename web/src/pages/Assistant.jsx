@@ -1,12 +1,14 @@
 import { motion } from 'framer-motion'
 import { Sparkles, Database, Trash2, ArrowRight } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
+import { useData } from '../context/DataContext.jsx'
 import { useChat } from '../components/chatbot/useChat.js'
 import ChatMessages from '../components/chatbot/ChatMessages.jsx'
 import ChatComposer from '../components/chatbot/ChatComposer.jsx'
 
 export default function Assistant() {
   const { t } = useLang()
+  const { apiOnline } = useData()
   const { messages, loading, send, clear } = useChat()
 
   const suggestions = ['assistant.suggest1', 'assistant.suggest2', 'assistant.suggest3', 'assistant.suggest4']
@@ -22,7 +24,9 @@ export default function Assistant() {
           <p className="page-sub">{t('assistant.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span className="rag-badge"><Database size={13} strokeWidth={2.3} /> {t('assistant.ragOn')}</span>
+          <span className="rag-badge">
+            <Database size={13} strokeWidth={2.3} /> {apiOnline ? t('assistant.ragOn') : t('assistant.ragOffline')}
+          </span>
           {messages.length > 0 && (
             <button className="btn btn--ghost btn--sm" onClick={clear}><Trash2 size={15} /> {t('assistant.clear')}</button>
           )}

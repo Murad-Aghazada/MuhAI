@@ -45,19 +45,20 @@ def test_result_is_always_a_known_category():
     assert classify_expense("rastgele metin") in CATEGORIES
 
 
-# ── Documented behaviour discovered by these tests ─────────────────────
-def test_rule_order_means_vendor_brand_can_win_over_intent():
-    """Known behaviour: _RULES is first-match-wins and `software` is checked
-    before `marketing`, so a Google *ad* spend classifies as software because
-    "google" is a software keyword. Recorded so a future reorder is deliberate.
+# ── Fixed behaviour (was F12 / F9) ─────────────────────────────────────
+def test_spend_intent_beats_vendor_brand():
+    """`marketing` is checked before `software`, so an ad spend on a software
+    vendor classifies by what the money was for, not who took it (F12).
     """
-    assert classify_expense("Google reklam harcamasi") == "software"
+    assert classify_expense("Google reklam harcamasi") == "marketing"
+    assert classify_expense("Google Workspace lisans") == "software"
 
 
-def test_classifier_is_diacritic_sensitive():
-    """Known limitation: keywords carry Turkish diacritics, so OCR text that has
-    lost them ("bakim" for "bakım") falls through to `other`. Relevant because
-    OCR output frequently drops diacritics.
+def test_classifier_is_diacritic_insensitive():
+    """OCR frequently drops Turkish diacritics; both spellings must land in the
+    same category (F9). Matching folds ı/ş/ğ/ü/ö/ç on both sides.
     """
     assert classify_expense("Klima bakım ve onarım") == "maintenance"
-    assert classify_expense("Klima bakim ve onarim") == "other"
+    assert classify_expense("Klima bakim ve onarim") == "maintenance"
+    assert classify_expense("AKARYAKIT ALIMI") == "fuel"
+    assert classify_expense("Ofis kirtasiye") == "office_supplies"

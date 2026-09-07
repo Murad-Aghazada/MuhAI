@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { useReveal } from '../../lib/useReveal.js'
 
 /**
  * Grouped/animated bar chart. Bars grow from the baseline with a
@@ -14,8 +15,7 @@ export default function BarChart({
   formatValue = (v) => v,
   seriesNames = [],
 }) {
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-60px' })
+  const [ref, inView] = useReveal({ once: true, margin: '-60px' })
   const [hover, setHover] = useState(null)
 
   const max = Math.max(...data.flatMap((d) => keys.map((k) => d[k]))) * 1.1

@@ -1,301 +1,440 @@
-import { useState, useRef, useCallback } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ReceiptText, Clock, CheckCircle2, ScanLine, UploadCloud, FileText, Sparkles, AlertCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileText,
+  Loader2,
+  Pencil,
+  Plus,
+  ScanLine,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
+import { useData } from '../context/DataContext.jsx'
 import { formatCurrency, formatDate } from '../lib/format.js'
-import { allInvoices, invoiceKpis, ocrSample } from '../data/mockData.js'
+import { COLLECTIONS, markInvoicePaid, removeItem, saveInvoiceWithLedger, updateItem } from '../lib/db.js'
+import { scanInvoice } from '../lib/api.js'
 import { runOcr } from '../lib/ocr.js'
-import StatCard from '../components/ui/StatCard.jsx'
+import { isOverdue } from '../lib/analytics.js'
+import { splitVat } from '../lib/seed.js'
 import Badge from '../components/ui/Badge.jsx'
+import InvoiceModal from '../components/invoices/InvoiceModal.jsx'
+import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
 const STATUS_TONE = { paid: 'green', pending: 'amber', overdue: 'red' }
+const CONFIDENCE_THRESHOLD = 0.7
+
+const emptyInvoice = () => {
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    number: '',
+    vendor: '',
+    taxId: '',
+    direction: 'purchase',
+    issueDate: today,
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    paidDate: null,
+    amount: 0,
+    netAmount: 0,
+    vatAmount: 0,
+    vatRate: 0.2,
+    status: 'pending',
+    category: 'other',
+    source: 'manual',
+    ocrConfidence: null,
+    needsReview: false,
+    currency: 'TRY',
+  }
+}
 
 export default function Invoices() {
   const { t, lang } = useLang()
-  const cur = (v) => (v == null ? '—' : formatCurrency(v, lang, { decimals: Number.isInteger(v) ? 0 : 2 }))
+  const { companyId, invoices, loading } = useData()
+  const cur = (v) => formatCurrency(v, lang)
 
-  const [phase, setPhase] = useState('idle') // idle | scanning | done
-  const [source, setSource] = useState(null) // 'demo' | 'file'
-  const [imageUrl, setImageUrl] = useState(null)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
-  const [dragging, setDragging] = useState(false)
   const fileRef = useRef(null)
-  const timers = useRef([])
+  const [filter, setFilter] = useState('all')
+  const [query, setQuery] = useState('')
+  const [modal, setModal] = useState(null) // { invoice, mode, ocr }
+  const [scanning, setScanning] = useState(false)
+  const [scanMode, setScanMode] = useState('server')
+  const [progress, setProgress] = useState(0)
+  const [flash, setFlash] = useState(null)
+  const [busyId, setBusyId] = useState(null)
 
-  const reset = () => {
-    timers.current.forEach(clearTimeout)
-    setError(null)
+  const reviewCount = invoices.filter((i) => i.needsReview).length
+
+  const stats = useMemo(() => {
+    const paid = invoices.filter((i) => i.status === 'paid')
+    const pending = invoices.filter((i) => i.status !== 'paid')
+    const scanned = invoices.filter((i) => i.ocrConfidence != null)
+    const avgConfidence = scanned.length
+      ? (scanned.reduce((s, i) => s + i.ocrConfidence, 0) / scanned.length) * 100
+      : null
+    return {
+      total: invoices.length,
+      pending: pending.length,
+      pendingValue: pending.reduce((s, i) => s + (Number(i.amount) || 0), 0),
+      paid: paid.length,
+      paidValue: paid.reduce((s, i) => s + (Number(i.amount) || 0), 0),
+      avgConfidence,
+    }
+  }, [invoices])
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return invoices
+      .filter((i) => {
+        if (filter === 'review') return Boolean(i.needsReview)
+        if (filter !== 'all') {
+          const status = isOverdue(i) ? 'overdue' : i.status
+          if (status !== filter) return false
+        }
+        if (!q) return true
+        return `${i.vendor} ${i.number}`.toLowerCase().includes(q)
+      })
+      .sort((a, b) => String(b.issueDate).localeCompare(String(a.issueDate)))
+  }, [invoices, filter, query])
+
+  function notify(message, tone = 'ok') {
+    setFlash({ message, tone })
+    setTimeout(() => setFlash(null), 4000)
   }
 
-  // --- Real OCR on an uploaded image ---
-  const handleFile = useCallback(
-    async (file) => {
-      if (!file || !file.type.startsWith('image/')) return
-      reset()
-      const url = URL.createObjectURL(file)
-      setSource('file')
-      setImageUrl(url)
-      setResult(null)
-      setProgress(0)
-      setPhase('scanning')
-      try {
-        const { fields, confidence, text } = await runOcr(file, (p) => setProgress(Math.round(p * 100)))
-        setResult({ ...fields, confidence, rawText: text, lineItems: null })
-        setPhase('done')
-      } catch (e) {
-        console.error('[muhai] OCR failed', e)
-        setError(t('invoices.ocrError'))
-        setPhase('idle')
+  // ── OCR ─────────────────────────────────────────────────────────────
+  async function handleFile(file) {
+    if (!file) return
+    setScanning(true)
+    setProgress(0)
+    try {
+      const draft = emptyInvoice()
+
+      if (scanMode === 'server') {
+        const res = await scanInvoice(file)
+        const value = (f) => res[f]?.value ?? null
+        const conf = (f) => res[f]?.confidence ?? 0
+
+        const total = Number(value('total_amount')) || 0
+        const vat = Number(value('vat_amount')) || splitVat(total).vat
+
+        Object.assign(draft, {
+          vendor: value('vendor_name') || '',
+          number: value('invoice_number') || '',
+          issueDate: value('date') || draft.issueDate,
+          amount: total,
+          vatAmount: vat,
+          netAmount: Math.max(total - vat, 0),
+          source: 'ocr',
+          ocrConfidence: Math.min(
+            conf('vendor_name'),
+            conf('invoice_number'),
+            conf('total_amount'),
+          ),
+          needsReview: res.needs_review,
+          rawText: res.raw_text || '',
+          fieldConfidence: {
+            vendor: conf('vendor_name'),
+            number: conf('invoice_number'),
+            date: conf('date'),
+            amount: conf('total_amount'),
+            vat: conf('vat_amount'),
+          },
+        })
+      } else {
+        const res = await runOcr(file, setProgress)
+        const total = res.fields.total || 0
+        const vat = res.fields.vat ?? splitVat(total).vat
+        const confidence = res.confidence / 100
+        Object.assign(draft, {
+          vendor: res.fields.vendor === '—' ? '' : res.fields.vendor,
+          number: res.fields.invoiceNo === '—' ? '' : res.fields.invoiceNo,
+          taxId: res.fields.taxId === '—' ? '' : res.fields.taxId,
+          amount: total,
+          vatAmount: vat,
+          netAmount: res.fields.subtotal ?? Math.max(total - vat, 0),
+          source: 'ocr-browser',
+          ocrConfidence: confidence,
+          needsReview: confidence < CONFIDENCE_THRESHOLD || !total,
+          rawText: res.text,
+          fieldConfidence: null,
+        })
       }
-    },
-    [t],
-  )
 
-  // --- Simulated demo (no image handy) ---
-  const runDemo = () => {
-    reset()
-    setSource('demo')
-    setImageUrl(null)
-    setResult(null)
-    setPhase('scanning')
-    timers.current = [
-      setTimeout(() => setProgress(60), 900),
-      setTimeout(() => {
-        setResult({ ...ocrSample, rawText: null })
-        setPhase('done')
-      }, 2600),
-    ]
+      setModal({ invoice: draft, mode: 'create' })
+      notify(t('invoices.ocrDone'))
+    } catch (err) {
+      console.error('[muhai] OCR failed', err)
+      notify(err.message || t('invoices.ocrError'), 'error')
+    } finally {
+      setScanning(false)
+      setProgress(0)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
-  const onDrop = (e) => {
-    e.preventDefault()
-    setDragging(false)
-    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0])
+  // ── Persistence ─────────────────────────────────────────────────────
+  async function handleSave(invoice, mode) {
+    if (mode === 'create') {
+      await saveInvoiceWithLedger(companyId, invoice)
+    } else {
+      const { id, ...patch } = invoice
+      await updateItem(companyId, COLLECTIONS.invoices, id, patch)
+    }
+    setModal(null)
+    notify(t('invoices.saved'))
   }
 
-  const stats = [
-    { icon: ReceiptText, label: t('invoices.kpiTotal'), value: invoiceKpis.total, format: (v) => Math.round(v).toString() },
-    { icon: Clock, label: t('invoices.kpiPending'), value: invoiceKpis.pending, format: (v) => Math.round(v).toString(), sparkColor: 'var(--c-amber)' },
-    { icon: CheckCircle2, label: t('invoices.kpiPaid'), value: invoiceKpis.paid, format: (v) => Math.round(v).toString() },
-    { icon: ScanLine, label: t('invoices.kpiOcr'), value: invoiceKpis.ocr, format: (v) => `${v.toFixed(1)}%` },
-  ]
+  async function handleDelete(invoice) {
+    if (!window.confirm(t('invoices.deleteConfirm'))) return
+    setBusyId(invoice.id)
+    try {
+      await removeItem(companyId, COLLECTIONS.invoices, invoice.id)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
-  const scanning = phase === 'scanning'
+  async function handleMarkPaid(invoice) {
+    setBusyId(invoice.id)
+    try {
+      await markInvoicePaid(companyId, invoice)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function exportCsv() {
+    const header = ['number', 'vendor', 'direction', 'issueDate', 'dueDate', 'net', 'vat', 'amount', 'status']
+    const rows = visible.map((i) =>
+      [i.number, i.vendor, i.direction, i.issueDate, i.dueDate, i.netAmount, i.vatAmount, i.amount, i.status]
+        .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
+        .join(','),
+    )
+    const blob = new Blob(['﻿' + [header.join(','), ...rows].join('\n')], {
+      type: 'text/csv;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `muhai-faturalar-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  if (loading) return <PageSkeleton />
 
   return (
     <div className="page">
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
-
       <div className="page-head page-head-row">
         <div>
-          <span className="eyebrow">{t('nav.groupMain')}</span>
-          <h1 className="page-title" style={{ marginTop: 8 }}>{t('invoices.title')}</h1>
+          <h1 className="page-title">{t('invoices.title')}</h1>
           <p className="page-sub">{t('invoices.subtitle')}</p>
         </div>
-        <button className="btn btn--brand btn--sm" onClick={() => fileRef.current?.click()}>
-          <UploadCloud size={16} /> {t('invoices.upload')}
-        </button>
-      </div>
-
-      <div className="kpi-grid">
-        {stats.map((s, i) => (
-          <StatCard key={s.label} {...s} index={i} />
-        ))}
-      </div>
-
-      {/* OCR scanner */}
-      <div className="ocr-grid">
-        <section className="panel ocr-stage">
-          <div className="panel-head">
-            <div>
-              <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ScanLine size={18} color="var(--brand-deep)" /> {t('invoices.scanTitle')}
-              </div>
-              <div className="panel-sub">{t('invoices.scanSub')}</div>
-            </div>
-            <Badge tone="green">Tesseract 5.0 · CNN</Badge>
-          </div>
-
-          <div
-            className={`ocr-dropzone ${scanning || dragging ? 'ocr-dropzone--active' : ''}`}
-            onClick={phase === 'idle' ? () => fileRef.current?.click() : undefined}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-          >
-            {imageUrl ? (
-              /* real uploaded invoice */
-              <div className="ocr-doc ocr-doc--image">
-                <img src={imageUrl} alt="invoice" />
-                {scanning && <motion.div className="ocr-scanline" animate={{ top: ['2%', '96%', '2%'] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }} />}
-                {phase === 'done' && <div className="ocr-doc__check"><CheckCircle2 size={26} /></div>}
-              </div>
-            ) : (
-              /* faux invoice (demo / idle) */
-              <div className="ocr-doc">
-                <div className="ocr-doc__head">
-                  <div className="ocr-doc__logo" />
-                  <div className="ocr-doc__lines"><span style={{ width: '70%' }} /><span style={{ width: '45%' }} /></div>
-                </div>
-                {[88, 72, 80, 60, 76].map((w, i) => (
-                  <div className="ocr-doc__row" key={i}><span style={{ width: `${w}%` }} /><span style={{ width: '18%' }} /></div>
-                ))}
-                <div className="ocr-doc__total"><span style={{ width: '30%' }} /><span style={{ width: '22%' }} /></div>
-                {scanning && source === 'demo' && <motion.div className="ocr-scanline" animate={{ top: ['4%', '94%', '4%'] }} transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }} />}
-              </div>
-            )}
-
-            <div className="ocr-hint">
-              {phase === 'idle' && !error && (
-                <>
-                  <UploadCloud size={22} />
-                  <span>{t('invoices.dropHere')}</span>
-                  <small>{t('invoices.dropOr')}</small>
-                </>
-              )}
-              {phase === 'idle' && error && (
-                <span className="ocr-status" style={{ color: 'var(--neg)' }}><AlertCircle size={18} /> {error}</span>
-              )}
-              {scanning && (
-                <div style={{ width: '100%', textAlign: 'center' }}>
-                  <span className="ocr-status">
-                    <span className="ocr-spinner" />
-                    {source === 'file'
-                      ? progress > 0
-                        ? `${t('invoices.recognizing')} · %${progress}`
-                        : t('invoices.preparing')
-                      : progress > 0
-                        ? t('invoices.detecting')
-                        : t('invoices.scanning')}
-                  </span>
-                  {source === 'file' && (
-                    <div className="ocr-progress"><motion.div className="ocr-progress__bar" animate={{ width: `${Math.max(progress, 6)}%` }} transition={{ ease: 'linear' }} /></div>
-                  )}
-                </div>
-              )}
-              {phase === 'done' && <span className="ocr-status ocr-status--done"><CheckCircle2 size={18} /> {t('invoices.extracted')}</span>}
-            </div>
-          </div>
-
-          {phase === 'idle' && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button className="btn btn--primary" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
-                <UploadCloud size={16} /> {t('invoices.upload')}
-              </button>
-              <button className="btn btn--ghost" style={{ flex: 1 }} onClick={runDemo}>
-                <ScanLine size={16} /> {t('invoices.runDemo')}
-              </button>
-            </div>
-          )}
-        </section>
-
-        {/* Extracted result */}
-        <section className="panel">
-          <div className="panel-head">
-            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Sparkles size={17} color="var(--brand-deep)" /> {t('invoices.extracted')}
-            </div>
-            {phase === 'done' && result && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                {source === 'file' && <Badge tone="sky">{t('invoices.realBadge')}</Badge>}
-                <Badge tone="green">{t('invoices.confidence')} {result.confidence}%</Badge>
-              </div>
-            )}
-          </div>
-
-          {phase !== 'done' || !result ? (
-              <div className="ocr-empty">
-                <FileText size={30} strokeWidth={1.6} />
-                <p>{lang === 'en' ? 'Extracted fields will appear here after scanning.' : 'Taranan alanlar burada görünecek.'}</p>
-              </div>
-            ) : (
-              <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <div className="ocr-fields">
-                  <Field label={t('invoices.vendor')} value={result.vendor} delay={0} />
-                  <Field label={t('invoices.invoiceNo')} value={result.invoiceNo} mono delay={0.05} />
-                  <Field label={t('invoices.taxId')} value={result.taxId} mono delay={0.1} />
-                </div>
-
-                {result.lineItems && (
-                  <div className="ocr-items">
-                    {result.lineItems.map((li, i) => (
-                      <motion.div className="ocr-item" key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.07 }}>
-                        <span>{li.name}</span>
-                        <span className="mono muted">×{li.qty}</span>
-                        <span className="mono strong">{cur(li.total)}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="ocr-summary">
-                  <Row label={t('invoices.subtotal')} value={cur(result.subtotal)} />
-                  <Row label={t('invoices.vat')} value={cur(result.vat)} />
-                  <Row label={t('invoices.total')} value={cur(result.total)} total />
-                </div>
-
-                {result.rawText && (
-                  <details className="ocr-rawtext">
-                    <summary>{t('invoices.rawText')}</summary>
-                    <pre>{result.rawText.trim()}</pre>
-                  </details>
-                )}
-              </motion.div>
-            )}
-        </section>
-      </div>
-
-      {/* Table */}
-      <section className="panel" style={{ marginTop: 18, padding: '22px 0 8px' }}>
-        <div className="panel-head" style={{ padding: '0 22px' }}>
-          <div className="panel-title">{t('invoices.tableTitle')}</div>
-          <button className="btn btn--ghost btn--sm">{t('common.filter')}</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn--ghost btn--sm" onClick={exportCsv} disabled={!visible.length}>
+            <Download size={14} strokeWidth={2.4} /> {t('invoices.exportCsv')}
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setModal({ invoice: emptyInvoice(), mode: 'create' })}>
+            <Plus size={14} strokeWidth={2.6} /> {t('invoices.addManual')}
+          </button>
+          <button className="btn btn--brand btn--sm" onClick={() => fileRef.current?.click()} disabled={scanning}>
+            {scanning ? <Loader2 size={14} className="spin" /> : <Upload size={14} strokeWidth={2.4} />}
+            {scanning ? t('invoices.scanning') : t('invoices.upload')}
+          </button>
         </div>
-        <div style={{ padding: '0 6px' }}>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,.pdf"
+        hidden
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+
+      {flash && (
+        <motion.div
+          className={`notice notice--${flash.tone === 'error' ? 'error' : 'info'}`}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ marginBottom: 16 }}
+        >
+          {flash.message}
+        </motion.div>
+      )}
+
+      {reviewCount > 0 && (
+        <div className="review-banner">
+          <AlertTriangle size={18} strokeWidth={2.2} />
+          <span>
+            <strong>{t('invoices.reviewTitle')}</strong> — {reviewCount} {t('invoices.reviewBody')}
+          </span>
+          <span className="review-banner__spacer" />
+          <button className="btn btn--ghost btn--sm" onClick={() => setFilter('review')}>
+            {t('invoices.reviewOpen')}
+          </button>
+        </div>
+      )}
+
+      <div className="mini-stats" style={{ marginBottom: 20 }}>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('invoices.kpiTotal')}</div>
+          <div className="mini-stats__value tnum">{stats.total}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('invoices.kpiPending')}</div>
+          <div className="mini-stats__value tnum">{cur(stats.pendingValue)}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('invoices.kpiPaid')}</div>
+          <div className="mini-stats__value tnum mini-stats__value--pos">{cur(stats.paidValue)}</div>
+        </div>
+        <div className="mini-stats__item">
+          <div className="mini-stats__label">{t('invoices.kpiOcr')}</div>
+          <div className="mini-stats__value tnum">
+            {stats.avgConfidence != null ? `%${stats.avgConfidence.toFixed(1)}` : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <div className="seg">
+          {['all', 'pending', 'paid', 'overdue', 'review'].map((k) => (
+            <button key={k} className={filter === k ? 'is-active' : ''} onClick={() => setFilter(k)}>
+              {k === 'all'
+                ? t('invoices.filterAll')
+                : k === 'review'
+                  ? t('invoices.needsReview')
+                  : t(`invoices.st${k[0].toUpperCase()}${k.slice(1)}`)}
+            </button>
+          ))}
+        </div>
+        <label className="search-inline">
+          <Search size={15} strokeWidth={2.2} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('invoices.searchPlaceholder')} />
+        </label>
+        <span className="toolbar__spacer" />
+        <div className="seg">
+          <button className={scanMode === 'server' ? 'is-active' : ''} onClick={() => setScanMode('server')} title={t('invoices.scanServer')}>
+            <ScanLine size={13} strokeWidth={2.3} style={{ verticalAlign: -2, marginRight: 5 }} />
+            Tesseract 5
+          </button>
+          <button className={scanMode === 'browser' ? 'is-active' : ''} onClick={() => setScanMode('browser')} title={t('invoices.scanBrowser')}>
+            {lang === 'en' ? 'On-device' : 'Cihaz üstü'}
+          </button>
+        </div>
+      </div>
+
+      {scanning && scanMode === 'browser' && (
+        <div className="notice notice--info" style={{ marginBottom: 16 }}>
+          {t('invoices.recognizing')} — %{Math.round(progress * 100)}
+        </div>
+      )}
+
+      <section className="panel" style={{ paddingLeft: 0, paddingRight: 0 }}>
+        <div className="panel-head" style={{ padding: '0 22px' }}>
+          <div>
+            <div className="panel-title">{t('invoices.tableTitle')}</div>
+            <div className="panel-sub">
+              {visible.length} / {invoices.length}
+            </div>
+          </div>
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="chart-empty" style={{ height: 180, margin: '0 22px' }}>
+            {t('invoices.noInvoices')}
+          </div>
+        ) : (
           <table className="tbl">
             <thead>
               <tr>
-                <th>{t('invoices.colVendor')}</th>
+                <th style={{ paddingLeft: 22 }}>{t('invoices.colVendor')}</th>
                 <th>{t('invoices.colNo')}</th>
                 <th>{t('invoices.colDate')}</th>
+                <th>{t('invoices.colDue')}</th>
+                <th className="num">{t('invoices.vat')}</th>
                 <th className="num">{t('invoices.colAmount')}</th>
                 <th>{t('invoices.colStatus')}</th>
+                <th style={{ paddingRight: 22, textAlign: 'right' }}>{t('common.action')}</th>
               </tr>
             </thead>
             <tbody>
-              {allInvoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="strong">{inv.vendor}</td>
-                  <td className="mono" style={{ fontSize: 12.5 }}>{inv.id}</td>
-                  <td>{formatDate(inv.date, lang)}</td>
-                  <td className="num strong">{formatCurrency(inv.amount, lang)}</td>
-                  <td><Badge tone={STATUS_TONE[inv.status]}>{t(`invoices.st${inv.status[0].toUpperCase() + inv.status.slice(1)}`)}</Badge></td>
-                </tr>
-              ))}
+              {visible.map((inv) => {
+                const status = isOverdue(inv) ? 'overdue' : inv.status
+                return (
+                  <tr key={inv.id}>
+                    <td className="strong" style={{ paddingLeft: 22 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {inv.vendor}
+                        {inv.source?.startsWith('ocr') && (
+                          <span className={`conf ${inv.ocrConfidence >= CONFIDENCE_THRESHOLD ? 'conf--ok' : 'conf--low'}`}>
+                            OCR %{Math.round((inv.ocrConfidence ?? 0) * 100)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="mono" style={{ fontSize: 12.5 }}>{inv.number}</td>
+                    <td>{formatDate(inv.issueDate, lang)}</td>
+                    <td>{inv.dueDate ? formatDate(inv.dueDate, lang) : '—'}</td>
+                    <td className="num tnum">{cur(inv.vatAmount || 0)}</td>
+                    <td className="num strong tnum">{cur(inv.amount)}</td>
+                    <td>
+                      <Badge tone={STATUS_TONE[status]}>
+                        {t(`invoices.st${status[0].toUpperCase()}${status.slice(1)}`)}
+                      </Badge>
+                    </td>
+                    <td style={{ paddingRight: 22 }}>
+                      <div className="row-actions">
+                        {inv.status !== 'paid' && (
+                          <button
+                            className="icon-btn"
+                            title={t('invoices.markPaid')}
+                            onClick={() => handleMarkPaid(inv)}
+                            disabled={busyId === inv.id}
+                          >
+                            <CheckCircle2 size={15} strokeWidth={2.2} />
+                          </button>
+                        )}
+                        <button className="icon-btn" title={t('common.edit')} onClick={() => setModal({ invoice: inv, mode: 'edit' })}>
+                          <Pencil size={14} strokeWidth={2.2} />
+                        </button>
+                        <button
+                          className="icon-btn icon-btn--danger"
+                          title={t('common.delete')}
+                          onClick={() => handleDelete(inv)}
+                          disabled={busyId === inv.id}
+                        >
+                          <Trash2 size={14} strokeWidth={2.2} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
-        </div>
+        )}
       </section>
-    </div>
-  )
-}
 
-function Field({ label, value, mono, delay }) {
-  return (
-    <motion.div className="ocr-field" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
-      <span className="ocr-field__label">{label}</span>
-      <span className={`ocr-field__value ${mono ? 'mono' : ''}`}>{value}</span>
-    </motion.div>
-  )
-}
+      {!invoices.length && (
+        <p className="page-sub" style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FileText size={15} /> {t('invoices.dropOr')}
+        </p>
+      )}
 
-function Row({ label, value, total }) {
-  return (
-    <div className={`ocr-row ${total ? 'ocr-row--total' : ''}`}>
-      <span>{label}</span>
-      <span className="mono">{value}</span>
+      {modal && (
+        <InvoiceModal
+          invoice={modal.invoice}
+          mode={modal.mode}
+          onClose={() => setModal(null)}
+          onSave={handleSave}
+        />
+      )}
     </div>
   )
 }

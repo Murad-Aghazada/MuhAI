@@ -17,6 +17,11 @@ __pycache__/
 .venv/
 venv/
 
+# --- firebase ---
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
 # --- editors / os ---
 .DS_Store
 .vscode/*

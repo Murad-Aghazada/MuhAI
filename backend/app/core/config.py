@@ -32,10 +32,23 @@ class Settings(BaseSettings):
     # AI (Gemini). When empty, the chatbot uses the offline rule backend.
     GEMINI_API_KEY: str = ""
 
+    # ── Firebase ───────────────────────────────────────────────────────
+    # Firestore is the system of record; this API is a stateless compute
+    # layer. Callers authenticate with a Firebase ID token, verified against
+    # this project id. No service-account key is required.
+    FIREBASE_PROJECT_ID: str = ""
+
+    # Set to false only for an offline demo where Google's public signing
+    # certificates are unreachable. Compute endpoints then accept unauthenticated
+    # calls. Never do this on a deployment the jury (or anyone) can reach.
+    FIREBASE_AUTH_REQUIRED: bool = True
+
     # CORS — comma-separated origins. Kept as a plain string so
     # pydantic-settings does not attempt to JSON-decode it; use
     # ``cors_origins`` for the parsed list.
     BACKEND_CORS_ORIGINS: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:4173,http://127.0.0.1:4173,"
         "http://localhost:8081,http://localhost:19006,exp://127.0.0.1:19000"
     )
 
