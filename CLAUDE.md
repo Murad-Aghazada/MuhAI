@@ -84,7 +84,7 @@ Tests (dev deps are deliberately absent from the runtime image, see N11):
 
 ```bash
 docker compose exec backend pip install -r requirements-dev.txt
-docker compose exec backend python -m pytest          # 122 pass
+docker compose exec backend python -m pytest          # 155 pass
 ```
 
 Legacy DB-backed routes (`/api/invoices`, …) need the opt-in profile:
@@ -98,15 +98,17 @@ Environment: `backend/.env` and `web/.env.local`, both git-ignored.
 
 ## 4. Current state
 
-**Backend** — 76 Python files. FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2,
-Celery 5.3, Redis 5. **16 routers, 58 endpoints, 122 tests passing.**
+**Backend** — 78 Python files. FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2,
+Celery 5.3, Redis 5. **16 routers, 58 endpoints, 155 tests passing.**
 
 - `/api/compute/{dashboard,muhai-score,forecast,tax-summary,payroll,classify,ocr,chat}`
   is what the web client uses; auth is a Firebase ID token verified in
   `app/core/firebase_auth.py` against Google's public certs — stdlib only
-- Assistant calls **`gemini-2.5-flash`** over the REST endpoint with stdlib
-  `urllib` (override with `GEMINI_MODEL`), falling back to a deterministic
-  keyword matcher on any error
+- Assistant has two modes. **Online** it calls `gemini-2.5-flash` over the REST
+  endpoint with stdlib `urllib` (override with `GEMINI_MODEL`). **Offline** —
+  on any network, quota or key failure — it answers from a local BM25 knowledge
+  base plus pre-answered questions and returns `source="offline"`, which the
+  chat UI badges. Neither mode needs anything downloaded at runtime (N14)
 - Prophet 1.1.5 forecasting on real data, moving-average fallback under 10
   points and on any Prophet failure
 - Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7.
@@ -131,15 +133,13 @@ sidebar below 1000 px but were not verified (no test account).
 
 ## 5. Open items
 
-1. **Build the offline assistant mode.** Decided design: online, the assistant
-   calls Gemini as it does now. Offline, it serves a **RAG model over a local
-   knowledge base plus pre-answered questions**. Today's offline path is only
-   `RuleChatBackend`, a keyword matcher — that is the gap to close.
-2. **Verify the signed-in screens on a phone viewport.** Landing and auth are
+1. **Verify the signed-in screens on a phone viewport.** Landing and auth are
    confirmed at 375 px; the app shell has a drawer sidebar below 1000 px but
    was never checked with a real account.
-3. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
+2. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
    and `VITE_API_URL`.
+3. Grow the offline knowledge base. 20 passages cover the common ground; add a
+   passage whenever a plausible question falls through to the default reply.
 4. Code-split the bundle — `dist/index-*.js` is 973 kB (266 kB gzipped).
 5. Move server OCR onto the Celery worker so the request returns a job id.
 6. Bank reconciliation and vendor-category learning exist only on the legacy
@@ -153,7 +153,7 @@ sidebar below 1000 px but were not verified (no test account).
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Cloud Firestore | restate |
 | S4 **Docker Compose, 4 services** | 1 by default, 4 under `--profile legacy` | restate |
-| S18 **"13 servis geliştirildi"** | 16 routers / 58 endpoints / 122 tests | understated — pick the number you defend |
+| S18 **"13 servis geliştirildi"** | 16 routers / 58 endpoints / 155 tests | understated — pick the number you defend |
 | S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
 | S3/S16 **GİB / SGK / bank APIs** | Confirm whether `bank_service.py` and the tax routes hit live endpoints or stubs | phrase to match exactly |
 
@@ -200,6 +200,17 @@ threshold with a working review queue).
 - **N11 — `pytest` is not in the runtime image.** Run
   `docker compose exec backend pip install -r requirements-dev.txt` once after
   any `docker compose down` or rebuild.
+- **N14 — The offline assistant's two numbers do different jobs.** In
+  `rag.py`, `Hit.score` is raw BM25 and only orders results; `Hit.ratio` is
+  idf-weighted query coverage in [0, 1] and is the only one safe to threshold,
+  because BM25's magnitude moves with query length. Unknown words must stay in
+  the coverage denominator — excluding them lets a mostly-nonsense question
+  score 1.00 off one incidental term. Thresholds live in `chat_service.py`;
+  re-measure against the corpus before changing them.
+- **N14b — Fold anything you compare against folded text.** `rag.py`'s
+  stopword list was written with Turkish diacritics while `tokenize()` folds
+  first, so none of the diacritic words ever matched and they leaked through as
+  content terms. The list is folded at definition time now. Same trap as F9.
 - **N13 — Browser OCR assets are vendored, not fetched.** `web/public/tessdata`
   holds the worker, both LSTM wasm cores and gzipped `tur`/`eng` traineddata;
   `web/src/lib/ocr.js` passes `workerPath`, `corePath` and `langPath` so
