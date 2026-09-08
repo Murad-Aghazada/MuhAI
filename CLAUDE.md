@@ -109,7 +109,9 @@ Celery 5.3, Redis 5. **16 routers, 58 endpoints, 122 tests passing.**
   keyword matcher on any error
 - Prophet 1.1.5 forecasting on real data, moving-average fallback under 10
   points and on any Prophet failure
-- Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7
+- Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7.
+  The browser-side OCR mode is fully vendored under `web/public/tessdata`, so
+  **neither OCR path needs internet** (see N13)
 - Muhai Score: 8 weighted categories. Tax engine: 2026 KDV / income / corporate
   / stopaj / SGK / stamp rates
 
@@ -129,21 +131,18 @@ sidebar below 1000 px but were not verified (no test account).
 
 ## 5. Open items
 
-1. **Vendor `tur`/`eng` traineddata locally.** `tesseract.js` fetches language
-   data from a CDN at runtime, so the on-device OCR toggle dies without
-   internet. Server-side OCR — the default path — is unaffected.
-2. **Offline demo path.** The assistant genuinely calls Gemini now, so a dead
-   venue network drops it to the keyword fallback. Graceful, but decide whether
-   that is acceptable on stage.
-3. **Exercise the offline fallback** with `GEMINI_API_KEY` empty — never tested.
-4. **Align the deck and speech with the code** — see §6.
-5. **Verify the signed-in screens on a phone viewport.**
-6. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
+1. **Build the offline assistant mode.** Decided design: online, the assistant
+   calls Gemini as it does now. Offline, it serves a **RAG model over a local
+   knowledge base plus pre-answered questions**. Today's offline path is only
+   `RuleChatBackend`, a keyword matcher — that is the gap to close.
+2. **Verify the signed-in screens on a phone viewport.** Landing and auth are
+   confirmed at 375 px; the app shell has a drawer sidebar below 1000 px but
+   was never checked with a real account.
+3. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
    and `VITE_API_URL`.
-7. Code-split the bundle — `dist/index-*.js` is 973 kB (266 kB gzipped);
-   `tesseract.js` is a large part of it.
-8. Move server OCR onto the Celery worker so the request returns a job id.
-9. Bank reconciliation and vendor-category learning exist only on the legacy
+4. Code-split the bundle — `dist/index-*.js` is 973 kB (266 kB gzipped).
+5. Move server OCR onto the Celery worker so the request returns a job id.
+6. Bank reconciliation and vendor-category learning exist only on the legacy
    Postgres routes; no Firestore equivalent yet.
 
 ## 6. TEKNOFEST claims that do not match the code
@@ -155,7 +154,7 @@ sidebar below 1000 px but were not verified (no test account).
 | S2 **PostgreSQL 15 + Redis 7** | Cloud Firestore | restate |
 | S4 **Docker Compose, 4 services** | 1 by default, 4 under `--profile legacy` | restate |
 | S18 **"13 servis geliştirildi"** | 16 routers / 58 endpoints / 122 tests | understated — pick the number you defend |
-| S14 **Expo / React Native shipped** | No native client | restate as responsive web |
+| S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
 | S3/S16 **GİB / SGK / bank APIs** | Confirm whether `bank_service.py` and the tax routes hit live endpoints or stubs | phrase to match exactly |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
@@ -201,6 +200,14 @@ threshold with a working review queue).
 - **N11 — `pytest` is not in the runtime image.** Run
   `docker compose exec backend pip install -r requirements-dev.txt` once after
   any `docker compose down` or rebuild.
+- **N13 — Browser OCR assets are vendored, not fetched.** `web/public/tessdata`
+  holds the worker, both LSTM wasm cores and gzipped `tur`/`eng` traineddata;
+  `web/src/lib/ocr.js` passes `workerPath`, `corePath` and `langPath` so
+  nothing is pulled from a CDN. `.gitattributes` marks the directory `-text`
+  because the cores inline their wasm as base64 and a CRLF rewrite would
+  corrupt them. If you upgrade `tesseract.js`, re-copy the worker and cores
+  from `node_modules` — a version mismatch between worker and core fails at
+  init, not at build.
 - **N12 — The API does not come back by itself after a reboot.** The container
   restarts, but only once the Docker *daemon* runs, and Docker Desktop's
   autostart is currently off. With Docker down the app shows "hesaplama servisi
