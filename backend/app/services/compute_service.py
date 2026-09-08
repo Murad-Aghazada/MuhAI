@@ -1,6 +1,6 @@
 """Aggregation for the stateless compute layer.
 
-Turns a :class:`~app.schemas.compute.BusinessSnapshot` — the slice of Firestore
+Turns a :class:`~app.schemas.compute.BusinessSnapshot` — the slice of the workspace
 the client sends up — into the inputs each pure engine already expects
 (tax, Muhai Score, forecasting, payroll). No DB, no I/O: everything here is a
 function of its arguments, which is what makes the whole ``/api/compute``

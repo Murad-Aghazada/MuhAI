@@ -324,8 +324,8 @@ class GeminiChatBackend(ChatBackend):
     Talks to the REST endpoint with the standard library rather than the
     google-generativeai SDK: that package was never in requirements.txt, so the
     old ``import google.generativeai`` raised ImportError on every call and this
-    backend silently degraded to the rule matcher. Same stdlib-only approach as
-    app/core/firebase_auth.py — no new dependency, no image rebuild.
+    backend silently degraded to the rule matcher. Stdlib only — no new
+    dependency, no image rebuild.
 
     Falls back to OfflineRagBackend on any error (network, quota, bad key),
     so a network failure degrades to real retrieval rather than to nothing.

@@ -1,6 +1,6 @@
 /* ============================================================
    RAG knowledge base — Turkish accounting / tax / SGK facts.
-   Seeded into Firebase RTDB and retrieved to ground Gemini.
+   Retrieved client-side to ground the assistant when it answers locally.
    (Informational; rates are illustrative for the 2026 demo.)
    ============================================================ */
 

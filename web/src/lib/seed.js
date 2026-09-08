@@ -1,13 +1,15 @@
 /* ============================================================
    Demo dataset generator.
 
-   Writes a realistic 12-month trading history into Firestore for a company:
-   transactions, five invoices, stock and staff. Everything the dashboard,
-   tax page and Muhai Score display is then computed from these documents —
-   there are no hardcoded numbers anywhere in the UI.
+   Writes a realistic 12-month trading history into the signed-in company's
+   workspace: transactions, five invoices, stock and staff. Everything the
+   dashboard, tax page and Muhai Score display is then computed from these
+   documents — there are no hardcoded numbers anywhere in the UI.
 
    Deterministic by design: a seeded PRNG means the same company always gets
-   the same figures, so a demo is repeatable and a screenshot stays true.
+   the same figures, so a demo is repeatable and a screenshot stays true. The
+   company id is the seed, not a destination — the API knows which workspace
+   to write to from the caller's token.
    ============================================================ */
 import { COLLECTIONS, addMany, updateCompany } from './db.js'
 
@@ -337,12 +339,11 @@ export async function seedCompany(companyId, { today = new Date(), seedKey } = {
   const payroll = EMPLOYEES.reduce((s, e) => s + e.grossSalary, 0)
 
   await Promise.all([
-    addMany(companyId, COLLECTIONS.transactions, transactions),
-    addMany(companyId, COLLECTIONS.invoices, invoices),
-    addMany(companyId, COLLECTIONS.products, PRODUCTS.map((p) => ({ ...p, demo: true }))),
-    addMany(companyId, COLLECTIONS.employees, EMPLOYEES.map((e) => ({ ...e, demo: true }))),
+    addMany(COLLECTIONS.transactions, transactions),
+    addMany(COLLECTIONS.invoices, invoices),
+    addMany(COLLECTIONS.products, PRODUCTS.map((p) => ({ ...p, demo: true }))),
+    addMany(COLLECTIONS.employees, EMPLOYEES.map((e) => ({ ...e, demo: true }))),
     addMany(
-      companyId,
       COLLECTIONS.taxObligations,
       buildTaxObligations(today, monthlyRevenue, monthlyExpense, payroll),
     ),
@@ -353,7 +354,7 @@ export async function seedCompany(companyId, { today = new Date(), seedKey } = {
     (s, t) => s + (t.type === 'income' ? t.amount : -t.amount),
     0,
   )
-  await updateCompany(companyId, {
+  await updateCompany({
     seeded: true,
     seededAt: new Date().toISOString(),
     cashBalance: round2(Math.max(netFlow, 0) + 180000),

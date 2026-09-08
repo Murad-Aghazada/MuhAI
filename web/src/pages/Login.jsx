@@ -8,7 +8,7 @@ import AuthShell from '../components/auth/AuthShell.jsx'
 
 export default function Login() {
   const { t, lang } = useLang()
-  const { login, resetPassword } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -16,14 +16,12 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
-  const [notice, setNotice] = useState(null)
 
   const from = location.state?.from?.pathname || '/app'
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
-    setNotice(null)
     setBusy(true)
     try {
       await login({ email: email.trim(), password })
@@ -32,20 +30,6 @@ export default function Login() {
       setError(authErrorMessage(err, lang))
     } finally {
       setBusy(false)
-    }
-  }
-
-  async function handleReset() {
-    if (!email.trim()) {
-      setError(t('auth.resetNeedEmail'))
-      return
-    }
-    setError(null)
-    try {
-      await resetPassword(email.trim())
-      setNotice(t('auth.resetSent'))
-    } catch (err) {
-      setError(authErrorMessage(err, lang))
     }
   }
 
@@ -87,11 +71,6 @@ export default function Login() {
             {error}
           </motion.div>
         )}
-        {notice && (
-          <motion.div className="auth-alert auth-alert--ok" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-            {notice}
-          </motion.div>
-        )}
 
         <button className="btn btn--brand btn--block" type="submit" disabled={busy}>
           {busy ? <Loader2 size={16} className="spin" /> : null}
@@ -99,9 +78,6 @@ export default function Login() {
           {!busy && <ArrowRight size={16} strokeWidth={2.4} />}
         </button>
 
-        <button className="link-btn auth-link-center" type="button" onClick={handleReset}>
-          {t('auth.forgot')}
-        </button>
       </form>
 
       <div className="auth-foot">

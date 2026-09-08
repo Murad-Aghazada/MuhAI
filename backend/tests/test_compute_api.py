@@ -1,8 +1,8 @@
 """Tests for the stateless /api/compute layer.
 
 This is the surface the web client actually calls, so it is covered end to end
-through the FastAPI app — no database, no Firebase network call. Auth is
-disabled per-test by flipping ``FIREBASE_AUTH_REQUIRED``; a separate test
+through the FastAPI app — no database, no network call. Auth is
+disabled per-test by flipping ``COMPUTE_AUTH_REQUIRED``; a separate test
 asserts that the flag genuinely gates the endpoints.
 """
 import datetime as dt
@@ -18,10 +18,10 @@ AS_OF = dt.date(2026, 6, 30)
 @pytest.fixture(autouse=True)
 def open_auth():
     """Run the compute endpoints unauthenticated, restoring the setting after."""
-    original = settings.FIREBASE_AUTH_REQUIRED
-    settings.FIREBASE_AUTH_REQUIRED = False
+    original = settings.COMPUTE_AUTH_REQUIRED
+    settings.COMPUTE_AUTH_REQUIRED = False
     yield
-    settings.FIREBASE_AUTH_REQUIRED = original
+    settings.COMPUTE_AUTH_REQUIRED = original
 
 
 def _transactions(months: int = 12, day_step: int = 3) -> list[dict]:
@@ -108,7 +108,7 @@ def test_compute_routes_are_mounted(client):
 
 
 def test_auth_is_enforced_when_required(client):
-    settings.FIREBASE_AUTH_REQUIRED = True
+    settings.COMPUTE_AUTH_REQUIRED = True
     r = client.post("/api/compute/dashboard", json=_snapshot())
     assert r.status_code == 401
 

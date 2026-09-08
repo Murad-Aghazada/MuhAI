@@ -7,7 +7,6 @@ import { useData } from '../context/DataContext.jsx'
 import { COLLECTIONS, clearCollection, updateCompany } from '../lib/db.js'
 import { seedCompany } from '../lib/seed.js'
 import { apiBaseUrl, ping } from '../lib/api.js'
-import { projectId } from '../lib/firebase.js'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
@@ -53,7 +52,7 @@ export default function Settings() {
     e.preventDefault()
     setSaving(true)
     try {
-      await updateCompany(companyId, form)
+      await updateCompany(form)
       await refreshCompany()
       notify(t('settings.saved'))
     } catch (err) {
@@ -69,7 +68,7 @@ export default function Settings() {
       // Clear first so re-seeding replaces the dataset instead of stacking a
       // second year of movements on top of the first.
       for (const name of Object.values(COLLECTIONS)) {
-        await clearCollection(companyId, name)
+        await clearCollection(name)
       }
       const counts = await seedCompany(companyId)
       await refreshCompany()
@@ -88,9 +87,9 @@ export default function Settings() {
     setClearing(true)
     try {
       for (const name of Object.values(COLLECTIONS)) {
-        await clearCollection(companyId, name)
+        await clearCollection(name)
       }
-      await updateCompany(companyId, { seeded: false, cashBalance: 0 })
+      await updateCompany({ seeded: false, cashBalance: 0 })
       await refreshCompany()
       notify(t('settings.cleared'))
     } catch (err) {
@@ -133,7 +132,7 @@ export default function Settings() {
           <div className="panel-head">
             <div>
               <div className="panel-title">{t('settings.companySection')}</div>
-              <div className="panel-sub">Firestore · companies/{companyId?.slice(0, 8)}…</div>
+              <div className="panel-sub">PostgreSQL · companies/{companyId?.slice(0, 8)}…</div>
             </div>
             <Building2 size={20} color="var(--ink-4)" />
           </div>
@@ -206,11 +205,13 @@ export default function Settings() {
           <div className="kdv-rows">
             <div className="kdv-row">
               <span>{t('settings.firestore')}</span>
-              <strong className="mono" style={{ fontSize: 12.5 }}>{projectId}</strong>
+              <strong className="mono" style={{ fontSize: 12.5 }}>PostgreSQL 15</strong>
             </div>
             <div className="kdv-row">
               <span>{t('settings.apiUrl')}</span>
-              <strong className="mono" style={{ fontSize: 12.5 }}>{apiBaseUrl}</strong>
+              <strong className="mono" style={{ fontSize: 12.5 }}>
+                {apiBaseUrl || window.location.origin}
+              </strong>
             </div>
             <div className="kdv-row">
               <span>{t('common.status')}</span>

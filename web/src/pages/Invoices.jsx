@@ -179,10 +179,10 @@ export default function Invoices() {
   // ── Persistence ─────────────────────────────────────────────────────
   async function handleSave(invoice, mode) {
     if (mode === 'create') {
-      await saveInvoiceWithLedger(companyId, invoice)
+      await saveInvoiceWithLedger(invoice)
     } else {
       const { id, ...patch } = invoice
-      await updateItem(companyId, COLLECTIONS.invoices, id, patch)
+      await updateItem(COLLECTIONS.invoices, id, patch)
     }
     setModal(null)
     notify(t('invoices.saved'))
@@ -192,7 +192,7 @@ export default function Invoices() {
     if (!window.confirm(t('invoices.deleteConfirm'))) return
     setBusyId(invoice.id)
     try {
-      await removeItem(companyId, COLLECTIONS.invoices, invoice.id)
+      await removeItem(COLLECTIONS.invoices, invoice.id)
     } finally {
       setBusyId(null)
     }
@@ -201,7 +201,7 @@ export default function Invoices() {
   async function handleMarkPaid(invoice) {
     setBusyId(invoice.id)
     try {
-      await markInvoicePaid(companyId, invoice)
+      await markInvoicePaid(invoice)
     } finally {
       setBusyId(null)
     }

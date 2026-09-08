@@ -15,95 +15,104 @@ Last verified: **2026-09-08**.
 
 ```
 /
-  backend/              FastAPI — stateless compute/AI API
+  backend/              FastAPI — data + compute API, Alembic migrations
   web/                  Vite + React 18 frontend (src/, own package.json)
-  docs/                 RECOVERY.md, TEKNOFEST material, reference PDFs
-  db_backup/            pg_dump of the retired Postgres dev database
-  firestore.rules       Firestore security rules (deployed)
-  firebase.json         Firebase CLI config
-  .firebaserc           pins the CLI to project muhai-b80f0
-  docker-compose.yml    backend by default; Postgres/Redis/Celery opt-in
+  docs/                 DEPLOY.md — the VPS runbook
+  db_backup/            pg_dump of an earlier development database
+  docker-compose.yml            the deployable stack
+  docker-compose.override.yml   development layer, applied automatically
+  .env.example                  every setting the stack has
 ```
 
 Repo: `https://github.com/UghurGambarov/MuhAI.git` (private), branch `master`.
 
 ## 2. Architecture
 
-**Cloud Firestore is the system of record** — chosen because it was quick to
-build on, not as the endgame. The browser authenticates against Firebase Auth
-and reads/writes Firestore directly. FastAPI is a **stateless compute layer**
-holding all the real calculation; nothing under `/api/compute` touches a
-database, so every endpoint there is a pure function of its request body.
+**Self-hosted, entirely in Docker.** Postgres is the system of record and
+FastAPI owns both the data and the maths. There is no third-party service in
+the path: no Firebase, no managed database, no external auth. A VPS with Docker
+on it is the whole deployment target.
 
 ```
-  Browser (React)  ──auth+data──▶  Firebase Auth + Cloud Firestore
-        │
-        └──ID token + snapshot──▶  FastAPI /api/compute/*
-                                     2026 tax engine · Muhai Score
-                                     Prophet forecast · payroll
-                                     Tesseract OCR · assistant
+  Browser (React)
+        │  nginx serves the bundle and proxies /api — one origin, no CORS
+        ▼
+  FastAPI  ──▶  PostgreSQL 15 (system of record) · Redis 7 (Celery broker)
+     │
+     └── 2026 tax engine · Muhai Score · Prophet forecast · payroll
+         Tesseract OCR · assistant (Gemini online, local BM25 offline)
 ```
 
-**Hosting: the backend will move to a self-managed VPS.** Until then it runs in
-Docker on the dev machine. Managed container hosts were considered and declined.
+Two halves to the API:
 
-### Firestore data model
+* **`/api/workspace`** — the data layer. Company profile plus five
+  collections. The signed-in token *is* the company scope: every query is
+  filtered by the caller's `company_id`, so no client can name another
+  company's rows. That replaced the Firestore security rules with something
+  the database enforces.
+* **`/api/compute`** — stateless. Reads no table; a pure function of the
+  snapshot posted to it plus today's date. Authenticates the caller but never
+  resolves a company.
+
+Sessions are JWTs signed by the API (`SECRET_KEY`), passwords bcrypt hashes.
+
+### Data model
 
 ```
-users/{uid}                 → { companyId, displayName, email, role }
-companies/{companyId}       → profile, members[], ownerUid, cashBalance
-  .../invoices/{id}         number, vendor, direction, issueDate, dueDate,
-                            paidDate, netAmount, vatAmount, amount, status,
-                            category, source, ocrConfidence, needsReview
-  .../transactions/{id}     date, amount, type, category, description, vendor
-  .../products/{id}         name, sku, stock, minStock, unitPrice, monthlyUsage
-  .../employees/{id}        name, role, grossSalary, startDate, sgkNo
-  .../taxObligations/{id}   type, name, period, dueDate, amount, status
+companies                 name, taxId, taxOffice, sector, city, legalForm,
+                          currency, cashBalance, seeded, ownerUid
+users                     email, hashed_password, display_name, role, company_id
+company_invoices          number, vendor, direction, issueDate, dueDate,
+                          paidDate, netAmount, vatAmount, amount, status,
+                          category, source, ocrConfidence, needsReview
+company_transactions      date, amount, type, category, description, vendor
+company_products          name, sku, stock, minStock, unitPrice, monthlyUsage
+company_employees         name, role, grossSalary, startDate, sgkNo
+company_tax_obligations   type, name, period, dueDate, amount, status
 ```
 
-Dates are ISO `YYYY-MM-DD` strings, not Timestamps: they are calendar dates,
-they sort lexicographically, and they cross the API boundary unchanged.
-
-Rules (deployed to `muhai-b80f0`): a user reads its own `users/{uid}`; a company
-and everything beneath it is readable and writable only by uids in that
-company's `members`. `ownerUid` and `members` are immutable through the client.
+The client still speaks **documents** — camelCase keys, ISO `YYYY-MM-DD` date
+strings. `app/services/workspace.py` is the only place that maps documents to
+rows, and it is covered by `tests/test_workspace_mapping.py`. Every table also
+has an `extra` JSONB column that round-trips keys without a column of their
+own, so an unrecognised field is preserved rather than dropped.
 
 ## 3. Running it
 
 ```bash
-docker compose up -d                                  # API only, :8000
-curl http://localhost:8000/health                     # -> {"status":"healthy"}
-npm --prefix web install && npm --prefix web run dev  # frontend :5173
+cp .env.example .env                  # then set SECRET_KEY: openssl rand -hex 32
+docker compose up -d --build          # dev stack; API on :8000
+npm --prefix web install && npm --prefix web run dev     # frontend :5173
+curl http://localhost:8000/health     # -> {"status":"healthy"}
 ```
 
-Containers carry `restart: unless-stopped`, so after a reboot **just opening
-Docker Desktop restores the API** — no compose command needed. The frontend dev
-server is separate and not containerised.
+A bare `docker compose` also applies `docker-compose.override.yml` — that is
+the development layer (bind-mounts, `--reload`, Postgres/Redis on localhost,
+web container disabled behind the `ui` profile). **Deploying uses the base file
+alone**: `docker compose -f docker-compose.yml up -d --build`. Runbook in
+`docs/DEPLOY.md`.
 
 Tests (dev deps are deliberately absent from the runtime image, see N11):
 
 ```bash
 docker compose exec backend pip install -r requirements-dev.txt
-docker compose exec backend python -m pytest          # 155 pass
+docker compose exec backend python -m pytest
 ```
 
-Legacy DB-backed routes (`/api/invoices`, …) need the opt-in profile:
-
-```bash
-docker compose --profile legacy up -d                 # + Postgres, Redis, Celery
-```
-
-Rules deploy with `firebase deploy --only firestore:rules`.
-Environment: `backend/.env` and `web/.env.local`, both git-ignored.
+Environment: root `.env` configures the whole stack and is the only file the
+containers read. `backend/.env` is for running the API outside Docker;
+`web/.env.local` for the Vite dev server. All three are git-ignored.
 
 ## 4. Current state
 
-**Backend** — 78 Python files. FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2,
-Celery 5.3, Redis 5. **16 routers, 58 endpoints, 155 tests passing.**
+**Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Celery 5.3,
+Redis 5, Alembic through `0009_company_workspace`. **17 routers, 175 tests.**
 
+- `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
+  clear, and two atomic invoice↔ledger operations
+- `/api/auth/*` — register (account + company in one transaction), login, me,
+  company recovery, change password, delete account
 - `/api/compute/{dashboard,muhai-score,forecast,tax-summary,payroll,classify,ocr,chat}`
-  is what the web client uses; auth is a Firebase ID token verified in
-  `app/core/firebase_auth.py` against Google's public certs — stdlib only
 - Assistant has two modes. **Online** it calls `gemini-2.5-flash` over the REST
   endpoint with stdlib `urllib` (override with `GEMINI_MODEL`). **Offline** —
   on any network, quota or key failure — it answers from a local BM25 knowledge
@@ -116,12 +125,26 @@ Celery 5.3, Redis 5. **16 routers, 58 endpoints, 155 tests passing.**
   **neither OCR path needs internet** (see N13)
 - Muhai Score: 8 weighted categories. Tax engine: 2026 KDV / income / corporate
   / stopaj / SGK / stamp rates
+- The user-scoped routes from before the workspace (`/api/invoices`,
+  `/api/transactions`, …) still work on their own older tables. **Nothing calls
+  them.** They are deprecated and safe to delete; bank reconciliation and
+  vendor-category learning live only there (see open item 3)
 
-**Web frontend** — 49 modules, Vite + React 18, TR/EN, custom SVG charts.
+**Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
+**487 kB (150 kB gzipped)**, down from 973 kB when the Firebase SDK went.
 
-- Firebase Auth, two-step company sign-up, protected `/app`, live Firestore
-  subscriptions in `context/DataContext.jsx`
-- **No mock data anywhere.** Every figure derives from Firestore + the compute API
+- Own JWT auth against `/api/auth`, token in localStorage, two-step company
+  sign-up, protected `/app`. **There is no password reset** — Firebase used to
+  send that mail and self-hosting would need an SMTP sender. Removed on
+  purpose (2026-09-08); do not re-add it as a dead button
+- `lib/client.js` is the only place that knows where the API is or how a
+  request is authenticated. `lib/db.js` is the workspace client, `lib/api.js`
+  the compute client
+- Writes announce themselves through `db.js`'s `onChange`, and `DataContext`
+  reloads (debounced). That replaced Firestore's push updates without making
+  seven screens each remember to refetch
+- **No mock data anywhere.** Every figure derives from the workspace + the
+  compute API
 - Falls back to local aggregation with a "hesaplama servisi çevrimdışı" badge
   when the API is unreachable — never a blank screen, never an invented number
 - `lib/seed.js` generates a deterministic demo dataset
@@ -137,14 +160,13 @@ sidebar below 1000 px but were not verified (no test account).
    measured at 375 px against the real CSS on 2026-09-08 and the two overflows
    found were fixed (N15). What is still unchecked is the live experience with
    a real account: touch targets, the sidebar drawer, modals and long lists.
-2. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
-   and `VITE_API_URL`.
-3. Grow the offline knowledge base. 20 passages cover the common ground; add a
+2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-4. Code-split the bundle — `dist/index-*.js` is 973 kB (266 kB gzipped).
-5. Move server OCR onto the Celery worker so the request returns a job id.
-6. Bank reconciliation and vendor-category learning exist only on the legacy
-   Postgres routes; no Firestore equivalent yet.
+3. Decide the fate of the legacy user-scoped routes and their tables. They are
+   dead code with two live ideas in them — bank reconciliation and
+   vendor-category learning — that have no workspace equivalent yet.
+4. Move server OCR onto the Celery worker so the request returns a job id.
+   The worker is running and idle; nothing dispatches to it.
 
 ## 6. TEKNOFEST claims that do not match the code
 
@@ -152,9 +174,9 @@ sidebar below 1000 px but were not verified (no test account).
 |---|---|---|
 | Slide 4 says **Django** | Code is FastAPI, and staying that way | fix the deck |
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
-| S2 **PostgreSQL 15 + Redis 7** | Cloud Firestore | restate |
-| S4 **Docker Compose, 4 services** | 1 by default, 4 under `--profile legacy` | restate |
-| S18 **"13 servis geliştirildi"** | 16 routers / 58 endpoints / 155 tests | understated — pick the number you defend |
+| S2 **PostgreSQL 15 + Redis 7** | True as written | none |
+| S4 **Docker Compose, 4 services** | 5 — postgres, redis, backend, worker, web (plus a one-shot migrate job) | restate |
+| S18 **"13 servis geliştirildi"** | 17 routers, 175 tests | understated — pick the number you defend |
 | S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
 | S3/S16 **GİB / SGK / bank APIs** | Confirm whether `bank_service.py` and the tax routes hit live endpoints or stubs | phrase to match exactly |
 
@@ -167,16 +189,19 @@ threshold with a working review queue).
 
 - **N1 — Avoid unnecessary rebuilds.** `docker-compose.yml` declares `image:`
   alongside `build:` so existing images are reused. Rebuild only when
-  `requirements.txt` or the `Dockerfile` changes.
+  `requirements.txt`, `package.json` or a `Dockerfile` changes.
 - **N1b — Pins in `requirements.txt` carry comments explaining why.** Do not
   bump `cmdstanpy` without re-running `tests/test_forecast_service.py`; that pin
   is what makes Prophet load at all.
 - **N2 — The compose project name is pinned** (`name: muhai`) so `postgres_data`
   resolves to the existing `muhai_postgres_data`. Changing it orphans the DB.
 - **N3 — `.dockerignore` excludes `tests/` and `.env`.** That is how they were
-  lost once. Keep them in git.
-- **N4 — The migration step is best-effort** (`||`, not `&&`) so the compute API
-  starts with no database present. Do not "fix" it back.
+  lost once. Keep them in git. The dev override bind-mounts `./backend`, which
+  is what puts the tests back inside the container.
+- **N4 — Migrations belong to the one-shot `migrate` service**, not to app
+  startup: several uvicorn workers would race for the same lock. The app's own
+  startup hook still runs them when `RUN_MIGRATIONS_ON_STARTUP` is true, which
+  is the default outside Docker and in the dev override.
 - **N5 — The Bash tool cannot reach `D:`**; use PowerShell for that drive.
 - **N6 — `useInView` / `whileInView` are not trustworthy.** Use
   `web/src/lib/useReveal.js` or `components/ui/Reveal.jsx` for any
@@ -193,21 +218,25 @@ threshold with a working review queue).
   anything is broken.
 - **N8 — Recovering source from an image** (the trick that saved this project):
   `docker create --name tmp <image>` → `docker cp tmp:/app ./dest` → `docker rm tmp`.
-- **N9 — The Firebase web config in `web/.env.local` is public by design.** It
-  identifies the project; it grants nothing. Access is decided by Firebase Auth
-  plus `firestore.rules`. Real secrets live only in `backend/.env`.
 - **N10 — `web/public/sample-invoice.png`** is a synthetic Turkish invoice for
   exercising OCR (net 12.350, KDV 2.470, total 14.820).
 - **N11 — `pytest` is not in the runtime image.** Run
   `docker compose exec backend pip install -r requirements-dev.txt` once after
-  any `docker compose down` or rebuild.
-- **N15 — Measure mobile layout, do not eyeball it.** Inject a representative
-  element at a 375 px viewport and compare `scrollWidth` against the parent's
-  `clientWidth`. That is how the two real overflows were found — a nine-column
-  table at 684 px in a 341 px panel, and a five-button `.seg` at 389 px — while
-  `.ocr-fields` and `.ocr-item`, which looked equally suspect in the CSS,
-  measured clean. Wide content scrolls in its own container (`.tbl-scroll`,
-  and `.seg` below 760 px); the page body must never scroll sideways.
+  any `docker compose down` or rebuild. The dev override runs the backend as
+  root for exactly this reason — the image's own user cannot write to
+  `/opt/venv`.
+- **N12 — The API does not come back by itself after a reboot.** The containers
+  restart, but only once the Docker *daemon* runs, and Docker Desktop's
+  autostart is currently off. With Docker down the app shows "hesaplama servisi
+  çevrimdışı" and the assistant drops to the keyword fallback.
+- **N13 — Browser OCR assets are vendored, not fetched.** `web/public/tessdata`
+  holds the worker, both LSTM wasm cores and gzipped `tur`/`eng` traineddata;
+  `web/src/lib/ocr.js` passes `workerPath`, `corePath` and `langPath` so
+  nothing is pulled from a CDN. `.gitattributes` marks the directory `-text`
+  because the cores inline their wasm as base64 and a CRLF rewrite would
+  corrupt them. If you upgrade `tesseract.js`, re-copy the worker and cores
+  from `node_modules` — a version mismatch between worker and core fails at
+  init, not at build.
 - **N14 — The offline assistant's two numbers do different jobs.** In
   `rag.py`, `Hit.score` is raw BM25 and only orders results; `Hit.ratio` is
   idf-weighted query coverage in [0, 1] and is the only one safe to threshold,
@@ -219,17 +248,18 @@ threshold with a working review queue).
   stopword list was written with Turkish diacritics while `tokenize()` folds
   first, so none of the diacritic words ever matched and they leaked through as
   content terms. The list is folded at definition time now. Same trap as F9.
-- **N13 — Browser OCR assets are vendored, not fetched.** `web/public/tessdata`
-  holds the worker, both LSTM wasm cores and gzipped `tur`/`eng` traineddata;
-  `web/src/lib/ocr.js` passes `workerPath`, `corePath` and `langPath` so
-  nothing is pulled from a CDN. `.gitattributes` marks the directory `-text`
-  because the cores inline their wasm as base64 and a CRLF rewrite would
-  corrupt them. If you upgrade `tesseract.js`, re-copy the worker and cores
-  from `node_modules` — a version mismatch between worker and core fails at
-  init, not at build.
-- **N12 — The API does not come back by itself after a reboot.** The container
-  restarts, but only once the Docker *daemon* runs, and Docker Desktop's
-  autostart is currently off. With Docker down the app shows "hesaplama servisi
-  çevrimdışı" and the assistant drops to the keyword fallback.
+- **N15 — Measure mobile layout, do not eyeball it.** Inject a representative
+  element at a 375 px viewport and compare `scrollWidth` against the parent's
+  `clientWidth`. That is how the two real overflows were found — a nine-column
+  table at 684 px in a 341 px panel, and a five-button `.seg` at 389 px — while
+  `.ocr-fields` and `.ocr-item`, which looked equally suspect in the CSS,
+  measured clean. Wide content scrolls in its own container (`.tbl-scroll`,
+  and `.seg` below 760 px); the page body must never scroll sideways.
+- **N16 — In production the browser and the API share an origin.** nginx in the
+  web container proxies `/api` to the backend, so `VITE_API_URL` is empty in a
+  Docker build and CORS never applies. `BACKEND_CORS_ORIGINS` matters only for
+  the Vite dev server, which is on a different port.
 
-History of the 2026-09-01 data-loss recovery: `docs/RECOVERY.md`.
+The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
+deleted in ca3f72f. The dump that survived it is `db_backup/`, and the
+technique that saved the source is N8 above.

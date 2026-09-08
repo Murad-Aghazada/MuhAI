@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { Building2, Loader2, LogOut } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
-import { createCompany } from '../lib/db.js'
 import { seedCompany } from '../lib/seed.js'
 import AuthShell from '../components/auth/AuthShell.jsx'
 
@@ -14,13 +13,14 @@ const LEGAL_FORMS = ['ltd', 'as', 'sahis', 'koop']
 /**
  * Recovery screen for a signed-in account that has no company yet.
  *
- * This happens when registration created the Firebase Auth user and then the
- * Firestore write failed (rules not published, offline, tab closed). Without
- * this the account is stranded: it can sign in but has nothing to sign in to.
+ * Registration now creates the account and its company in one server-side
+ * transaction, so this state should no longer arise. The screen stays because
+ * the alternative to a recovery path is a stranded account: one that can sign
+ * in but has nothing to sign in to.
  */
 export default function CompanySetup() {
   const { t, lang } = useLang()
-  const { user, refreshCompany, logout } = useAuth()
+  const { user, refreshCompany, logout, createCompanyForAccount } = useAuth()
   const navigate = useNavigate()
 
   const [form, setForm] = useState({
@@ -52,17 +52,13 @@ export default function CompanySetup() {
 
     setBusy(true)
     try {
-      const companyId = await createCompany(user.uid, {
-        email: user.email,
-        displayName: user.displayName || '',
-        company: {
-          name: form.companyName.trim(),
-          taxId: form.taxId.trim(),
-          taxOffice: form.taxOffice.trim(),
-          city: form.city.trim(),
-          sector: form.sector,
-          legalForm: form.legalForm,
-        },
+      const companyId = await createCompanyForAccount({
+        name: form.companyName.trim(),
+        taxId: form.taxId.trim(),
+        taxOffice: form.taxOffice.trim(),
+        city: form.city.trim(),
+        sector: form.sector,
+        legalForm: form.legalForm,
       })
       if (form.withDemoData) {
         try {

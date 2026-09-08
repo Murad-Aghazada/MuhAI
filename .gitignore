@@ -1,9 +1,12 @@
+# --- compose ---
+# The stack's whole configuration, including SECRET_KEY. Never commit it.
+.env
+
 # --- web frontend ---
 node_modules
 dist
 dist-ssr
 *.local
-.env
 .env.local
 npm-debug.log*
 yarn-debug.log*
@@ -16,11 +19,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
-
-# --- firebase ---
-.firebase/
-firebase-debug.log
-firestore-debug.log
 
 # --- editors / os ---
 .DS_Store

@@ -1,37 +1,26 @@
 /* ============================================================
-   Firestore data access.
+   Company data access.
 
-   One company per account. Everything the company owns lives in
-   subcollections beneath its document, which is what makes the security
-   rules a single ownership check:
+   One company per account. The signed-in token *is* the company scope: the
+   API resolves it server-side, so no call here passes a company id and no
+   client-side code can ask for another company's rows. That replaced the
+   Firestore security rules with something the database enforces itself.
 
-     users/{uid}                     -> { companyId, displayName, email }
-     companies/{companyId}           -> profile + members[]
-       .../invoices/{id}
-       .../transactions/{id}
-       .../products/{id}
-       .../employees/{id}
-       .../taxObligations/{id}
+   The document shapes are unchanged from when Firestore held them:
 
-   Dates are stored as ISO "YYYY-MM-DD" strings rather than Timestamps: they
-   are calendar dates (an invoice is dated the 5th regardless of timezone),
-   they sort lexicographically, and they cross the API boundary unchanged.
+     invoices        number, vendor, direction, issueDate, dueDate, paidDate,
+                     netAmount, vatAmount, amount, status, category, source,
+                     ocrConfidence, needsReview
+     transactions    date, amount, type, category, description, vendor
+     products        name, sku, stock, minStock, unitPrice, monthlyUsage
+     employees       name, role, grossSalary, startDate, sgkNo
+     taxObligations  type, name, period, dueDate, amount, status
+
+   Dates stay ISO "YYYY-MM-DD" strings rather than timestamps: they are
+   calendar dates (an invoice is dated the 5th regardless of timezone), they
+   sort lexicographically, and they cross the API boundary unchanged.
    ============================================================ */
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  writeBatch,
-} from 'firebase/firestore'
-import { db } from './firebase.js'
+import { del, get, patch, post } from './client.js'
 
 export const COLLECTIONS = {
   invoices: 'invoices',
@@ -41,186 +30,126 @@ export const COLLECTIONS = {
   taxObligations: 'taxObligations',
 }
 
-// ── Paths ─────────────────────────────────────────────────────────────
-export const userRef = (uid) => doc(db, 'users', uid)
-export const companyRef = (companyId) => doc(db, 'companies', companyId)
-export const subCollection = (companyId, name) =>
-  collection(db, 'companies', companyId, name)
-export const subDoc = (companyId, name, id) =>
-  doc(db, 'companies', companyId, name, id)
+const BASE = '/api/workspace'
 
-// ── User ↔ company link ───────────────────────────────────────────────
-export async function getUserProfile(uid) {
-  const snap = await getDoc(userRef(uid))
-  return snap.exists() ? { uid, ...snap.data() } : null
+// ── Change notification ───────────────────────────────────────────────
+/*
+   Firestore pushed every write back to the app, so a screen that saved
+   something saw it appear without asking. A REST API does not, and making
+   each of the seven calling screens remember to refetch would be a bug
+   waiting to happen — the one that forgets shows stale figures.
+
+   So every mutation below announces itself here and DataContext reloads. The
+   round trip is the cost of not needing an open socket; a company's whole
+   dataset is a few hundred rows.
+*/
+const listeners = new Set()
+
+/** Subscribe to workspace mutations. Returns the unsubscribe function. */
+export function onChange(listener) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
 }
 
-export async function getCompany(companyId) {
-  const snap = await getDoc(companyRef(companyId))
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null
+function notify(collection) {
+  for (const listener of listeners) {
+    try {
+      listener(collection)
+    } catch (e) {
+      console.error('[muhai] workspace change listener failed', e)
+    }
+  }
 }
+
+// ── Company ───────────────────────────────────────────────────────────
 
 /**
- * Create the company document and link it to its owner.
- * Written as one batch so a half-registered account can never exist.
+ * Company profile plus all five collections, in one round trip.
+ * The app needs every collection to build the compute snapshot, so fetching
+ * them together avoids a request waterfall on each load.
  */
-export async function createCompany(uid, { email, displayName, company }) {
-  const companyId = doc(collection(db, 'companies')).id
-  const batch = writeBatch(db)
-
-  batch.set(companyRef(companyId), {
-    name: company.name,
-    taxId: company.taxId || '',
-    taxOffice: company.taxOffice || '',
-    sector: company.sector || 'general',
-    city: company.city || '',
-    email,
-    legalForm: company.legalForm || 'ltd',
-    currency: 'TRY',
-    cashBalance: 0,
-    ownerUid: uid,
-    members: [uid],
-    seeded: false,
-    createdAt: serverTimestamp(),
-  })
-
-  batch.set(userRef(uid), {
-    email,
-    displayName: displayName || '',
-    companyId,
-    role: 'owner',
-    createdAt: serverTimestamp(),
-  })
-
-  await batch.commit()
-  return companyId
+export function loadWorkspace() {
+  return get(BASE, { timeout: 30000 })
 }
 
-export async function updateCompany(companyId, patch) {
-  await updateDoc(companyRef(companyId), patch)
+export function getCompany() {
+  return get(`${BASE}/company`)
 }
 
-// ── Generic subcollection CRUD ────────────────────────────────────────
-export async function listAll(companyId, name, orderField) {
-  const base = subCollection(companyId, name)
-  const q = orderField ? query(base, orderBy(orderField, 'desc')) : base
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+export async function updateCompany(patchDoc) {
+  const company = await patch(`${BASE}/company`, patchDoc)
+  notify('company')
+  return company
 }
 
-/** Live subscription. Returns the unsubscribe function. */
-export function watch(companyId, name, orderField, onData, onError) {
-  const base = subCollection(companyId, name)
-  const q = orderField ? query(base, orderBy(orderField, 'desc')) : base
-  return onSnapshot(
-    q,
-    (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-    (err) => {
-      console.error(`[muhai] ${name} subscription failed`, err)
-      onError?.(err)
-    },
-  )
+// ── Generic collection access ─────────────────────────────────────────
+
+export function listAll(name) {
+  return get(`${BASE}/${name}`, { timeout: 30000 })
 }
 
-export async function addItem(companyId, name, data) {
-  const ref = doc(subCollection(companyId, name))
-  await setDoc(ref, { ...data, createdAt: serverTimestamp() })
-  return ref.id
+export async function addItem(name, data) {
+  const { id } = await post(`${BASE}/${name}`, data)
+  notify(name)
+  return id
 }
 
-export async function updateItem(companyId, name, id, patch) {
-  await updateDoc(subDoc(companyId, name, id), patch)
+export async function updateItem(name, id, patchDoc) {
+  const doc = await patch(`${BASE}/${name}/${id}`, patchDoc)
+  notify(name)
+  return doc
 }
 
-export async function removeItem(companyId, name, id) {
-  await deleteDoc(subDoc(companyId, name, id))
+export async function removeItem(name, id) {
+  await del(`${BASE}/${name}/${id}`)
+  notify(name)
 }
 
 /**
  * Write many documents at once.
- * Firestore caps a batch at 500 writes, so this chunks automatically.
+ * The server takes up to 1000 per call and commits them in one transaction;
+ * this chunks so a larger dataset still arrives as a few whole batches rather
+ * than several hundred separate requests.
  */
-export async function addMany(companyId, name, items) {
-  const CHUNK = 400
+export async function addMany(name, items) {
+  const CHUNK = 500
   const ids = []
   for (let i = 0; i < items.length; i += CHUNK) {
-    const batch = writeBatch(db)
-    for (const item of items.slice(i, i + CHUNK)) {
-      const ref = doc(subCollection(companyId, name))
-      batch.set(ref, { ...item, createdAt: serverTimestamp() })
-      ids.push(ref.id)
-    }
-    await batch.commit()
+    const res = await post(`${BASE}/${name}/bulk`, items.slice(i, i + CHUNK), {
+      timeout: 60000,
+    })
+    ids.push(...res.ids)
   }
+  notify(name)
   return ids
 }
 
-/** Delete every document in a subcollection. Used by "reset demo data". */
-export async function clearCollection(companyId, name) {
-  const snap = await getDocs(subCollection(companyId, name))
-  const CHUNK = 400
-  const refs = snap.docs.map((d) => d.ref)
-  for (let i = 0; i < refs.length; i += CHUNK) {
-    const batch = writeBatch(db)
-    refs.slice(i, i + CHUNK).forEach((r) => batch.delete(r))
-    await batch.commit()
-  }
-  return refs.length
+/** Delete every document in a collection. Used by "reset demo data". */
+export async function clearCollection(name) {
+  const res = await del(`${BASE}/${name}`, { timeout: 30000 })
+  notify(name)
+  return res?.deleted ?? 0
 }
 
 // ── Invoice → ledger ──────────────────────────────────────────────────
+
 /**
- * Save an invoice and, when it is already paid, the matching cash movement —
- * atomically, so the dashboard can never show an invoice whose money never
- * moved (or the reverse).
+ * Save an invoice and, when it is already paid, the matching cash movement.
+ * The server does both in one transaction, so the dashboard can never show an
+ * invoice whose money never moved (or the reverse).
  */
-export async function saveInvoiceWithLedger(companyId, invoice) {
-  const batch = writeBatch(db)
-
-  const invRef = doc(subCollection(companyId, COLLECTIONS.invoices))
-  batch.set(invRef, { ...invoice, createdAt: serverTimestamp() })
-
-  if (invoice.status === 'paid') {
-    const txRef = doc(subCollection(companyId, COLLECTIONS.transactions))
-    batch.set(txRef, {
-      date: invoice.paidDate || invoice.issueDate,
-      amount: invoice.amount,
-      type: invoice.direction === 'sales' ? 'income' : 'expense',
-      category: invoice.category || 'other',
-      description: `${invoice.number} · ${invoice.vendor}`,
-      vendor: invoice.vendor,
-      invoiceId: invRef.id,
-      createdAt: serverTimestamp(),
-    })
-  }
-
-  await batch.commit()
-  return invRef.id
+export async function saveInvoiceWithLedger(invoice) {
+  const { id } = await post(`${BASE}/invoices/with-ledger`, invoice)
+  notify('invoices')
+  return id
 }
 
-/**
- * Flip an invoice to paid and post the cash movement in the same batch.
- */
-export async function markInvoicePaid(companyId, invoice, paidDate) {
-  const batch = writeBatch(db)
-  const when = paidDate || new Date().toISOString().slice(0, 10)
-
-  batch.update(subDoc(companyId, COLLECTIONS.invoices, invoice.id), {
-    status: 'paid',
-    paidDate: when,
-  })
-
-  const txRef = doc(subCollection(companyId, COLLECTIONS.transactions))
-  batch.set(txRef, {
-    date: when,
-    amount: invoice.amount,
-    type: invoice.direction === 'sales' ? 'income' : 'expense',
-    category: invoice.category || 'other',
-    description: `${invoice.number} · ${invoice.vendor}`,
-    vendor: invoice.vendor,
-    invoiceId: invoice.id,
-    createdAt: serverTimestamp(),
-  })
-
-  await batch.commit()
+/** Flip an invoice to paid and post the cash movement in the same transaction. */
+export async function markInvoicePaid(invoice, paidDate) {
+  const result = await post(
+    `${BASE}/invoices/${invoice.id}/pay`,
+    paidDate ? { paidDate } : {},
+  )
+  notify('invoices')
+  return result
 }

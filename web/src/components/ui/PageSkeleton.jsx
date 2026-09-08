@@ -1,4 +1,4 @@
-/** Shimmer placeholder shown while the Firestore subscriptions settle. */
+/** Shimmer placeholder shown while the workspace loads. */
 export default function PageSkeleton({ rows = 4 }) {
   return (
     <div className="page">

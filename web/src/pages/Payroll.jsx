@@ -27,7 +27,7 @@ export default function Payroll() {
   const [busyId, setBusyId] = useState(null)
 
   // The API returns payslips in the order employees were sent, so joining by
-  // index would break the moment Firestore reorders. Match on name instead.
+  // index would break the moment the list is reordered. Match on name instead.
   const rows = useMemo(() => {
     const slips = new Map((payroll?.payslips ?? []).map((p) => [p.name, p]))
     return employees.map((e) => ({ employee: e, slip: slips.get(e.name) || null }))
@@ -53,7 +53,7 @@ export default function Payroll() {
     if (!window.confirm(`${employee.name} — ${t('common.delete')}?`)) return
     setBusyId(employee.id)
     try {
-      await removeItem(companyId, COLLECTIONS.employees, employee.id)
+      await removeItem(COLLECTIONS.employees, employee.id)
     } finally {
       setBusyId(null)
     }
@@ -233,7 +233,7 @@ export default function Payroll() {
           employee={modal}
           onClose={() => setModal(null)}
           onSave={async (data) => {
-            await addItem(companyId, COLLECTIONS.employees, data)
+            await addItem(COLLECTIONS.employees, data)
             setModal(null)
           }}
         />

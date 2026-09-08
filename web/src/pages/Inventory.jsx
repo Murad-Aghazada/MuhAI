@@ -66,7 +66,7 @@ export default function Inventory() {
     setBusyId(product.id)
     try {
       const next = Math.max(0, (Number(product.stock) || 0) + delta)
-      await updateItem(companyId, COLLECTIONS.products, product.id, { stock: next })
+      await updateItem(COLLECTIONS.products, product.id, { stock: next })
     } finally {
       setBusyId(null)
     }
@@ -76,7 +76,7 @@ export default function Inventory() {
     if (!window.confirm(`${product.name} — ${t('common.delete')}?`)) return
     setBusyId(product.id)
     try {
-      await removeItem(companyId, COLLECTIONS.products, product.id)
+      await removeItem(COLLECTIONS.products, product.id)
     } finally {
       setBusyId(null)
     }
@@ -250,7 +250,7 @@ export default function Inventory() {
           product={modal}
           onClose={() => setModal(null)}
           onSave={async (data) => {
-            await addItem(companyId, COLLECTIONS.products, data)
+            await addItem(COLLECTIONS.products, data)
             setModal(null)
           }}
         />

@@ -22,6 +22,7 @@ from app.api.routes import (
     reminders,
     tax,
     transactions,
+    workspace,
 )
 from app.core.config import settings
 from app.db.migrate import run_upgrade_to_head
@@ -35,11 +36,16 @@ async def lifespan(app: FastAPI):
 
     Run in a worker thread because Alembic's env.py drives an async engine via
     ``asyncio.run`` — which cannot be nested inside the running event loop.
+
+    Skipped when ``RUN_MIGRATIONS_ON_STARTUP`` is false: under Docker a
+    one-shot ``migrate`` service has already done this, and letting several
+    uvicorn workers each try it would have them racing for the same lock.
     """
-    try:
-        await asyncio.to_thread(run_upgrade_to_head)
-    except Exception as exc:  # pragma: no cover - depends on live DB
-        logger.error("Startup migration failed: %s", exc)
+    if settings.RUN_MIGRATIONS_ON_STARTUP:
+        try:
+            await asyncio.to_thread(run_upgrade_to_head)
+        except Exception as exc:  # pragma: no cover - depends on live DB
+            logger.error("Startup migration failed: %s", exc)
     yield
 
 
@@ -72,6 +78,7 @@ async def health() -> dict[str, str]:
 # Mount all routers under /api
 for router in (
     auth,
+    workspace,
     invoices,
     transactions,
     payroll,

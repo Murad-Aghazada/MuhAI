@@ -1,17 +1,21 @@
 /* ============================================================
    Company data.
 
-   Subscribes to the company's Firestore collections (so every write shows
-   up in the UI immediately, in every open tab) and asks the compute API for
-   the derived analytics: dashboard rollup, Muhai Score, Prophet forecast,
-   tax summary and payroll.
+   Loads the company's five collections from /api/workspace and asks
+   /api/compute for the derived analytics: dashboard rollup, Muhai Score,
+   Prophet forecast, tax summary and payroll.
 
-   If the API is unreachable the dashboard still renders — the same
+   Firestore used to push writes back to every open tab. A REST API does not,
+   so db.js announces each mutation and this provider reloads — see the note
+   there. The reload is debounced because a screen that writes an invoice and
+   its ledger entry fires twice in the same tick.
+
+   If the compute API is unreachable the dashboard still renders: the same
    aggregations are computed locally and `apiOnline` goes false so the UI can
    say so honestly instead of showing stale or invented numbers.
    ============================================================ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { COLLECTIONS, watch } from '../lib/db.js'
+import { loadWorkspace, onChange } from '../lib/db.js'
 import { buildSnapshot, localDashboard, todayIso } from '../lib/analytics.js'
 import * as api from '../lib/api.js'
 import { useAuth } from './AuthContext.jsx'
@@ -20,10 +24,15 @@ const DataContext = createContext(null)
 
 const EMPTY = { invoices: [], transactions: [], products: [], employees: [], taxObligations: [] }
 
+// Long enough to coalesce the writes of one user action, short enough that the
+// screen updates before the user looks away.
+const RELOAD_DEBOUNCE_MS = 150
+
 export function DataProvider({ children }) {
-  const { companyId, company } = useAuth()
+  const { companyId, company: authCompany, refreshCompany } = useAuth()
 
   const [raw, setRaw] = useState(EMPTY)
+  const [company, setCompany] = useState(authCompany)
   const [loading, setLoading] = useState(true)
   const [dbError, setDbError] = useState(null)
 
@@ -37,43 +46,64 @@ export function DataProvider({ children }) {
   const [apiError, setApiError] = useState(null)
   const [computing, setComputing] = useState(false)
 
-  // ── Firestore subscriptions ─────────────────────────────────────────
+  // Keep the company profile in step with the auth context, which owns it
+  // between sign-in and the first workspace load.
+  useEffect(() => setCompany(authCompany), [authCompany])
+
+  // ── Workspace load ──────────────────────────────────────────────────
+  const mounted = useRef(true)
   useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const load = useCallback(async () => {
     if (!companyId) {
       setRaw(EMPTY)
       setLoading(false)
       return
     }
-
-    setLoading(true)
-    const arrived = new Set()
-    const specs = [
-      [COLLECTIONS.invoices, 'issueDate'],
-      [COLLECTIONS.transactions, 'date'],
-      [COLLECTIONS.products, null],
-      [COLLECTIONS.employees, null],
-      [COLLECTIONS.taxObligations, 'dueDate'],
-    ]
-
-    const unsubs = specs.map(([name, orderField]) =>
-      watch(
-        companyId,
-        name,
-        orderField,
-        (docs) => {
-          setRaw((prev) => ({ ...prev, [name]: docs }))
-          arrived.add(name)
-          if (arrived.size === specs.length) setLoading(false)
-        },
-        (err) => {
-          setDbError(err)
-          setLoading(false)
-        },
-      ),
-    )
-
-    return () => unsubs.forEach((u) => u?.())
+    try {
+      const workspace = await loadWorkspace()
+      if (!mounted.current) return
+      setRaw({
+        invoices: workspace.invoices ?? [],
+        transactions: workspace.transactions ?? [],
+        products: workspace.products ?? [],
+        employees: workspace.employees ?? [],
+        taxObligations: workspace.taxObligations ?? [],
+      })
+      if (workspace.company) setCompany(workspace.company)
+      setDbError(null)
+    } catch (err) {
+      if (!mounted.current) return
+      console.error('[muhai] could not load the workspace', err)
+      setDbError(err)
+    } finally {
+      if (mounted.current) setLoading(false)
+    }
   }, [companyId])
+
+  useEffect(() => {
+    setLoading(true)
+    load()
+  }, [load])
+
+  // Reload after any write, debounced.
+  useEffect(() => {
+    if (!companyId) return undefined
+    let timer = null
+    const unsubscribe = onChange(() => {
+      clearTimeout(timer)
+      timer = setTimeout(load, RELOAD_DEBOUNCE_MS)
+    })
+    return () => {
+      clearTimeout(timer)
+      unsubscribe()
+    }
+  }, [companyId, load])
 
   // ── Snapshot posted to the compute API ──────────────────────────────
   const snapshot = useMemo(
@@ -89,8 +119,8 @@ export function DataProvider({ children }) {
     [company, raw.transactions, raw.invoices, raw.products, raw.employees],
   )
 
-  // Compare by content: Firestore hands back new array identities on every
-  // snapshot, and recomputing a Prophet forecast on each one would be absurd.
+  // Compare by content: every reload hands back new array identities, and
+  // recomputing a Prophet forecast on each one would be absurd.
   const snapshotKey = useMemo(() => JSON.stringify(snapshot), [snapshot])
   const lastComputed = useRef(null)
 
@@ -141,10 +171,12 @@ export function DataProvider({ children }) {
     recompute(snapshot)
   }, [loading, companyId, snapshotKey, snapshot, recompute])
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     lastComputed.current = null
+    await load()
+    await refreshCompany().catch(() => {})
     return recompute(snapshot)
-  }, [recompute, snapshot])
+  }, [load, recompute, refreshCompany, snapshot])
 
   // Local aggregation is always available, so panels have something to show
   // during the very first round trip.

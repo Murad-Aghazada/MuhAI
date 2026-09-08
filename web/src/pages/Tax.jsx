@@ -48,7 +48,7 @@ export default function Tax() {
   async function markFiled(obligation) {
     setBusyId(obligation.id)
     try {
-      await updateItem(companyId, COLLECTIONS.taxObligations, obligation.id, {
+      await updateItem(COLLECTIONS.taxObligations, obligation.id, {
         status: 'filed',
         paidDate: new Date().toISOString().slice(0, 10),
       })

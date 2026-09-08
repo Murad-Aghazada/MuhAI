@@ -1,5 +1,5 @@
 /* ============================================================
-   Local derivations over the Firestore documents.
+   Local derivations over the workspace documents.
 
    Two jobs:
      1. Build the snapshot payload the compute API expects.

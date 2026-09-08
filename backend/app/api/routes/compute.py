@@ -1,12 +1,14 @@
 """Stateless compute endpoints — the API the web client actually calls.
 
-Firestore is the system of record. The browser posts the company's data here
-and gets back everything that is genuinely *computed*: the 2026 Turkish tax
-engine, the Muhai Score, Prophet cash-flow forecasting, payroll, expense
-classification, Tesseract OCR and the grounded assistant.
+The browser posts the company's data here and gets back everything that is
+genuinely *computed*: the 2026 Turkish tax engine, the Muhai Score, Prophet
+cash-flow forecasting, payroll, expense classification, Tesseract OCR and the
+grounded assistant.
 
-Nothing in this module reads or writes the database, so the whole surface is a
-pure function of the request body plus today's date.
+Nothing in this module reads or writes a table, so the whole surface is a pure
+function of the request body plus today's date — which is why it authenticates
+the caller but never resolves a company. The data itself lives next door under
+/api/workspace.
 """
 from __future__ import annotations
 
@@ -14,7 +16,7 @@ import datetime as dt
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
-from app.api.firebase_deps import CurrentFirebaseUser
+from app.api.deps import ComputeCaller
 from app.schemas.compute import (
     BusinessSnapshot,
     ClassifyBatchRequest,
@@ -115,7 +117,7 @@ def _insight(series: list[dict], rollup: dict, runway_days: float) -> str:
 # ── Dashboard ──────────────────────────────────────────────────────────
 @router.post("/dashboard", response_model=DashboardOut)
 async def dashboard(
-    snapshot: BusinessSnapshot, current_user: CurrentFirebaseUser
+    snapshot: BusinessSnapshot, caller: ComputeCaller
 ) -> DashboardOut:
     today = _as_of(snapshot)
     series = agg.monthly_series(snapshot.transactions, today)
@@ -148,7 +150,7 @@ async def dashboard(
 # ── Muhai Score ────────────────────────────────────────────────────────
 @router.post("/muhai-score", response_model=MuhaiScoreOut)
 async def muhai_score(
-    snapshot: BusinessSnapshot, current_user: CurrentFirebaseUser
+    snapshot: BusinessSnapshot, caller: ComputeCaller
 ) -> MuhaiScoreOut:
     result = compute_muhai_score(agg.score_inputs(snapshot, _as_of(snapshot)))
     return MuhaiScoreOut(
@@ -165,7 +167,7 @@ async def muhai_score(
 # ── Cash-flow forecast ─────────────────────────────────────────────────
 @router.post("/forecast", response_model=ForecastOut)
 async def forecast(
-    snapshot: BusinessSnapshot, current_user: CurrentFirebaseUser, horizon: int = 30
+    snapshot: BusinessSnapshot, caller: ComputeCaller, horizon: int = 30
 ) -> ForecastOut:
     horizon = max(1, min(horizon, 180))
     today = _as_of(snapshot)
@@ -186,7 +188,7 @@ async def forecast(
 # ── Tax summary ────────────────────────────────────────────────────────
 @router.post("/tax-summary", response_model=TaxSummaryOut)
 async def tax_summary(
-    snapshot: BusinessSnapshot, current_user: CurrentFirebaseUser
+    snapshot: BusinessSnapshot, caller: ComputeCaller
 ) -> TaxSummaryOut:
     today = _as_of(snapshot)
     series = agg.monthly_series(snapshot.transactions, today)
@@ -231,7 +233,7 @@ async def tax_summary(
 # ── Payroll ────────────────────────────────────────────────────────────
 @router.post("/payroll", response_model=PayrollRunOut)
 async def payroll(
-    snapshot: BusinessSnapshot, current_user: CurrentFirebaseUser
+    snapshot: BusinessSnapshot, caller: ComputeCaller
 ) -> PayrollRunOut:
     today = _as_of(snapshot)
     payslips: list[PayslipOut] = []
@@ -272,7 +274,7 @@ async def payroll(
 # ── Expense classification ─────────────────────────────────────────────
 @router.post("/classify", response_model=ClassifyBatchResponse)
 async def classify(
-    payload: ClassifyBatchRequest, current_user: CurrentFirebaseUser
+    payload: ClassifyBatchRequest, caller: ComputeCaller
 ) -> ClassifyBatchResponse:
     return ClassifyBatchResponse(
         items=[
@@ -288,7 +290,7 @@ async def classify(
 # ── OCR ────────────────────────────────────────────────────────────────
 @router.post("/ocr", response_model=OcrExtractResult)
 async def ocr(
-    current_user: CurrentFirebaseUser, file: UploadFile = File(...)
+    caller: ComputeCaller, file: UploadFile = File(...)
 ) -> OcrExtractResult:
     """Server-side Tesseract 5 (tur+eng) with per-field confidence."""
     content = await file.read()
@@ -313,7 +315,7 @@ async def ocr(
 # ── Assistant ──────────────────────────────────────────────────────────
 @router.post("/chat", response_model=ComputeChatResponse)
 async def chat(
-    payload: ComputeChatRequest, current_user: CurrentFirebaseUser
+    payload: ComputeChatRequest, caller: ComputeCaller
 ) -> ComputeChatResponse:
     """Grounded assistant. The Gemini key stays server-side (F3)."""
     ctx = BusinessContext()

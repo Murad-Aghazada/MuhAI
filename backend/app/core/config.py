@@ -18,10 +18,17 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://muhai:muhai_secret@localhost:5432/muhai"
     )
 
+    # Apply Alembic migrations from the app's own startup hook. Convenient on a
+    # workstation, wrong under multiple uvicorn workers — they would race each
+    # other for the same schema lock. In Docker a one-shot `migrate` service
+    # runs them first and this is switched off.
+    RUN_MIGRATIONS_ON_STARTUP: bool = True
+
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Security
+    # Security. Sessions are signed with this; changing it logs everyone out.
+    # Generate with: openssl rand -hex 32
     SECRET_KEY: str = "change_me_in_production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
@@ -34,16 +41,11 @@ class Settings(BaseSettings):
     # Empty falls back to chat_service.GEMINI_MODEL_DEFAULT.
     GEMINI_MODEL: str = ""
 
-    # ── Firebase ───────────────────────────────────────────────────────
-    # Firestore is the system of record; this API is a stateless compute
-    # layer. Callers authenticate with a Firebase ID token, verified against
-    # this project id. No service-account key is required.
-    FIREBASE_PROJECT_ID: str = ""
-
-    # Set to false only for an offline demo where Google's public signing
-    # certificates are unreachable. Compute endpoints then accept unauthenticated
-    # calls. Never do this on a deployment the jury (or anyone) can reach.
-    FIREBASE_AUTH_REQUIRED: bool = True
+    # ── Compute layer ──────────────────────────────────────────────────
+    # /api/compute reads no table, so it needs an identity but not a company.
+    # Set false only for an offline demo: the endpoints then accept
+    # unauthenticated calls. Never do this on a deployment anyone can reach.
+    COMPUTE_AUTH_REQUIRED: bool = True
 
     # CORS — comma-separated origins. Kept as a plain string so
     # pydantic-settings does not attempt to JSON-decode it; use

@@ -1,6 +1,6 @@
 """Schemas for the stateless ``/api/compute`` layer.
 
-Firestore holds the data; the client posts the slice it needs analysed and gets
+The workspace holds the data; the client posts the slice it needs analysed and gets
 computed results back. Nothing here touches the database, so every endpoint is
 a pure function of its request body.
 """
@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ── Shared input records (mirrors of the Firestore documents) ──────────
+# ── Shared input records (mirrors of the workspace documents) ──────────
 
 
 class TxnIn(BaseModel):

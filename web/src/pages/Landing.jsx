@@ -27,7 +27,7 @@ const FEATURES = [
 ]
 
 // Illustrative series for the marketing hero mock only. Real figures come
-// from Firestore + the compute API once you are signed in.
+// from the workspace + the compute API once you are signed in.
 const PREVIEW_CASHFLOW = [
   { income: 183000, expense: 118000 },
   { income: 176000, expense: 109000 },
