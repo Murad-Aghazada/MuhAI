@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Sparkles, FileText } from 'lucide-react'
+import { Sparkles, FileText, WifiOff } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 
 /* Render **bold** inline, leaving the rest as text. */
@@ -79,6 +79,12 @@ export default function ChatMessages({ messages, loading, welcome }) {
           </span>
           <div className="msg__bubble">
             <FormattedText text={m.text} />
+            {m.source === 'offline' && (
+              <div className="msg__offline">
+                <WifiOff size={10} strokeWidth={2.4} />
+                {t('assistant.offlineBadge')}
+              </div>
+            )}
             {m.sources?.length > 0 && (
               <div className="msg__sources">
                 <span className="msg__sources-label">{t('assistant.sources')}</span>

@@ -246,7 +246,7 @@ def test_chat_grounds_on_the_snapshot(client):
     assert r.status_code == 200
     body = r.json()
     assert body["reply"]
-    assert body["source"] in {"placeholder", "ai"}
+    assert body["source"] in {"placeholder", "ai", "offline"}
 
 
 def test_chat_works_without_a_snapshot(client):

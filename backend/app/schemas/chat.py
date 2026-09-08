@@ -9,7 +9,8 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
-    source: Literal["placeholder", "ai"] = "placeholder"
+    # "offline" = answered locally by retrieval + pre-answered questions.
+    source: Literal["placeholder", "ai", "offline"] = "offline"
 
 
 class QuickQuestionsResponse(BaseModel):

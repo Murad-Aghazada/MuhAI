@@ -238,4 +238,4 @@ class ComputeChatRequest(BaseModel):
 
 class ComputeChatResponse(BaseModel):
     reply: str
-    source: Literal["placeholder", "ai"]
+    source: Literal["placeholder", "ai", "offline"]

@@ -120,6 +120,22 @@
 .msg__bubble strong { color: var(--ink); font-weight: 700; }
 .msg--user .msg__bubble strong { color: #fff; }
 
+/* Shown when the backend answered from the local knowledge base because
+   Gemini was unreachable — the answer is real, just not model-generated. */
+.msg__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-inset, #f2f2ee);
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+}
+
 .msg__sources {
   display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
 }
