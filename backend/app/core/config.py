@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     # AI (Gemini). When empty, the chatbot uses the offline rule backend.
     GEMINI_API_KEY: str = ""
+    # Empty falls back to chat_service.GEMINI_MODEL_DEFAULT.
+    GEMINI_MODEL: str = ""
 
     # ── Firebase ───────────────────────────────────────────────────────
     # Firestore is the system of record; this API is a stateless compute

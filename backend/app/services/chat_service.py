@@ -129,10 +129,26 @@ class RuleChatBackend(ChatBackend):
         return ChatResponse(reply=_DEFAULT_REPLY, source="placeholder")
 
 
+# Stable, generally-available Flash model. Overridable via GEMINI_MODEL so the
+# model can be changed without touching code. The previously hardcoded
+# "gemini-1.5-flash" has been retired and 404s on the v1beta endpoint.
+GEMINI_MODEL_DEFAULT = "gemini-2.5-flash"
+_GEMINI_ENDPOINT = (
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+)
+_GEMINI_TIMEOUT = 20
+
+
 class GeminiChatBackend(ChatBackend):
     """Calls Gemini with the system prompt + business context injected.
 
-    Falls back to the rule backend on any error (missing SDK, network, quota).
+    Talks to the REST endpoint with the standard library rather than the
+    google-generativeai SDK: that package was never in requirements.txt, so the
+    old ``import google.generativeai`` raised ImportError on every call and this
+    backend silently degraded to the rule matcher. Same stdlib-only approach as
+    app/core/firebase_auth.py — no new dependency, no image rebuild.
+
+    Falls back to the rule backend on any error (network, quota, bad key).
     """
 
     def __init__(self) -> None:
@@ -140,17 +156,33 @@ class GeminiChatBackend(ChatBackend):
 
     def reply(self, message: str, ctx: BusinessContext) -> ChatResponse:
         try:
-            import google.generativeai as genai
+            import json
+            import urllib.request
 
             from app.core.config import settings
 
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel(
-                "gemini-1.5-flash",
-                system_instruction=f"{SYSTEM_PROMPT}\nMevcut veriler: {ctx.as_prompt_block()}",
+            model = getattr(settings, "GEMINI_MODEL", "") or GEMINI_MODEL_DEFAULT
+            instruction = f"{SYSTEM_PROMPT}\nMevcut veriler: {ctx.as_prompt_block()}"
+            payload = {
+                "system_instruction": {"parts": [{"text": instruction}]},
+                "contents": [{"role": "user", "parts": [{"text": message}]}],
+            }
+            req = urllib.request.Request(
+                _GEMINI_ENDPOINT.format(model=model),
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    # Key travels in a header, not the query string, so it does
+                    # not end up in proxy or access logs.
+                    "x-goog-api-key": settings.GEMINI_API_KEY,
+                },
+                method="POST",
             )
-            resp = model.generate_content(message)
-            text = (getattr(resp, "text", "") or "").strip()
+            with urllib.request.urlopen(req, timeout=_GEMINI_TIMEOUT) as resp:
+                body = json.load(resp)
+
+            parts = body["candidates"][0]["content"]["parts"]
+            text = "".join(p.get("text", "") for p in parts).strip()
             if not text:
                 raise ValueError("empty response")
             return ChatResponse(reply=text, source="ai")

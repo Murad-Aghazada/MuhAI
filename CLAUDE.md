@@ -7,7 +7,7 @@ Application ID 4579275 · Baku Higher Oil School.
 This file is the working handoff. It is auto-loaded each session — read it
 before starting work, and update it when facts change.
 
-Last verified: **2026-09-07**.
+Last verified: **2026-09-08**.
 
 ---
 
@@ -130,7 +130,9 @@ Pydantic v2, Celery 5.3, Redis 5.
 - Prophet 1.1.5 forecasting, moving-average fallback under 10 points and on any
   Prophet failure. **Confirmed running on real seeded data** (120 daily points,
   80% interval) on 2026-09-07
-- `chat_service.py`: Gemini backend + deterministic offline fallback
+- `chat_service.py`: Gemini backend (`gemini-2.5-flash` over the REST endpoint,
+  stdlib `urllib` only) + deterministic offline fallback. Verified answering
+  open-ended questions with `source="ai"` on 2026-09-08
 - Muhai Score: 8 weighted categories, pure and explainable
 - Tax engine: 2026 KDV / income / corporate / stopaj / SGK / stamp rates
 
@@ -170,7 +172,7 @@ batch classification, chat with and without a snapshot, and that
 |---|---|---|---|
 | F1 | ~~**Prophet does not run.**~~ Cause: `requirements.txt` pinned `prophet==1.1.5` but left **cmdstanpy unpinned**, resolving to 1.3.0, whose stricter `set_cmdstan_path()` validation rejects Prophet's stripped `stan_model/cmdstan-2.33.1`, so every Stan backend fails to load. Fixed by pinning `cmdstanpy==1.2.4` and widening `forecast_cashflow()` to fall back on any Prophet failure. | **Critical** | **Fixed 2026-09-01** |
 | F2 | ~~**Frontend and backend are disconnected.**~~ The web client now has an API client (`web/src/lib/api.js`), sends a Firebase ID token, and renders backend-computed dashboard, score, forecast, tax and payroll figures. | **Critical** | **Fixed 2026-09-07** |
-| F3 | **Gemini API key was public.** Removed from the frontend entirely — `web/src/lib/gemini.js` is deleted, the assistant goes through `/api/compute/chat`, and a build of `dist/` contains no key and no `generativelanguage` endpoint. **The old key value was exposed and still needs rotating in Google AI Studio.** | High | Frontend clean; **key rotation still owed** |
+| F3 | **Gemini API key was hardcoded in the frontend.** Removed entirely — `web/src/lib/gemini.js` is deleted, the assistant goes through `/api/compute/chat`, and `web/dist/` contains no key and no `generativelanguage` endpoint. **Scope checked 2026-09-08: the key is *not* in git history** — every committed revision of `gemini.js` holds the literal `'REDACTED_ROTATED_KEY'`, and the only `AIza…` strings in history are the Firebase web config (public by design, N9). The live key exists only in `backend/.env`, which is git-ignored. Exposure was therefore limited to the pre-git working tree, the lost `D:\MuhAI` copy, and any bundle built from it — the app was never publicly deployed (`firebase.json` has no `hosting` block). | High → Medium | Frontend clean; **rotation advisable, not urgent** |
 | F4 | **`SECRET_KEY` was `change_me_in_production`.** Local `.env` has a generated key. Only signs the legacy JWT routes now; `/api/compute` uses Firebase tokens. | High | Fixed locally |
 | F5 | **Expo/React Native client lost.** Affects speech claim S14. | High | Open |
 | F6 | ~~**No auth on the web app.**~~ Firebase Auth email/password, company registration, protected routes, per-company Firestore rules. | High | **Fixed 2026-09-07** |
@@ -180,6 +182,7 @@ batch classification, chat with and without a snapshot, and that
 | F10 | **Empty tables.** Moot for the app — Firestore is the store and all five collections carry data. The Postgres tables under the `legacy` profile remain unexercised. | Low | Superseded by the Firestore migration |
 | F11 | ~~**Dead UI controls.**~~ Topbar search, notifications, account menu, logout, export→CSV, add/edit/delete invoice, mark-paid, add/adjust/delete product, add/delete employee, mark-filed, refresh, seed/clear data all work. | Medium (demo risk) | **Fixed 2026-09-07** |
 | F12 | ~~**Expense classifier rule order.**~~ `marketing` is now checked before `software`, so "Google reklam" classifies on spend intent, not vendor brand. | Low | **Fixed 2026-09-07** |
+| F14 | **The Gemini assistant never actually ran.** `GeminiChatBackend.reply()` did `import google.generativeai`, but that package is not in `requirements.txt` and is not in the image — so every call raised `ImportError`, was swallowed by the bare `except Exception`, and returned the keyword-matcher answer with `source="placeholder"`. The hardcoded `gemini-1.5-flash` had also been retired and would have 404'd. Rewritten to call the REST endpoint with stdlib `urllib` (same approach as `firebase_auth.py`, no new dependency, no image rebuild) against `gemini-2.5-flash`, overridable via `GEMINI_MODEL`. | **High** | **Fixed 2026-09-08** |
 | F13 | **Scroll-triggered animations could never fire.** `useInView` does not fire in embedded/iframed contexts, and every chart animates in from `pathLength: 0` — so charts rendered blank and KPI counters froze at ₺0. Fixed with `web/src/lib/useReveal.js`, which guarantees the reveal via a fallback timer. | High (demo risk) | **Fixed 2026-09-07** |
 
 ## 7. Next steps
@@ -189,7 +192,8 @@ Phases 0–3 are done. What remains:
 ### Phase 4 — Data and demo state
 1. ~~Seed a realistic multi-month dataset~~ — `web/src/lib/seed.js`.
 2. ~~Exercise the Prophet path against real data~~ — 120 points, confirmed.
-3. Verify the assistant's offline fallback with `GEMINI_API_KEY` empty.
+3. ~~Verify the assistant's live path~~ — confirmed 2026-09-08 (F14). Still worth
+   exercising the *offline* fallback with `GEMINI_API_KEY` empty.
 4. Vendor `tur`/`eng` traineddata locally for the on-device OCR mode (F8).
 
 ### Phase 5 — Align the presentation with the code
@@ -219,7 +223,7 @@ See §8 — the claims table is the checklist.
 | S2 PostgreSQL 15 + Redis 7 | **Changed** — Firestore is the store; Postgres/Redis are opt-in for legacy routes | restate as "Cloud Firestore" |
 | S4 Docker Compose, 4 services | **Changed** — 1 service by default, 4 under `--profile legacy` | restate |
 | S5 Tesseract 5 + Turkish pack, swappable `OcrEngine` | **True**, and now reachable from the UI | none |
-| S7 Gemini 2.5 Flash + RAG | **True** (backend). Frontend RAG removed, not dead | none |
+| S7 Gemini 2.5 Flash + RAG | **True as of 2026-09-08** — the model really is `gemini-2.5-flash` and the call really reaches it (F14). Before that fix the claim was false in practice: every answer came from the keyword fallback | none |
 | S9 per-field confidence, 0.7 threshold | **True**, with a working review queue in the UI | none |
 | S6 Prophet forecasting | **True** — runs on real data with an 80% band. The sub-10-point fallback is a **moving average**; the speech says **OLS regression** | correct the "OLS" wording |
 | S18 / Slide 13 "13 servis geliştirildi ve test edildi" | Understated — **16 routers / 58 endpoints**, 122 tests | pick the number you defend |
@@ -261,6 +265,13 @@ Reminder #5 in the team's own notes gives the honest escape hatch:
   identifies the project; it grants nothing. Access is decided by Firebase Auth
   plus `firestore.rules`. Real secrets (Gemini key, JWT secret) live only in
   `backend/.env`.
+- **N12 — the API does not come back on its own after a reboot.** The `backend`
+  service has `restart: unless-stopped`, so the *container* restarts — but only
+  once the Docker **daemon** is running, and Docker Desktop does not start at
+  login unless "Start Docker Desktop when you sign in" is enabled in its
+  settings. With Docker down the web app shows *"Hesaplama servisi çevrimdışı"*
+  and the assistant silently drops to the keyword fallback. Start Docker
+  Desktop, or deploy the API somewhere always-on (Phase 6.5).
 - **N11 — `pytest` is not in the runtime image.** `requirements-dev.txt` is
   excluded on purpose, so a freshly recreated container has no pytest and the
   documented test command fails with "No module named pytest". Run
