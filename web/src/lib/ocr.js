@@ -5,6 +5,22 @@
    ============================================================ */
 import Tesseract from 'tesseract.js'
 
+/* ---- Vendored Tesseract assets (see web/public/tessdata) ------------
+   Left unconfigured, tesseract.js pulls its worker, its wasm core and the
+   language data from a CDN on first use, so the on-device OCR mode needs
+   internet. Everything is vendored under public/tessdata and pointed at
+   here, so this path works with the network unplugged.
+
+   corePath is a *directory*: tesseract.js appends the right filename
+   itself, picking tesseract-core-simd-lstm.wasm.js where WebAssembly SIMD
+   is available and tesseract-core-lstm.wasm.js where it is not. Both are
+   vendored. Only the LSTM cores are needed — the default OEM never asks
+   for the legacy engine.
+
+   langPath resolves to `<lang>.traineddata.gz`, hence gzip: true.
+   -------------------------------------------------------------------- */
+const TESSDATA = `${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/tessdata`
+
 /** "1.234,56" -> 1234.56 ; "1,234.56" -> 1234.56 ; "1.234" -> 1234 */
 export function parseTRNumber(raw) {
   if (!raw) return NaN
@@ -103,6 +119,10 @@ export function extractFields(text) {
  */
 export async function runOcr(image, onProgress) {
   const { data } = await Tesseract.recognize(image, 'tur+eng', {
+    workerPath: `${TESSDATA}/worker.min.js`,
+    corePath: TESSDATA,
+    langPath: TESSDATA,
+    gzip: true,
     logger: (m) => {
       if (m.status === 'recognizing text' && onProgress) onProgress(m.progress)
     },
