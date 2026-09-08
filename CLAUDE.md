@@ -183,6 +183,7 @@ batch classification, chat with and without a snapshot, and that
 | F11 | ~~**Dead UI controls.**~~ Topbar search, notifications, account menu, logout, export→CSV, add/edit/delete invoice, mark-paid, add/adjust/delete product, add/delete employee, mark-filed, refresh, seed/clear data all work. | Medium (demo risk) | **Fixed 2026-09-07** |
 | F12 | ~~**Expense classifier rule order.**~~ `marketing` is now checked before `software`, so "Google reklam" classifies on spend intent, not vendor brand. | Low | **Fixed 2026-09-07** |
 | F14 | **The Gemini assistant never actually ran.** `GeminiChatBackend.reply()` did `import google.generativeai`, but that package is not in `requirements.txt` and is not in the image — so every call raised `ImportError`, was swallowed by the bare `except Exception`, and returned the keyword-matcher answer with `source="placeholder"`. The hardcoded `gemini-1.5-flash` had also been retired and would have 404'd. Rewritten to call the REST endpoint with stdlib `urllib` (same approach as `firebase_auth.py`, no new dependency, no image rebuild) against `gemini-2.5-flash`, overridable via `GEMINI_MODEL`. | **High** | **Fixed 2026-09-08** |
+| F15 | **Auth headline was invisible.** `index.css` has a global `h1, h2, h3, h4, h5 { color: var(--ink) }`; a type selector out-specifies an *inherited* value, so `.auth-aside__title` — which declared no colour of its own — resolved to `#0e1311` on the `#0e1311` aside gradient. The main headline on `/login` and `/register` had been unreadable since the screens were built. Fixed with an explicit `color: #fff`. | Medium (demo risk) | **Fixed 2026-09-08** |
 | F13 | **Scroll-triggered animations could never fire.** `useInView` does not fire in embedded/iframed contexts, and every chart animates in from `pathLength: 0` — so charts rendered blank and KPI counters froze at ₺0. Fixed with `web/src/lib/useReveal.js`, which guarantees the reveal via a fallback timer. | High (demo risk) | **Fixed 2026-09-07** |
 
 ## 7. Next steps
@@ -204,12 +205,29 @@ See §8 — the claims table is the checklist.
 2. Expand test coverage to the legacy route layer with a test database.
 3. CI running migrations + tests.
 4. Rate limiting on public endpoints.
-5. Deploy somewhere the jury can reach (Firebase Hosting for `web/`, any
-   container host for the API; set `BACKEND_CORS_ORIGINS` and `VITE_API_URL`).
-6. Offline demo path that survives venue network failure.
+5. ~~Deploy somewhere the jury can reach.~~ **Decided 2026-09-08: local only.**
+   Cloud Run was offered and declined; the API stays in Docker on the dev
+   machine. Consequence: the app is reachable only where the stack runs, and
+   teammates cannot use it remotely (see Phase 7.1).
+6. Offline demo path that survives venue network failure. **Note the assistant
+   is now genuinely network-dependent** — since F14 it really calls Gemini, so
+   a dead venue network drops it to the keyword fallback. That is graceful, but
+   it is no longer a theoretical risk.
 
 ### Phase 7 — Backlog surfaced by the migration
-1. Multi-user companies: `members[]` supports it, but there is no invite flow.
+1. **Multi-user companies — blocked, design settled, not built.** Investigated
+   2026-09-08. `firestore.rules` freezes the member list
+   (`request.resource.data.members == resource.data.members`) and
+   `createCompany()` mints a fresh company per registration, so a teammate who
+   signs up lands in their own empty company with no path into yours. Agreed
+   shape: email-keyed invites at `companies/{cid}/invites/{email}`, with rules
+   letting a signed-in non-member add **only their own uid** to `members` when
+   an invite exists for `request.auth.token.email` — guarded by a size check,
+   `toSet().difference()` so nobody can be dropped, and
+   `diff().affectedKeys().hasOnly(['members'])`. One prerequisite: the catch-all
+   `match /{collection}/{docId}` must be narrowed to the five real collections,
+   because Firestore `allow` rules are OR'd and it would otherwise grant every
+   member write access to `invites`.
 2. Move server OCR onto the Celery worker so the request returns a job id.
 3. Bank transactions / reconciliation and vendor-category learning have no
    Firestore equivalent yet — they exist only on the legacy Postgres routes.
