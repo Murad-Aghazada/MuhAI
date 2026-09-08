@@ -133,9 +133,10 @@ sidebar below 1000 px but were not verified (no test account).
 
 ## 5. Open items
 
-1. **Verify the signed-in screens on a phone viewport.** Landing and auth are
-   confirmed at 375 px; the app shell has a drawer sidebar below 1000 px but
-   was never checked with a real account.
+1. **Walk the signed-in screens on a phone while logged in.** The layout was
+   measured at 375 px against the real CSS on 2026-09-08 and the two overflows
+   found were fixed (N15). What is still unchecked is the live experience with
+   a real account: touch targets, the sidebar drawer, modals and long lists.
 2. **Deploy the backend to the VPS** when it exists; set `BACKEND_CORS_ORIGINS`
    and `VITE_API_URL`.
 3. Grow the offline knowledge base. 20 passages cover the common ground; add a
@@ -200,6 +201,13 @@ threshold with a working review queue).
 - **N11 — `pytest` is not in the runtime image.** Run
   `docker compose exec backend pip install -r requirements-dev.txt` once after
   any `docker compose down` or rebuild.
+- **N15 — Measure mobile layout, do not eyeball it.** Inject a representative
+  element at a 375 px viewport and compare `scrollWidth` against the parent's
+  `clientWidth`. That is how the two real overflows were found — a nine-column
+  table at 684 px in a 341 px panel, and a five-button `.seg` at 389 px — while
+  `.ocr-fields` and `.ocr-item`, which looked equally suspect in the CSS,
+  measured clean. Wide content scrolls in its own container (`.tbl-scroll`,
+  and `.seg` below 760 px); the page body must never scroll sideways.
 - **N14 — The offline assistant's two numbers do different jobs.** In
   `rag.py`, `Hit.score` is raw BM25 and only orders results; `Hit.ratio` is
   idf-weighted query coverage in [0, 1] and is the only one safe to threshold,
