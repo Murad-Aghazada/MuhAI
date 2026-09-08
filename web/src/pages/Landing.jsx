@@ -7,6 +7,7 @@ import {
 import { useLang } from '../i18n/LanguageContext.jsx'
 import LanguageToggle from '../components/layout/LanguageToggle.jsx'
 import AnimatedNumber from '../components/ui/AnimatedNumber.jsx'
+import Reveal from '../components/ui/Reveal.jsx'
 import AreaChart from '../components/charts/AreaChart.jsx'
 import DonutChart from '../components/charts/DonutChart.jsx'
 import { MONTHS } from '../lib/format.js'
@@ -150,14 +151,7 @@ export default function Landing() {
         <SectionHead eyebrow={t('landing.featuresEyebrow')} title={t('landing.featuresTitle')} sub={t('landing.featuresSub')} />
         <div className="lp-features">
           {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.key}
-              variants={fadeUp}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, margin: '-60px' }}
-              custom={i}
-            >
+            <Reveal key={f.key} variants={fadeUp} custom={i}>
               <Link to={f.to} className="lp-feature" style={{ '--accent': f.color }}>
                 <div className="lp-feature__top">
                   <span className="lp-feature__icon">
@@ -172,7 +166,7 @@ export default function Landing() {
                   {t('landing.featureCta')} <ArrowRight size={14} strokeWidth={2.6} />
                 </span>
               </Link>
-            </motion.div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -182,12 +176,12 @@ export default function Landing() {
         <SectionHead eyebrow={t('landing.howEyebrow')} title={t('landing.howTitle')} center />
         <div className="lp-steps">
           {['how1', 'how2', 'how3'].map((s, i) => (
-            <motion.div key={s} className="lp-step" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={i}>
+            <Reveal key={s} className="lp-step" variants={fadeUp} custom={i}>
               <span className="lp-step__num">0{i + 1}</span>
               <h4>{t(`landing.${s}Title`)}</h4>
               <p>{t(`landing.${s}Desc`)}</p>
               {i < 2 && <ArrowRight className="lp-step__arrow" size={20} />}
-            </motion.div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -195,7 +189,7 @@ export default function Landing() {
       {/* ---- AI showcase ---- */}
       <section className="lp-section lp-ai" id="assistant">
         <div className="lp-ai__grid">
-          <motion.div className="lp-ai__copy" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
+          <Reveal className="lp-ai__copy" variants={fadeUp}>
             <span className="eyebrow">{t('landing.aiEyebrow')}</span>
             <h2>{t('landing.aiTitle')}</h2>
             <p>{t('landing.aiSub')}</p>
@@ -205,9 +199,9 @@ export default function Landing() {
               ))}
             </ul>
             <Link to="/app/assistant" className="btn btn--primary">{t('dashboard.insightAction')} <ArrowUpRight size={16} /></Link>
-          </motion.div>
+          </Reveal>
 
-          <motion.div className="lp-ai__visual" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} custom={1}>
+          <Reveal className="lp-ai__visual" variants={fadeUp} custom={1}>
             <div className="lp-chat-demo">
               <div className="lp-chat-demo__head"><Database size={13} /> {t('assistant.ragOn')}</div>
               <div className="lp-chat-demo__msg lp-chat-demo__msg--user">{t('assistant.suggest1')}</div>
@@ -222,18 +216,18 @@ export default function Landing() {
             <div className="lp-ai__donut">
               <DonutChart data={donutData} size={120} thickness={16} centerLabel={t('dashboard.kpiExpense')} formatValue={() => '%100'} />
             </div>
-          </motion.div>
+          </Reveal>
         </div>
       </section>
 
       {/* ---- CTA ---- */}
       <section className="lp-cta">
-        <motion.div className="lp-cta__inner" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
+        <Reveal className="lp-cta__inner" variants={fadeUp}>
           <div className="lp-cta__glow" />
           <h2>{t('landing.ctaTitle')}</h2>
           <p>{t('landing.ctaSub')}</p>
           <Link to="/register" className="btn btn--brand">{t('landing.ctaButton')} <ArrowRight size={17} /></Link>
-        </motion.div>
+        </Reveal>
       </section>
 
       {/* ---- Footer ---- */}
@@ -277,11 +271,11 @@ function Stat({ value, suffix, label, fmt }) {
 
 function SectionHead({ eyebrow, title, sub, center }) {
   return (
-    <motion.div className={`lp-sec-head ${center ? 'lp-sec-head--center' : ''}`} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
+    <Reveal className={`lp-sec-head ${center ? 'lp-sec-head--center' : ''}`} variants={fadeUp}>
       <span className="eyebrow">{eyebrow}</span>
       <h2>{title}</h2>
       {sub && <p>{sub}</p>}
-    </motion.div>
+    </Reveal>
   )
 }
 
