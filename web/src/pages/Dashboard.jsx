@@ -335,7 +335,8 @@ export default function Dashboard() {
               {t('common.viewAll')} <ArrowUpRight size={14} strokeWidth={2.4} />
             </button>
           </div>
-          <table className="tbl">
+          <div className="tbl-scroll">
+            <table className="tbl">
             <thead>
               <tr>
                 <th>{t('invoices.colVendor')}</th>
@@ -360,7 +361,8 @@ export default function Dashboard() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </motion.section>
       </div>
     </div>

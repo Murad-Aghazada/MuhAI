@@ -114,7 +114,8 @@ export default function Payroll() {
           </div>
 
           {employees.length ? (
-            <table className="tbl">
+            <div className="tbl-scroll">
+              <table className="tbl">
               <thead>
                 <tr>
                   <th>{t('payroll.colName')}</th>
@@ -157,7 +158,8 @@ export default function Payroll() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           ) : (
             <div className="chart-empty" style={{ height: 180 }}>{t('common.none')}</div>
           )}

@@ -346,6 +346,21 @@
 }
 .seg button.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--sh-xs); }
 
+@media (max-width: 760px) {
+  /* The invoice filter row is five Turkish labels — 389px against a 341px
+     panel, which pushed the whole page sideways. The control scrolls instead.
+     Wrapping was the other option but it breaks the pill into ragged rows and
+     loses the segmented-control affordance. */
+  .seg {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button { flex-shrink: 0; }
+}
+
 .search-inline {
   display: flex;
   align-items: center;

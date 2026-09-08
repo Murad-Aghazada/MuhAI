@@ -190,7 +190,8 @@ export default function Inventory() {
           </div>
 
           {visible.length ? (
-            <table className="tbl">
+            <div className="tbl-scroll">
+              <table className="tbl">
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 22 }}>{t('inventory.colProduct')}</th>
@@ -236,7 +237,8 @@ export default function Inventory() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           ) : (
             <div className="chart-empty" style={{ height: 160, margin: '0 22px' }}>{t('common.none')}</div>
           )}

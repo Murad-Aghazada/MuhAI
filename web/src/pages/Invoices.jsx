@@ -350,7 +350,8 @@ export default function Invoices() {
             {t('invoices.noInvoices')}
           </div>
         ) : (
-          <table className="tbl">
+          <div className="tbl-scroll">
+            <table className="tbl">
             <thead>
               <tr>
                 <th style={{ paddingLeft: 22 }}>{t('invoices.colVendor')}</th>
@@ -417,7 +418,8 @@ export default function Invoices() {
                 )
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </section>
 

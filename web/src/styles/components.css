@@ -156,9 +156,28 @@
 .btn--sm { padding: 8px 14px; font-size: 13px; }
 
 /* ---- Tables ---- */
+/* These tables run to nine columns. On a 375px phone the panel is ~341px wide
+   while the table needs 684px, so without a scroll container of its own the
+   table drags the whole page sideways. Squashing it instead is not an option:
+   the cells hold currency and dates that must stay readable. So the table
+   keeps a usable minimum width and scrolls horizontally inside this wrapper,
+   and the page body never scrolls. */
+.tbl-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .tbl {
   width: 100%;
   border-collapse: collapse;
+}
+
+@media (max-width: 760px) {
+  /* Below the wrapper's minimum the table scrolls rather than compresses.
+     Tighter cell padding buys back roughly a column's worth of width. */
+  .tbl { min-width: 600px; }
+  .tbl th { padding: 0 11px 10px; }
+  .tbl td { padding: 12px 11px; font-size: 13px; }
 }
 .tbl th {
   text-align: left;

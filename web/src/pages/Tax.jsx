@@ -219,7 +219,8 @@ export default function Tax() {
           </div>
 
           {taxObligations.length ? (
-            <table className="tbl">
+            <div className="tbl-scroll">
+              <table className="tbl">
               <thead>
                 <tr>
                   <th>{t('tax.colType')}</th>
@@ -257,7 +258,8 @@ export default function Tax() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           ) : (
             <div className="chart-empty" style={{ height: 140, margin: '0 22px' }}>{t('common.none')}</div>
           )}
