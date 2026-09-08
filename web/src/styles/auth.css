@@ -13,9 +13,8 @@
 
 /* ---- Left panel ---- */
 .auth-page__aside {
-  background: var(--surface);
-  color: var(--ink);
-  border-right: 1px solid var(--line);
+  background: linear-gradient(160deg, #0e1311 0%, #16201c 55%, #10201a 100%);
+  color: #fff;
   padding: 38px 40px;
   display: flex;
   flex-direction: column;
@@ -30,7 +29,7 @@
   height: 420px;
   right: -180px;
   top: 20%;
-  background: radial-gradient(circle, rgba(14, 159, 110, 0.13), transparent 68%);
+  background: radial-gradient(circle, rgba(14, 159, 110, 0.4), transparent 68%);
   filter: blur(28px);
   pointer-events: none;
 }
@@ -42,7 +41,7 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 20px;
-  color: var(--ink);
+  color: #fff;
   text-decoration: none;
   position: relative;
   z-index: 1;
@@ -51,14 +50,18 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: var(--brand-tint);
-  border: 1px solid #cfeade;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: grid;
   place-items: center;
 }
 
 .auth-aside__body { position: relative; z-index: 1; }
 .auth-aside__title {
+  /* Explicit, not inherited: the global `h1..h5 { color: var(--ink) }` in
+     index.css out-specifies the `color: #fff` on .auth-page__aside, which
+     left this headline near-black on a near-black ground. */
+  color: #fff;
   font-family: var(--font-display);
   font-size: clamp(24px, 2.4vw, 31px);
   line-height: 1.22;
@@ -74,8 +77,8 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: var(--brand-tint);
-  color: var(--brand-deep);
+  background: rgba(14, 159, 110, 0.2);
+  color: #4fd6a0;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -85,7 +88,7 @@
   display: block;
   font-style: normal;
   font-size: 12.5px;
-  color: var(--ink-3);
+  color: #fff;
   margin-top: 2px;
 }
 
@@ -93,7 +96,7 @@
   position: relative;
   z-index: 1;
   font-size: 12px;
-  color: var(--ink-4);
+  color: #fff;
   font-family: var(--font-mono);
 }
 
