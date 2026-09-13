@@ -28,7 +28,9 @@ export default function AppLayout() {
             </motion.main>
           </AnimatePresence>
         </div>
-        <ChatWidget />
+        {/* The drawer is 280px wide; the launcher's label made it 150px wide
+            at right:16px, so the two met over the sidebar's Muhai Score. */}
+        <ChatWidget compact={menuOpen} />
       </div>
     </DataProvider>
   )

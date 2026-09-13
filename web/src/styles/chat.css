@@ -244,3 +244,15 @@
   .chat-fab { right: 16px; bottom: 16px; }
   .chat-panel { right: 8px; bottom: 8px; }
 }
+
+/* The sidebar is a 280px drawer below 1000px. While it is open the launcher
+   collapses to a circle so it clears the drawer instead of sitting on top of
+   the Muhai Score in its footer. */
+@media (max-width: 1000px) {
+  .chat-fab--compact {
+    width: 58px;
+    padding: 0;
+    justify-content: center;
+  }
+  .chat-fab--compact .chat-fab__label { display: none; }
+}

@@ -7,7 +7,7 @@ import { useChat } from './useChat.js'
 import ChatMessages from './ChatMessages.jsx'
 import ChatComposer from './ChatComposer.jsx'
 
-export default function ChatWidget() {
+export default function ChatWidget({ compact = false }) {
   const { t } = useLang()
   const { messages, loading, send } = useChat()
   const [open, setOpen] = useState(false)
@@ -23,8 +23,9 @@ export default function ChatWidget() {
       <AnimatePresence>
         {!open && (
           <motion.button
-            className="chat-fab"
+            className={`chat-fab ${compact ? 'chat-fab--compact' : ''}`}
             onClick={() => setOpen(true)}
+            aria-label={t('chatbot.open')}
             initial={{ opacity: 0, scale: 0.8, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 10 }}
@@ -33,7 +34,10 @@ export default function ChatWidget() {
             <span className="chat-fab__spark">
               <Sparkles size={16} strokeWidth={2.4} />
             </span>
-            {t('chatbot.open')}
+            {/* Kept in the DOM and hidden in CSS rather than removed: the
+                compact state is only meaningful under the drawer breakpoint,
+                and a stale `compact` must not strip the label on desktop. */}
+            <span className="chat-fab__label">{t('chatbot.open')}</span>
           </motion.button>
         )}
       </AnimatePresence>
