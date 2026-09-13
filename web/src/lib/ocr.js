@@ -1,5 +1,5 @@
 /* ============================================================
-   Real client-side OCR with Tesseract.js (tur + eng).
+   Real client-side OCR with Tesseract.js, Turkish only.
    Recognizes an uploaded invoice image and heuristically
    parses Turkish-invoice fields out of the raw text.
    ============================================================ */
@@ -120,8 +120,9 @@ export function extractFields(text) {
 
    Turkish alone, not "tur+eng": running both models costs a second pass and
    reconciles two dictionaries against Turkish text, which loses fields rather
-   than winning them. `eng.traineddata.gz` is still vendored for anyone who
-   wants to put it back.
+   than winning them. Only `tur.traineddata.gz` is vendored now; adding
+   English back means putting `eng.traineddata.gz` into public/tessdata as
+   well, or tesseract.js will try to fetch it from a CDN and fail offline.
 
    The worker is created once and reused. Each creation re-fetches and
    re-instantiates ~4 MB of wasm, which is the slowest part of a scan.

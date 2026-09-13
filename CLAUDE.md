@@ -272,7 +272,8 @@ threshold with a working review queue).
   autostart is currently off. With Docker down the app shows "hesaplama servisi
   çevrimdışı" and the assistant drops to the keyword fallback.
 - **N13 — Browser OCR assets are vendored, not fetched.** `web/public/tessdata`
-  holds the worker, both LSTM wasm cores and gzipped `tur`/`eng` traineddata;
+  holds the worker, both LSTM wasm cores and the gzipped `tur` traineddata
+  (English was dropped on 2026-09-13, see N18);
   `web/src/lib/ocr.js` passes `workerPath`, `corePath` and `langPath` so
   nothing is pulled from a CDN. `.gitattributes` marks the directory `-text`
   because the cores inline their wasm as base64 and a CRLF rewrite would
