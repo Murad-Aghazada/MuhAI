@@ -111,6 +111,50 @@ export function extractFields(text) {
   }
 }
 
+/* ---- Worker ---------------------------------------------------------
+   `Tesseract.recognize()` cannot set page-segmentation mode, and the default
+   (PSM 3, full layout analysis) reads an invoice as two columns — labels in
+   one, amounts in the other — so `extractFields` below finds "Ara Toplam:"
+   with no number beside it. PSM 6 treats the page as one uniform block and
+   keeps each row together. Same finding as the server engine, same fix.
+
+   Turkish alone, not "tur+eng": running both models costs a second pass and
+   reconciles two dictionaries against Turkish text, which loses fields rather
+   than winning them. `eng.traineddata.gz` is still vendored for anyone who
+   wants to put it back.
+
+   The worker is created once and reused. Each creation re-fetches and
+   re-instantiates ~4 MB of wasm, which is the slowest part of a scan.
+   -------------------------------------------------------------------- */
+let workerPromise = null
+// The worker outlives any one scan, so its logger cannot close over a single
+// caller's callback. It reports to whichever scan is currently running.
+let activeProgress = null
+
+function getWorker() {
+  if (!workerPromise) {
+    workerPromise = Tesseract.createWorker('tur', 1, {
+      workerPath: `${TESSDATA}/worker.min.js`,
+      corePath: TESSDATA,
+      langPath: TESSDATA,
+      gzip: true,
+      logger: (m) => {
+        if (m.status === 'recognizing text' && activeProgress) activeProgress(m.progress)
+      },
+    })
+      .then(async (worker) => {
+        await worker.setParameters({ tessedit_pageseg_mode: '6' })
+        return worker
+      })
+      .catch((err) => {
+        // Never cache a failed init — the next scan should be able to retry.
+        workerPromise = null
+        throw err
+      })
+  }
+  return workerPromise
+}
+
 /**
  * Run OCR on an image (File, Blob, data URL, or <img>/canvas).
  * @param {*} image
@@ -118,18 +162,16 @@ export function extractFields(text) {
  * @returns {Promise<{text:string, confidence:number, fields:object}>}
  */
 export async function runOcr(image, onProgress) {
-  const { data } = await Tesseract.recognize(image, 'tur+eng', {
-    workerPath: `${TESSDATA}/worker.min.js`,
-    corePath: TESSDATA,
-    langPath: TESSDATA,
-    gzip: true,
-    logger: (m) => {
-      if (m.status === 'recognizing text' && onProgress) onProgress(m.progress)
-    },
-  })
-  return {
-    text: data.text || '',
-    confidence: Math.max(0, Math.min(100, Math.round(data.confidence || 0))),
-    fields: extractFields(data.text || ''),
+  const worker = await getWorker()
+  activeProgress = onProgress || null
+  try {
+    const { data } = await worker.recognize(image)
+    return {
+      text: data.text || '',
+      confidence: Math.max(0, Math.min(100, Math.round(data.confidence || 0))),
+      fields: extractFields(data.text || ''),
+    }
+  } finally {
+    activeProgress = null
   }
 }

@@ -31,7 +31,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # OCR
-    OCR_LANG: str = "tur+eng"
+    # Turkish only. Adding "+eng" makes Tesseract run both language models and
+    # reconcile them, which on Turkish invoices costs time and loses fields —
+    # measured 27/32 against 28/32 for "tur" alone. Set OCR_LANG="tur+eng" if a
+    # company genuinely receives English documents.
+    OCR_LANG: str = "tur"
 
     # AI (Gemini). When empty, the chatbot uses the offline rule backend.
     GEMINI_API_KEY: str = ""

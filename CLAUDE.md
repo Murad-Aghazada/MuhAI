@@ -142,8 +142,11 @@ through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
 - Prophet 1.1.5 forecasting on real data, moving-average fallback under 10
   points and on any Prophet failure
 - Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7.
-  The browser-side OCR mode is fully vendored under `web/public/tessdata`, so
-  **neither OCR path needs internet** (see N13)
+  Both paths run **Turkish only at PSM 6**, with the server path also
+  preprocessing (grayscale, upscale under 1600 px, autocontrast, unsharp).
+  See N18 — the settings matter far more than the model does. The browser-side
+  OCR mode is fully vendored under `web/public/tessdata`, so **neither OCR
+  path needs internet** (see N13)
 - Muhai Score: 8 weighted categories. Tax engine: 2026 KDV / income / corporate
   / stopaj / SGK / stamp rates
 - The user-scoped routes from before the workspace (`/api/invoices`,
@@ -309,6 +312,29 @@ threshold with a working review queue).
   `.dash-grid` rule in `pages.css` out-ordered the media query at the top of
   the file and the dashboard had been two-column on mobile all along.
   Measure with `document.body.scrollWidth` against `clientWidth` (N15).
+
+- **N18 — OCR: the config beats the model. Measured, 2026-09-13.** The
+  temptation is to download a bigger traineddata file. Benchmarked on
+  `sample-invoice.png` across four simulated capture conditions (clean, phone
+  photo, dim light, photographed from too far), scoring four fields each:
+
+  | change | score | speed |
+  |---|---|---|
+  | before — `tur+eng`, PSM 3, no preprocessing | 25/32 | 0.30 s |
+  | `tessdata_best` tur (7.5 MB download) | 25/32 | ~40% slower |
+  | drop `+eng` | 26/32 | faster |
+  | **PSM 6 instead of PSM 3** | **28/32** | faster |
+
+  `tessdata_best` was *not better even once*. PSM 3 runs full layout analysis
+  and reads an invoice as two columns, so amounts land on different lines from
+  their labels and `_extract_fields` — which matches per line — sees
+  "Ara Toplam:" with no number. PSM 6 treats the page as one block. Running
+  `tur+eng` makes Tesseract reconcile two dictionaries against Turkish text
+  and loses fields rather than winning them. Preprocessing is what rescues a
+  distant photo (1/4 fields → 3/4); it does nothing for a clean scan. If you
+  do revisit the model, re-run the benchmark rather than assuming — and
+  remember any model must be baked into the image, never fetched at runtime
+  (N13).
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the
