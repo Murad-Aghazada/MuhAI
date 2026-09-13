@@ -71,6 +71,28 @@ _FOLDED_RULES: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+def vendor_key(vendor: str | None) -> str:
+    """Normalise a vendor name into the key learned categories are stored under.
+
+    Folded, punctuation deleted and whitespace collapsed, so "Teknopark
+    Gayrimenkul A.Ş." and "teknopark  gayrimenkul as" are the same vendor.
+
+    Punctuation is *deleted* rather than turned into a space on purpose:
+    Turkish company names end in "A.Ş.", "Ltd. Şti." and friends, and
+    substituting spaces would make "A.Ş." ("a s") a different vendor from "AŞ"
+    ("as"). The cost is that a hyphenated name no longer matches its spaced
+    spelling, which is a real difference in a way an abbreviation's dots are not.
+
+    The browser applies the identical transform in ``web/src/lib/db.js`` before
+    it writes; if one side changes, both must.
+    """
+    if not vendor:
+        return ""
+    folded = _fold(vendor)
+    cleaned = "".join(ch for ch in folded if ch.isalnum() or ch.isspace())
+    return " ".join(cleaned.split())
+
+
 def classify_expense(description: str | None, vendor: str | None = None) -> str:
     """Rule-based classification. Returns a category key (never raises)."""
     text = _fold(f"{vendor or ''} {description or ''}")

@@ -101,6 +101,7 @@ def test_compute_routes_are_mounted(client):
         "/api/compute/tax-summary",
         "/api/compute/payroll",
         "/api/compute/classify",
+        "/api/compute/compliance",
         "/api/compute/ocr",
         "/api/compute/chat",
     ):
@@ -163,6 +164,125 @@ def test_uncategorised_expenses_are_classified_not_dropped(client):
     breakdown = client.post("/api/compute/dashboard", json=snap).json()["expense_breakdown"]
     assert {b["key"] for b in breakdown} == {"maintenance"}
     assert breakdown[0]["value"] == 5_000
+
+
+# ── Compliance ─────────────────────────────────────────────────────────
+def _alerts(client, **overrides) -> list[dict]:
+    return client.post("/api/compute/compliance", json=_snapshot(**overrides)).json()["alerts"]
+
+
+def _invoice_alerts(alerts: list[dict]) -> list[dict]:
+    """Everything except the deadline warnings, which depend on the calendar."""
+    return [a for a in alerts if a["type"] != "tax_deadline"]
+
+
+def test_clean_invoices_raise_no_invoice_alerts(client):
+    # The fixture's KDV is exactly 20% of net and no document repeats, so any
+    # invoice-level alert here would be a false positive.
+    assert _invoice_alerts(_alerts(client)) == []
+
+
+def test_a_repeated_invoice_number_is_flagged_high(client):
+    dupe = {
+        "id": "inv-1",
+        "number": "MUH-2026-0001",
+        "date": "2026-06-01",
+        "amount": 14_820,
+        "vat_amount": 2_470,
+        "vendor": "Anadolu Tedarik A.Ş.",
+    }
+    alerts = _invoice_alerts(
+        _alerts(client, invoices=[dupe, {**dupe, "id": "inv-2", "date": "2026-06-04"}])
+    )
+    assert len(alerts) == 1
+    assert alerts[0]["type"] == "duplicate_invoice"
+    assert alerts[0]["severity"] == "high"
+    assert alerts[0]["ref_id"] == "inv-1"
+    assert "MUH-2026-0001" in alerts[0]["description"]
+
+
+def test_same_amount_date_and_vendor_is_flagged_without_a_number(client):
+    twin = {
+        "id": "inv-1",
+        "date": "2026-06-01",
+        "amount": 6_000,   # 1.000 KDV on 5.000 net — a clean 20%
+        "vat_amount": 1_000,
+        "vendor": "Ege Ambalaj Ltd.",
+    }
+    alerts = _invoice_alerts(_alerts(client, invoices=[twin, {**twin, "id": "inv-2"}]))
+    assert [a["type"] for a in alerts] == ["duplicate_invoice"]
+    assert alerts[0]["severity"] == "medium"
+
+
+def test_kdv_larger_than_the_total_is_flagged_high(client):
+    alerts = _invoice_alerts(
+        _alerts(
+            client,
+            invoices=[{"id": "inv-1", "date": "2026-06-01", "amount": 1_000, "vat_amount": 1_400}],
+        )
+    )
+    assert [(a["type"], a["severity"]) for a in alerts] == [("suspicious_invoice", "high")]
+    assert alerts[0]["ref_id"] == "inv-1"
+
+
+def test_a_kdv_rate_that_is_not_legal_is_flagged(client):
+    # 137 / 863 ≈ 15.9% — not 1, 10 or 20 (nor the historical 8/18).
+    alerts = _invoice_alerts(
+        _alerts(
+            client,
+            invoices=[{"id": "inv-1", "date": "2026-06-01", "amount": 1_000, "vat_amount": 137}],
+        )
+    )
+    assert [(a["type"], a["severity"]) for a in alerts] == [("suspicious_invoice", "medium")]
+
+
+def test_zero_kdv_is_treated_as_exempt_not_suspicious(client):
+    alerts = _invoice_alerts(
+        _alerts(
+            client,
+            invoices=[{"id": "inv-1", "date": "2026-06-01", "amount": 1_000, "vat_amount": 0}],
+        )
+    )
+    assert alerts == []
+
+
+def test_alerts_are_severity_ordered_and_counted(client):
+    body = client.post(
+        "/api/compute/compliance",
+        json=_snapshot(
+            invoices=[
+                {"id": "a", "number": "X-1", "date": "2026-06-01", "amount": 1_000, "vat_amount": 200},
+                {"id": "b", "number": "X-1", "date": "2026-06-02", "amount": 2_000, "vat_amount": 400},
+                {"id": "c", "date": "2026-06-03", "amount": 1_000, "vat_amount": 137},
+            ]
+        ),
+    ).json()
+
+    severities = [a["severity"] for a in body["alerts"]]
+    rank = {"high": 0, "medium": 1, "low": 2}
+    assert severities == sorted(severities, key=lambda s: rank[s])
+
+    assert body["total"] == len(body["alerts"])
+    assert body["high"] == severities.count("high")
+    assert body["medium"] == severities.count("medium")
+    assert body["low"] == severities.count("low")
+
+
+def test_deadline_alerts_carry_no_invoice_reference(client):
+    alerts = client.post("/api/compute/compliance", json=_snapshot()).json()["alerts"]
+    for a in alerts:
+        if a["type"] == "tax_deadline":
+            assert a["ref_id"] is None
+            assert a["description"]
+
+
+def test_compliance_survives_an_empty_company(client):
+    body = client.post(
+        "/api/compute/compliance",
+        json={"as_of": AS_OF.isoformat(), "invoices": []},
+    ).json()
+    assert _invoice_alerts(body["alerts"]) == []
+    assert body["total"] == len(body["alerts"])
 
 
 # ── Muhai Score ────────────────────────────────────────────────────────
@@ -235,6 +355,72 @@ def test_classify_batch_preserves_ids(client):
     body = client.post("/api/compute/classify", json=payload).json()
     assert [i["id"] for i in body["items"]] == ["a", "b", "c"]
     assert [i["category"] for i in body["items"]] == ["fuel", "marketing", "other"]
+    assert {i["source"] for i in body["items"]} == {"rules"}
+
+
+def test_a_learned_vendor_beats_the_keyword_rules(client):
+    # "Teknopark" hits no rule, so the rules alone would say "other".
+    payload = {
+        "items": [{"id": "a", "vendor": "Teknopark Gayrimenkul A.Ş."}],
+        "learned": {"teknopark gayrimenkul as": "rent"},
+    }
+    body = client.post("/api/compute/classify", json=payload).json()
+    assert body["items"][0] == {"id": "a", "category": "rent", "source": "learned"}
+
+
+def test_a_learned_vendor_overrides_a_confident_rule(client):
+    # "Shell" is a fuel keyword. If this company files Shell under travel,
+    # its own correction has to win — that is the whole point of learning.
+    payload = {
+        "items": [{"id": "a", "vendor": "Shell", "description": "Shell akaryakit"}],
+        "learned": {"shell": "travel"},
+    }
+    body = client.post("/api/compute/classify", json=payload).json()
+    assert body["items"][0]["category"] == "travel"
+    assert body["items"][0]["source"] == "learned"
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        "Teknopark Gayrimenkul A.Ş.",
+        "teknopark gayrimenkul as",
+        "  TEKNOPARK   Gayrimenkul  AŞ  ",
+        "Teknopark Gayrımenkul A.S.",
+    ],
+)
+def test_vendor_spelling_variants_hit_the_same_learned_entry(client, written):
+    """Punctuation, case, spacing and Turkish diacritics must not split a vendor."""
+    body = client.post(
+        "/api/compute/classify",
+        json={
+            "items": [{"id": "a", "vendor": written}],
+            "learned": {"Teknopark Gayrimenkul A.Ş.": "rent"},
+        },
+    ).json()
+    assert body["items"][0]["category"] == "rent"
+
+
+def test_an_unknown_category_in_the_learned_map_is_ignored(client):
+    """A corrupted or hand-edited map must not inject a category the UI cannot render."""
+    body = client.post(
+        "/api/compute/classify",
+        json={
+            "items": [{"id": "a", "vendor": "Shell", "description": "Shell akaryakit"}],
+            "learned": {"shell": "not_a_real_category"},
+        },
+    ).json()
+    assert body["items"][0]["category"] == "fuel"
+    assert body["items"][0]["source"] == "rules"
+
+
+def test_classify_without_a_learned_map_still_works(client):
+    """The field is optional: an older client posts only `items`."""
+    body = client.post(
+        "/api/compute/classify",
+        json={"items": [{"id": "a", "description": "Shell akaryakit"}]},
+    ).json()
+    assert body["items"][0]["category"] == "fuel"
 
 
 # ── Chat ───────────────────────────────────────────────────────────────

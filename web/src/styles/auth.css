@@ -185,6 +185,15 @@
 .field__wrap select { cursor: pointer; }
 .field__wrap input::placeholder { color: var(--ink-4); }
 .field__hint { font-size: 12px; color: var(--ink-4); }
+/* The classifier explaining itself: why this category was pre-filled. */
+.field__hint--learn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--brand-dark);
+  font-weight: 550;
+}
 
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 520px) { .field-row { grid-template-columns: 1fr; } }

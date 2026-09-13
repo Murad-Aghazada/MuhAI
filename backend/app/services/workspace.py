@@ -28,6 +28,7 @@ from app.db.models.company import (
     CompanyProduct,
     CompanyTaxObligation,
     CompanyTransaction,
+    CompanyVendorCategory,
 )
 
 # ── Coercions ─────────────────────────────────────────────────────────
@@ -193,6 +194,16 @@ COLLECTIONS: dict[str, Collection] = {
             "startDate": ("start_date", _as_date),
             "sgkNo": ("sgk_no", _as_str),
             "demo": ("demo", _as_bool),
+        },
+    ),
+    "vendorCategories": Collection(
+        name="vendorCategories",
+        model=CompanyVendorCategory,
+        fields={
+            "vendorKey": ("vendor_key", _as_str),
+            "vendor": ("vendor", _as_str),
+            "category": ("category", _as_str),
+            "corrected": ("corrected", _as_bool),
         },
     ),
     "taxObligations": Collection(

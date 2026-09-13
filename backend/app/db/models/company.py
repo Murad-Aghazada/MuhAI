@@ -78,6 +78,9 @@ class Company(Base, TimestampMixin):
     company_tax_obligations: Mapped[List["CompanyTaxObligation"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"
     )
+    company_vendor_categories: Mapped[List["CompanyVendorCategory"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
 
 
 class CompanyInvoice(Base, TimestampMixin):
@@ -190,3 +193,39 @@ class CompanyTaxObligation(Base, TimestampMixin):
     extra: Mapped[dict[str, Any]] = _extra()
 
     company: Mapped["Company"] = relationship(back_populates="company_tax_obligations")
+
+
+class CompanyVendorCategory(Base, TimestampMixin):
+    """What the classifier has learned about one vendor.
+
+    The keyword rules in ``expense_classifier.py`` are a starting guess. When a
+    user files "Teknopark Gayrimenkul" under rent rather than the ``other`` the
+    rules produced, that correction is the company's own knowledge and belongs
+    with its data — so it lives here rather than in the stateless compute
+    layer, and the browser posts it back as part of the classify request.
+
+    Deliberately *not* unique on (company_id, vendor_key): the workspace router
+    is generic CRUD with no upsert, and a database conflict would surface as a
+    500 in the middle of saving an invoice. The client reads the collection
+    before it writes and patches the existing row; a duplicate that slips
+    through is resolved on read by taking the newest.
+    """
+
+    __tablename__ = "company_vendor_categories"
+
+    id: Mapped[str] = uuid_pk()
+    company_id: Mapped[str] = _company_fk()
+
+    # Normalised for lookup: casefolded, diacritics stripped, collapsed spaces.
+    vendor_key: Mapped[str] = mapped_column(index=True, nullable=False)
+    # The vendor as the user actually typed it, for display.
+    vendor: Mapped[str] = mapped_column(default="", nullable=False)
+    category: Mapped[str] = mapped_column(default="other", nullable=False)
+    # True when a human overrode the suggestion, false when the app merely
+    # cached what the rules already said.
+    corrected: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    extra: Mapped[dict[str, Any]] = _extra()
+
+    company: Mapped["Company"] = relationship(
+        back_populates="company_vendor_categories"
+    )

@@ -145,6 +145,7 @@ def test_every_collection_the_client_uses_is_mapped():
         "products",
         "employees",
         "taxObligations",
+        "vendorCategories",
     }
 
 

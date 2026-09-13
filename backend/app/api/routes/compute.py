@@ -22,6 +22,8 @@ from app.schemas.compute import (
     ClassifyBatchRequest,
     ClassifyBatchResponse,
     ClassifiedItem,
+    ComplianceAlertItem,
+    ComplianceOut,
     ComputeChatRequest,
     ComputeChatResponse,
     DashboardOut,
@@ -35,7 +37,8 @@ from app.schemas.compute import (
 from app.schemas.invoice import OcrExtractResult
 from app.services import compute_service as agg
 from app.services.chat_service import BusinessContext, get_chat_reply
-from app.services.expense_classifier import CATEGORIES, classify_expense
+from app.services.compliance_service import InvoiceRecord, run_all_checks
+from app.services.expense_classifier import CATEGORIES, classify_expense, vendor_key
 from app.services.forecast_service import MIN_POINTS_FOR_PROPHET, forecast_cashflow
 from app.services.muhai_score_service import compute_muhai_score
 from app.services.ocr_service import scan_invoice
@@ -144,6 +147,55 @@ async def dashboard(
         overdue_count=rollup["overdue_count"],
         deadlines=_deadlines(today),
         insight=_insight(series, rollup, runway),
+    )
+
+
+# ── Compliance ─────────────────────────────────────────────────────────
+@router.post("/compliance", response_model=ComplianceOut)
+async def compliance(
+    snapshot: BusinessSnapshot, caller: ComputeCaller
+) -> ComplianceOut:
+    """Rule checks over the posted invoices plus the 2026 tax calendar.
+
+    The engine is already a pure function of its records, so it needs no table
+    of its own: duplicates, impossible KDV and imminent deadlines all fall out
+    of the same snapshot the dashboard posts. Nothing is stored, which means
+    an alert disappears the moment the underlying invoice is corrected.
+    """
+    records = [
+        InvoiceRecord(
+            # The client sends the workspace id so the UI can link the alert
+            # back to the document. The positional fallback keeps ids unique
+            # for an older client — duplicate detection dedupes on identity.
+            id=inv.id or f"#{index}",
+            invoice_number=inv.number,
+            vendor_name=inv.vendor,
+            amount=float(inv.amount),
+            vat_amount=float(inv.vat_amount),
+            date=inv.date,
+        )
+        for index, inv in enumerate(snapshot.invoices)
+    ]
+
+    alerts = run_all_checks(records, _as_of(snapshot))
+    counts = {"high": 0, "medium": 0, "low": 0}
+    for a in alerts:
+        counts[a.severity] = counts.get(a.severity, 0) + 1
+
+    return ComplianceOut(
+        alerts=[
+            ComplianceAlertItem(
+                type=a.type,
+                severity=a.severity,
+                description=a.description,
+                ref_id=a.ref_id,
+            )
+            for a in alerts
+        ],
+        total=len(alerts),
+        high=counts["high"],
+        medium=counts["medium"],
+        low=counts["low"],
     )
 
 
@@ -276,15 +328,38 @@ async def payroll(
 async def classify(
     payload: ClassifyBatchRequest, caller: ComputeCaller
 ) -> ClassifyBatchResponse:
-    return ClassifyBatchResponse(
-        items=[
-            ClassifiedItem(
-                id=item.id, category=classify_expense(item.description, item.vendor)
+    """Categorise expenses, preferring what this company has already taught us.
+
+    ``payload.learned`` is the company's own vendor -> category map, posted by
+    the browser because this layer reads no table. A learned answer always wins
+    over the keyword rules: the rules are a guess about Turkish business
+    vocabulary in general, while the map is a fact about this company.
+    """
+    # Normalise the incoming keys too — a client that sent raw vendor names
+    # would otherwise never match, and failing silently is the worst outcome.
+    learned = {
+        vendor_key(key): value
+        for key, value in payload.learned.items()
+        if value in CATEGORIES
+    }
+
+    items: list[ClassifiedItem] = []
+    for item in payload.items:
+        remembered = learned.get(vendor_key(item.vendor)) if item.vendor else None
+        if remembered:
+            items.append(
+                ClassifiedItem(id=item.id, category=remembered, source="learned")
             )
-            for item in payload.items
-        ],
-        categories=list(CATEGORIES),
-    )
+        else:
+            items.append(
+                ClassifiedItem(
+                    id=item.id,
+                    category=classify_expense(item.description, item.vendor),
+                    source="rules",
+                )
+            )
+
+    return ClassifyBatchResponse(items=items, categories=list(CATEGORIES))
 
 
 # ── OCR ────────────────────────────────────────────────────────────────

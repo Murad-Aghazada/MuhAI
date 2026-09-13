@@ -291,10 +291,99 @@
 }
 .dash-grid > .panel:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; }
 .dash-score { grid-column: 1; }
+/* Column 2 is free from row 3 down (the expense donut spans rows 1-2), so the
+   alerts sit beside the score instead of pushing the page taller. */
+.dash-compliance { grid-column: 2; }
 .dash-forecast { grid-column: 1 / -1; }
 
 @media (max-width: 980px) {
-  .dash-score, .dash-forecast { grid-column: 1; }
+  /* This block's `.dash-grid` above re-declares the columns *after* the
+     media query at the top of the file, so that one never applied and the
+     dashboard stayed two-column on a phone. Collapse it here instead. */
+  .dash-grid { grid-template-columns: 1fr; }
+  /* A grid item's default `min-width: auto` lets the recent-invoices table
+     push the whole track to its min-content width (602px at a 375px
+     viewport), which is what made the page scroll sideways. Allowing the
+     items to shrink hands the overflow back to `.tbl-scroll`, where N15
+     wants it. */
+  .dash-grid > * { min-width: 0; }
+  .dash-score, .dash-forecast, .dash-compliance { grid-column: 1; }
+  .dash-grid > .panel:nth-child(2) { grid-column: 1; grid-row: auto; }
+}
+
+/* ---- Compliance alerts ---- */
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.alert-row {
+  display: flex;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.alert-row__mark {
+  width: 3px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  flex: none;
+}
+.alert-row--high .alert-row__mark { background: var(--c-coral); }
+.alert-row--medium .alert-row__mark { background: var(--c-amber); }
+.alert-row--low .alert-row__mark { background: var(--ink-4); }
+.alert-row__body { flex: 1; min-width: 0; }
+.alert-row__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+  color: var(--ink-3);
+  /* In the 1fr column the row is ~255px wide. Let the severity badge drop to
+     its own line rather than squeezing the label into two. */
+  flex-wrap: wrap;
+}
+.alert-row--high .alert-row__head { color: #b03524; }
+.alert-row--medium .alert-row__head { color: #9a6212; }
+.alert-row__type {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.alert-row__head .badge { margin-left: auto; }
+.alert-row__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  /* Vendor names and invoice numbers arrive unbroken; the card must not
+     stretch the grid column to fit one of them. */
+  overflow-wrap: anywhere;
+}
+.alert-row .link-btn { margin-top: 6px; font-size: 12.5px; flex-wrap: wrap; }
+/* An invoice number is full of hyphens, every one of them a break opportunity.
+   Keep it whole and let the label wrap above it instead. */
+.alert-row__ref { white-space: nowrap; }
+.alert-clean {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 14px;
+  border-radius: var(--r-md);
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  font-size: 13.5px;
+  font-weight: 550;
+}
+.alert-more {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
 }
 
 /* ---- Data tables with actions ---- */
@@ -534,3 +623,56 @@
   align-items: start;
 }
 @media (max-width: 980px) { .settings-grid { grid-template-columns: 1fr; } }
+
+/* ---- Learned vendor categories (Settings) ---- */
+.learned-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* A busy company can teach it hundreds of vendors; the panel must not grow
+     without bound. */
+  max-height: 320px;
+  overflow-y: auto;
+}
+.learned-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-size: 13px;
+}
+.learned-row__vendor {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.learned-row__cat { color: var(--ink-3); flex: none; }
+.learned-row__flag {
+  flex: none;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+.learned-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+@media (max-width: 560px) {
+  .learned-row { flex-wrap: wrap; }
+  .learned-row__vendor { flex-basis: 100%; }
+}

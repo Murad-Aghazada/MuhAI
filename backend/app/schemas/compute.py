@@ -26,6 +26,10 @@ class TxnIn(BaseModel):
 
 
 class InvoiceIn(BaseModel):
+    # id and number are carried only for the compliance checks, which report
+    # *which* document tripped a rule. Every other engine ignores them.
+    id: str | None = None
+    number: str | None = None
     date: dt.date | None = None
     due_date: dt.date | None = None
     paid_date: dt.date | None = None
@@ -111,6 +115,31 @@ class DashboardOut(BaseModel):
     overdue_count: float
     deadlines: list[DeadlineOut]
     insight: str
+
+
+# ── Compliance ──────────────────────────────────────────────────────
+
+
+class ComplianceAlertItem(BaseModel):
+    """One rule violation the engine found in the posted snapshot.
+
+    ``description`` is Turkish, like the dashboard's ``insight`` — the rule
+    engine writes the specific sentence (which invoice, how many days) and the
+    client localises only the heading it sits under.
+    """
+
+    type: Literal["duplicate_invoice", "suspicious_invoice", "tax_deadline"]
+    severity: Literal["high", "medium", "low"]
+    description: str
+    ref_id: str | None = None
+
+
+class ComplianceOut(BaseModel):
+    alerts: list[ComplianceAlertItem]
+    total: int
+    high: int
+    medium: int
+    low: int
 
 
 # ── Muhai Score ────────────────────────────────────────────────────────
@@ -214,12 +243,17 @@ class ClassifyItem(BaseModel):
 
 class ClassifyBatchRequest(BaseModel):
     items: list[ClassifyItem]
+    # What this company has already taught the classifier: normalised vendor
+    # key -> category. The browser holds it (it is workspace data) and posts it
+    # with the request, which is how learning works without the compute layer
+    # ever reading a table.
+    learned: dict[str, str] = Field(default_factory=dict)
 
 
 class ClassifiedItem(BaseModel):
     id: str | None = None
     category: str
-    source: Literal["rules"] = "rules"
+    source: Literal["learned", "rules"] = "rules"
 
 
 class ClassifyBatchResponse(BaseModel):

@@ -7,6 +7,8 @@ import {
   CreditCard,
   Landmark,
   RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   Wallet,
@@ -26,6 +28,11 @@ import EmptyState from '../components/ui/EmptyState.jsx'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
 const STATUS_TONE = { paid: 'green', pending: 'amber', overdue: 'red' }
+const SEVERITY_TONE = { high: 'red', medium: 'amber', low: 'gray' }
+
+// The card is a prompt to act, not a register. Four rows keep it the height of
+// the score panel beside it; the rest are counted off underneath.
+const ALERTS_SHOWN = 4
 
 // Stable colours per category so the donut and legend never re-shuffle.
 const CATEGORY_COLORS = [
@@ -45,7 +52,7 @@ export default function Dashboard() {
   const { t, lang } = useLang()
   const { company, profile } = useAuth()
   const navigate = useNavigate()
-  const { dashboard, score, forecast, invoices, loading, isEmpty, apiOnline, computing, refresh } = useData()
+  const { dashboard, score, forecast, compliance, invoices, loading, isEmpty, apiOnline, computing, refresh } = useData()
 
   const cur = (v, o) => formatCurrency(v, lang, o)
   const compact = (v) => formatCurrency(v, lang, { compact: true })
@@ -89,6 +96,13 @@ export default function Dashboard() {
       color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
     }))
   }, [dashboard?.expense_breakdown, t])
+
+  // Alerts name an invoice by id; the row shows its number so the user knows
+  // which document is meant before clicking through.
+  const invoiceById = useMemo(
+    () => new Map(invoices.map((i) => [i.id, i])),
+    [invoices],
+  )
 
   const recent = useMemo(
     () =>
@@ -214,6 +228,68 @@ export default function Dashboard() {
             {t('dashboard.insightAction')}
             <ArrowRight size={15} strokeWidth={2.4} />
           </button>
+        </motion.section>
+
+        {/* Compliance & risk — rule checks over the same snapshot. Nothing is
+            stored, so an alert disappears as soon as the invoice is corrected. */}
+        <motion.section className="panel dash-compliance" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.36 }}>
+          <div className="panel-head">
+            <div>
+              <div className="panel-title">{t('dashboard.compliance.title')}</div>
+              <div className="panel-sub">{t('dashboard.compliance.sub')}</div>
+            </div>
+            {compliance?.total ? (
+              <Badge tone={compliance.high ? 'red' : 'amber'}>{compliance.total}</Badge>
+            ) : (
+              <ShieldCheck size={20} color={compliance ? 'var(--c-emerald)' : 'var(--ink-4)'} />
+            )}
+          </div>
+
+          {!compliance ? (
+            <div className="chart-empty" style={{ height: 120 }}>
+              {t('dashboard.compliance.offline')}
+            </div>
+          ) : compliance.total === 0 ? (
+            <div className="alert-clean">
+              <ShieldCheck size={18} strokeWidth={2.2} />
+              <span>{t('dashboard.compliance.clean')}</span>
+            </div>
+          ) : (
+            <>
+              <ul className="alert-list">
+                {compliance.alerts.slice(0, ALERTS_SHOWN).map((a, i) => {
+                  const invoice = a.ref_id ? invoiceById.get(a.ref_id) : null
+                  return (
+                    <li className={`alert-row alert-row--${a.severity}`} key={`${a.type}-${a.ref_id ?? ''}-${i}`}>
+                      <span className="alert-row__mark" />
+                      <div className="alert-row__body">
+                        <div className="alert-row__head">
+                          <ShieldAlert size={14} strokeWidth={2.3} />
+                          <span className="alert-row__type">{t(`dashboard.compliance.type.${a.type}`)}</span>
+                          <Badge tone={SEVERITY_TONE[a.severity]}>
+                            {t(`dashboard.compliance.sev.${a.severity}`)}
+                          </Badge>
+                        </div>
+                        <p className="alert-row__text">{a.description}</p>
+                        {invoice && (
+                          <button className="link-btn" onClick={() => navigate('/app/invoices')}>
+                            {t('dashboard.compliance.openInvoice')}
+                            {invoice.number && <span className="alert-row__ref">· {invoice.number}</span>}
+                            <ArrowUpRight size={13} strokeWidth={2.4} />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              {compliance.total > ALERTS_SHOWN && (
+                <p className="alert-more">
+                  +{compliance.total - ALERTS_SHOWN} {t('dashboard.compliance.more')}
+                </p>
+              )}
+            </>
+          )}
         </motion.section>
 
         {/* Muhai Score */}

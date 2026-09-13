@@ -30,7 +30,35 @@ export const COLLECTIONS = {
   taxObligations: 'taxObligations',
 }
 
+/*
+   Learned vendor → category corrections. Deliberately *outside* COLLECTIONS:
+   Settings iterates that object to wipe the demo dataset, and what the
+   classifier has learned from a human is not demo data. It gets its own
+   "forget" button instead.
+*/
+export const VENDOR_CATEGORIES = 'vendorCategories'
+
 const BASE = '/api/workspace'
+
+// ── Vendor keys ───────────────────────────────────────────────────────
+/*
+   Must agree character for character with `vendor_key` in the backend's
+   expense_classifier.py — the browser writes the key and the API looks it up.
+   Punctuation is deleted rather than spaced so "A.Ş." and "AŞ" are one vendor.
+*/
+const VENDOR_FOLD = {
+  ı: 'i', İ: 'i', ş: 's', Ş: 's', ğ: 'g', Ğ: 'g', ü: 'u', Ü: 'u',
+  ö: 'o', Ö: 'o', ç: 'c', Ç: 'c', â: 'a', î: 'i', û: 'u',
+}
+
+export function vendorKey(vendor) {
+  if (!vendor) return ''
+  const folded = String(vendor)
+    .toLowerCase()
+    .replace(/[ıİşŞğĞüÜöÖçÇâîû]/g, (ch) => VENDOR_FOLD[ch] || ch)
+  // Keep letters, digits and whitespace; drop everything else outright.
+  return folded.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean).join(' ')
+}
 
 // ── Change notification ───────────────────────────────────────────────
 /*
@@ -122,6 +150,56 @@ export async function addMany(name, items) {
   }
   notify(name)
   return ids
+}
+
+// ── Learned vendor categories ─────────────────────────────────────────
+
+/**
+ * Build the `vendorKey -> category` map the compute API expects.
+ * A duplicate key (two rows for one vendor, which the table does not forbid)
+ * resolves to the most recently created row.
+ */
+export function vendorCategoryMap(rows = []) {
+  const byKey = new Map()
+  for (const row of rows) {
+    const key = row.vendorKey || vendorKey(row.vendor)
+    if (!key || !row.category) continue
+    const seen = byKey.get(key)
+    if (!seen || String(row.createdAt || '') >= String(seen.createdAt || '')) {
+      byKey.set(key, row)
+    }
+  }
+  return Object.fromEntries([...byKey].map(([key, row]) => [key, row.category]))
+}
+
+/**
+ * Teach the classifier that this vendor belongs to this category.
+ *
+ * Upserts by hand because the workspace router is generic CRUD with no
+ * conflict handling — see the model's docstring. `rows` is the collection the
+ * caller already has, so the common case costs one write and no extra read.
+ */
+export async function rememberVendorCategory(rows, vendor, category, corrected = true) {
+  const key = vendorKey(vendor)
+  if (!key || !category) return null
+
+  const existing = rows.find((r) => (r.vendorKey || vendorKey(r.vendor)) === key)
+  if (existing) {
+    if (existing.category === category) return existing.id
+    await updateItem(VENDOR_CATEGORIES, existing.id, { category, corrected })
+    return existing.id
+  }
+  return addItem(VENDOR_CATEGORIES, {
+    vendorKey: key,
+    vendor: String(vendor).trim(),
+    category,
+    corrected,
+  })
+}
+
+/** Forget one learned vendor. */
+export function forgetVendorCategory(id) {
+  return removeItem(VENDOR_CATEGORIES, id)
 }
 
 /** Delete every document in a collection. Used by "reset demo data". */

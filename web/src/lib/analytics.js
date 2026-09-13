@@ -153,6 +153,10 @@ export function buildSnapshot({ company, transactions = [], invoices = [], produ
         vendor: t.vendor || null,
       })),
     invoices: invoices.map((i) => ({
+      // The compliance checks name the offending document, so unlike the
+      // other engines they need the id and the printed number.
+      id: i.id || null,
+      number: i.number || null,
       date: i.issueDate || null,
       due_date: i.dueDate || null,
       paid_date: i.paidDate || null,

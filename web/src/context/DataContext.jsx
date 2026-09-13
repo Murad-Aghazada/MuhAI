@@ -15,14 +15,17 @@
    say so honestly instead of showing stale or invented numbers.
    ============================================================ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { loadWorkspace, onChange } from '../lib/db.js'
+import { loadWorkspace, onChange, vendorCategoryMap } from '../lib/db.js'
 import { buildSnapshot, localDashboard, todayIso } from '../lib/analytics.js'
 import * as api from '../lib/api.js'
 import { useAuth } from './AuthContext.jsx'
 
 const DataContext = createContext(null)
 
-const EMPTY = { invoices: [], transactions: [], products: [], employees: [], taxObligations: [] }
+const EMPTY = {
+  invoices: [], transactions: [], products: [], employees: [], taxObligations: [],
+  vendorCategories: [],
+}
 
 // Long enough to coalesce the writes of one user action, short enough that the
 // screen updates before the user looks away.
@@ -41,6 +44,7 @@ export function DataProvider({ children }) {
   const [forecast, setForecast] = useState(null)
   const [taxSummary, setTaxSummary] = useState(null)
   const [payroll, setPayroll] = useState(null)
+  const [compliance, setCompliance] = useState(null)
 
   const [apiOnline, setApiOnline] = useState(true)
   const [apiError, setApiError] = useState(null)
@@ -74,6 +78,7 @@ export function DataProvider({ children }) {
         products: workspace.products ?? [],
         employees: workspace.employees ?? [],
         taxObligations: workspace.taxObligations ?? [],
+        vendorCategories: workspace.vendorCategories ?? [],
       })
       if (workspace.company) setCompany(workspace.company)
       setDbError(null)
@@ -133,8 +138,9 @@ export function DataProvider({ children }) {
         api.getForecast(payload, 30),
         api.getTaxSummary(payload),
         api.runPayroll(payload),
+        api.getCompliance(payload),
       ])
-      const [d, s, f, t, p] = results
+      const [d, s, f, t, p, c] = results
 
       const anyOk = results.some((r) => r.status === 'fulfilled')
       setApiOnline(anyOk)
@@ -153,6 +159,10 @@ export function DataProvider({ children }) {
       if (f.status === 'fulfilled') setForecast(f.value)
       if (t.status === 'fulfilled') setTaxSummary(t.value)
       if (p.status === 'fulfilled') setPayroll(p.value)
+      // Alerts are derived, never stored: a stale list would accuse the user
+      // of a duplicate they have already deleted. Clear it when the check
+      // could not run rather than keeping the last answer.
+      setCompliance(c.status === 'fulfilled' ? c.value : null)
 
       if (!anyOk) {
         // Keep whatever the API last returned rather than blanking the panels;
@@ -178,6 +188,12 @@ export function DataProvider({ children }) {
     return recompute(snapshot)
   }, [load, recompute, refreshCompany, snapshot])
 
+  // The vendor -> category map every classify call is posted with.
+  const learnedCategories = useMemo(
+    () => vendorCategoryMap(raw.vendorCategories),
+    [raw.vendorCategories],
+  )
+
   // Local aggregation is always available, so panels have something to show
   // during the very first round trip.
   const fallback = useMemo(
@@ -196,12 +212,15 @@ export function DataProvider({ children }) {
       products: raw.products,
       employees: raw.employees,
       taxObligations: raw.taxObligations,
+      vendorCategories: raw.vendorCategories,
+      learnedCategories,
       snapshot,
       dashboard: dashboard || fallback,
       score,
       forecast,
       taxSummary,
       payroll,
+      compliance,
       apiOnline,
       apiError,
       computing,
@@ -210,7 +229,8 @@ export function DataProvider({ children }) {
     }),
     [
       companyId, company, loading, dbError, raw, snapshot, dashboard, fallback,
-      score, forecast, taxSummary, payroll, apiOnline, apiError, computing, refresh,
+      score, forecast, taxSummary, payroll, compliance, learnedCategories,
+      apiOnline, apiError, computing, refresh,
     ],
   )
 

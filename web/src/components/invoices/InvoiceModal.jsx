@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { AlertTriangle, Loader2, Sparkles, X } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
+import { useData } from '../../context/DataContext.jsx'
 import { splitVat } from '../../lib/seed.js'
 import { classifyExpenses } from '../../lib/api.js'
+import { rememberVendorCategory, vendorKey } from '../../lib/db.js'
 
 const CATEGORIES = [
   'sales', 'raw_materials', 'office_supplies', 'marketing', 'software', 'rent',
@@ -21,9 +23,13 @@ const CONFIDENCE_THRESHOLD = 0.7
  */
 export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
   const { t, lang } = useLang()
+  const { vendorCategories, learnedCategories } = useData()
   const [form, setForm] = useState(invoice)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  // What the classifier proposed, and whether it came from this company's own
+  // corrections or from the generic keyword rules.
+  const [suggestion, setSuggestion] = useState(null)
 
   const conf = invoice.fieldConfidence || null
   const lowFields = useMemo(
@@ -36,15 +42,20 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
     [conf],
   )
 
-  // Suggest a category from the vendor + number, using the same rule engine
-  // the backend applies to transactions.
+  // Suggest a category from the vendor + number. The company's own learned
+  // corrections go with the request and outrank the keyword rules there.
   useEffect(() => {
     if (mode !== 'create' || !form.vendor || form.category !== 'other') return
     let cancelled = false
-    classifyExpenses([{ id: 'draft', vendor: form.vendor, description: form.number }])
+    classifyExpenses(
+      [{ id: 'draft', vendor: form.vendor, description: form.number }],
+      learnedCategories,
+    )
       .then((res) => {
-        const suggestion = res.items?.[0]?.category
-        if (!cancelled && suggestion) setForm((f) => (f.category === 'other' ? { ...f, category: suggestion } : f))
+        const hit = res.items?.[0]
+        if (cancelled || !hit?.category) return
+        setSuggestion(hit)
+        setForm((f) => (f.category === 'other' ? { ...f, category: hit.category } : f))
       })
       .catch(() => {})
     return () => {
@@ -52,7 +63,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
     }
     // Only re-run when the vendor changes; category is read, not tracked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.vendor, mode])
+  }, [form.vendor, mode, learnedCategories])
 
   const set = (key) => (e) => {
     const raw = e.target.value
@@ -89,6 +100,19 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
       }
       delete payload.fieldConfidence
       await onSave(payload, mode)
+
+      // Only once the invoice is safely saved. A correction recorded against a
+      // save that then failed would teach the classifier from an event the
+      // user never actually committed to.
+      const chosen = payload.category
+      const known = learnedCategories[vendorKey(payload.vendor)]
+      if (chosen && chosen !== 'other' && chosen !== known) {
+        // "Corrected" means a human disagreed with the suggestion. Accepting
+        // what the rules proposed is worth caching but is not a correction.
+        const corrected = mode !== 'create' || chosen !== suggestion?.category
+        await rememberVendorCategory(vendorCategories, payload.vendor, chosen, corrected)
+          .catch((e) => console.error('[muhai] could not remember the vendor category', e))
+      }
     } catch (err) {
       console.error('[muhai] invoice save failed', err)
       setError(err.message)
@@ -119,7 +143,10 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
               </div>
             )}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
+          {/* type="button" is not optional: a <button> inside a <form> defaults
+              to type="submit", which made this X the form's default button —
+              so Enter anywhere in the form activated *close*, not save. */}
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
             <X size={16} strokeWidth={2.2} />
           </button>
         </div>
@@ -212,6 +239,14 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
                     ))}
                   </select>
                 </span>
+                {suggestion && (
+                  <span className="field__hint field__hint--learn">
+                    <Sparkles size={12} strokeWidth={2.4} />
+                    {suggestion.source === 'learned'
+                      ? t('invoices.catLearned')
+                      : t('invoices.catSuggested')}
+                  </span>
+                )}
               </label>
             </div>
 

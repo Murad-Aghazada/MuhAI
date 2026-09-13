@@ -17,6 +17,7 @@ from app.db.models.company import (
     CompanyProduct,
     CompanyTaxObligation,
     CompanyTransaction,
+    CompanyVendorCategory,
 )
 from app.db.models.user import User
 from app.db.models.invoice import Invoice
@@ -37,6 +38,7 @@ __all__ = [
     "CompanyProduct",
     "CompanyEmployee",
     "CompanyTaxObligation",
+    "CompanyVendorCategory",
     "User",
     "Invoice",
     "Transaction",

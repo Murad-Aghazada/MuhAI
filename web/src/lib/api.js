@@ -24,9 +24,13 @@ export const getDashboard = (snapshot) => compute('/dashboard', snapshot)
 export const getMuhaiScore = (snapshot) => compute('/muhai-score', snapshot)
 export const getForecast = (snapshot, horizon = 30) =>
   compute(`/forecast?horizon=${horizon}`, snapshot, { timeout: 45000 })
+export const getCompliance = (snapshot) => compute('/compliance', snapshot)
 export const getTaxSummary = (snapshot) => compute('/tax-summary', snapshot)
 export const runPayroll = (snapshot) => compute('/payroll', snapshot)
-export const classifyExpenses = (items) => compute('/classify', { items })
+// `learned` is this company's vendor -> category map. The compute layer reads
+// no table, so the browser carries what it has taught the classifier.
+export const classifyExpenses = (items, learned = {}) =>
+  compute('/classify', { items, learned })
 export const askAssistant = (message, snapshot, lang = 'tr') =>
   compute('/chat', { message, snapshot, lang }, { timeout: 40000 })
 

@@ -106,13 +106,28 @@ containers read. `backend/.env` is for running the API outside Docker;
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Celery 5.3,
-Redis 5, Alembic through `0009_company_workspace`. **17 routers, 175 tests.**
+Redis 5, Alembic through `0010_company_vendor_categories`. **17 routers, 193
+tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
-  clear, and two atomic invoice↔ledger operations
+  clear, and two atomic invoice↔ledger operations. **Six** collections now:
+  the five business ones plus `vendorCategories`
 - `/api/auth/*` — register (account + company in one transaction), login, me,
   company recovery, change password, delete account
-- `/api/compute/{dashboard,muhai-score,forecast,tax-summary,payroll,classify,ocr,chat}`
+- `/api/compute/{dashboard,muhai-score,forecast,tax-summary,payroll,classify,compliance,ocr,chat}`
+- Compliance is the rule engine, not a table: duplicate invoices (by number,
+  and by amount+date+vendor), KDV that matches no legal rate or exceeds the
+  total, and tax deadlines inside their warning window. Stateless like the
+  rest, so an alert disappears the moment the invoice is corrected — nothing
+  to resolve, nothing to dedupe. `compliance_service.py` is unchanged; the
+  compute route just feeds it the snapshot the dashboard already posts
+- `/api/compute/classify` takes a `learned` map (vendor key → category) and
+  prefers it over the keyword rules. The map is workspace data the browser
+  posts with the request, which is how the classifier learns without the
+  compute layer ever reading a table. Vendor keys are normalised by
+  `expense_classifier.vendor_key()` — folded, punctuation **deleted** so
+  "A.Ş." and "AŞ" are one vendor — and `web/src/lib/db.js` must keep applying
+  the identical transform
 - Assistant has two modes. **Online** it calls `gemini-2.5-flash` over the REST
   endpoint with stdlib `urllib` (override with `GEMINI_MODEL`). **Offline** —
   on any network, quota or key failure — it answers from a local BM25 knowledge
@@ -148,6 +163,16 @@ Redis 5, Alembic through `0009_company_workspace`. **17 routers, 175 tests.**
 - Falls back to local aggregation with a "hesaplama servisi çevrimdışı" badge
   when the API is unreachable — never a blank screen, never an invented number
 - `lib/seed.js` generates a deterministic demo dataset
+- The dashboard's **Uyum & Risk** card renders those alerts, severity-marked,
+  with a link back to the offending invoice. Headings and severities are
+  TR/EN; the detail sentence is Turkish in both, exactly like the assistant
+  insight card above it
+- Correcting an invoice's category teaches the classifier: the modal records
+  vendor → category on save, the next invoice from that vendor is pre-filled,
+  and the hint under the field says whether the answer came from the rules or
+  from the company's own correction. Settings lists what has been learned and
+  can forget one entry or all of them. Deliberately outside the `COLLECTIONS`
+  object that "clear all data" iterates — learned knowledge is not demo data
 
 **Mobile** — there is **no native client**; the Expo/React Native app was lost
 and has not been rebuilt. The responsive web app is the mobile story. Landing
@@ -156,15 +181,20 @@ sidebar below 1000 px but were not verified (no test account).
 
 ## 5. Open items
 
-1. **Walk the signed-in screens on a phone while logged in.** The layout was
-   measured at 375 px against the real CSS on 2026-09-08 and the two overflows
-   found were fixed (N15). What is still unchecked is the live experience with
-   a real account: touch targets, the sidebar drawer, modals and long lists.
+1. **Walk the signed-in screens on a phone while logged in.** The dashboard
+   was measured with a real signed-in account on 2026-09-13 and two more
+   overflows were fixed (N17). What is still unchecked is every *other*
+   signed-in screen at 375 px with real data: touch targets, the sidebar
+   drawer, modals and long lists. There is a test account in the dev database
+   now — `compliance-test@example.com` / `TestParola2026!`, seeded.
 2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. Decide the fate of the legacy user-scoped routes and their tables. They are
-   dead code with two live ideas in them — bank reconciliation and
-   vendor-category learning — that have no workspace equivalent yet.
+3. Decide the fate of the legacy user-scoped routes and their tables. Now
+   only **bank reconciliation** is still trapped in there — `bank_service.py`
+   parses Turkish bank CSVs and fuzzy-matches rows to invoices, with no
+   workspace equivalent and no UI. Vendor-category learning was ported in
+   2026-09-13, so `vendor_categories` (0008) and `/api/expenses` are fully
+   superseded and safe to drop.
 4. Move server OCR onto the Celery worker so the request returns a job id.
    The worker is running and idle; nothing dispatches to it.
 
@@ -259,6 +289,17 @@ threshold with a working review queue).
   web container proxies `/api` to the backend, so `VITE_API_URL` is empty in a
   Docker build and CORS never applies. `BACKEND_CORS_ORIGINS` matters only for
   the Vite dev server, which is on a different port.
+
+- **N17 — A grid item's `min-width: auto` beats its child's `overflow-x`.**
+  `.dash-invoices` has a `.tbl-scroll` around its table, and the page still
+  scrolled sideways on a phone: the item's automatic minimum is its table's
+  min-content width, so the *track* grew to 602 px at a 375 px viewport and
+  the scroll container never got the chance to scroll. `.dash-grid > * {
+  min-width: 0 }` hands the overflow back to `.tbl-scroll`. The same block
+  also had to re-collapse `grid-template-columns`, because the later
+  `.dash-grid` rule in `pages.css` out-ordered the media query at the top of
+  the file and the dashboard had been two-column on mobile all along.
+  Measure with `document.body.scrollWidth` against `clientWidth` (N15).
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

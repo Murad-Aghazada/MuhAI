@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Building2, CheckCircle2, Database, Loader2, Plug, Trash2 } from 'lucide-react'
+import { Building2, CheckCircle2, Database, Loader2, Plug, Sparkles, Trash2, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useData } from '../context/DataContext.jsx'
-import { COLLECTIONS, clearCollection, updateCompany } from '../lib/db.js'
+import {
+  COLLECTIONS,
+  VENDOR_CATEGORIES,
+  clearCollection,
+  forgetVendorCategory,
+  updateCompany,
+} from '../lib/db.js'
 import { seedCompany } from '../lib/seed.js'
 import { apiBaseUrl, ping } from '../lib/api.js'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
@@ -15,12 +21,16 @@ const LEGAL_FORMS = ['ltd', 'as', 'sahis', 'koop']
 export default function Settings() {
   const { t } = useLang()
   const { company, companyId, refreshCompany } = useAuth()
-  const { invoices, transactions, products, employees, taxObligations, loading, refresh } = useData()
+  const {
+    invoices, transactions, products, employees, taxObligations,
+    vendorCategories, loading, refresh,
+  } = useData()
 
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [forgetting, setForgetting] = useState(null)
   const [flash, setFlash] = useState(null)
   const [apiUp, setApiUp] = useState(null)
 
@@ -96,6 +106,31 @@ export default function Settings() {
       notify(err.message, 'error')
     } finally {
       setClearing(false)
+    }
+  }
+
+  async function handleForget(id) {
+    setForgetting(id)
+    try {
+      await forgetVendorCategory(id)
+      notify(t('settings.vendorForgotten'))
+    } catch (err) {
+      notify(err.message, 'error')
+    } finally {
+      setForgetting(null)
+    }
+  }
+
+  async function handleForgetAll() {
+    if (!window.confirm(t('settings.vendorForgetAllConfirm'))) return
+    setForgetting('all')
+    try {
+      await clearCollection(VENDOR_CATEGORIES)
+      notify(t('settings.vendorForgotten'))
+    } catch (err) {
+      notify(err.message, 'error')
+    } finally {
+      setForgetting(null)
     }
   }
 
@@ -235,6 +270,47 @@ export default function Settings() {
               </div>
             ))}
           </div>
+
+          <div className="panel-head" style={{ marginTop: 26 }}>
+            <div>
+              <div className="panel-title">{t('settings.vendorSection')}</div>
+              <div className="panel-sub">{t('settings.vendorSectionSub')}</div>
+            </div>
+            <Sparkles size={20} color="var(--ink-4)" />
+          </div>
+          {vendorCategories.length ? (
+            <>
+              <ul className="learned-list">
+                {vendorCategories.map((v) => (
+                  <li className="learned-row" key={v.id}>
+                    <span className="learned-row__vendor" title={v.vendor}>{v.vendor || v.vendorKey}</span>
+                    <span className="learned-row__cat">{t(`dashboard.cat.${v.category}`)}</span>
+                    {v.corrected && <span className="learned-row__flag">{t('settings.vendorCorrected')}</span>}
+                    <button
+                      className="icon-btn icon-btn--danger"
+                      onClick={() => handleForget(v.id)}
+                      disabled={forgetting !== null}
+                      aria-label={t('settings.vendorForget')}
+                      title={t('settings.vendorForget')}
+                    >
+                      {forgetting === v.id ? <Loader2 size={13} className="spin" /> : <X size={13} strokeWidth={2.6} />}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                className="btn btn--ghost btn--sm"
+                style={{ marginTop: 12 }}
+                onClick={handleForgetAll}
+                disabled={forgetting !== null}
+              >
+                {forgetting === 'all' ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={2.3} />}
+                {t('settings.vendorForgetAll')}
+              </button>
+            </>
+          ) : (
+            <p className="learned-empty">{t('settings.vendorEmpty')}</p>
+          )}
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
