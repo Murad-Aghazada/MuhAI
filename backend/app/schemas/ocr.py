@@ -1,47 +1,13 @@
+"""Schemas for OCR extraction.
+
+Was ``schemas/invoice.py`` and carried the CRUD models for the user-scoped
+``/api/invoices`` routes alongside these. Those routes and their table are
+gone; what survived is the structured result ``/api/compute/ocr`` returns and
+``ocr_service`` builds.
+"""
 import datetime as dt
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from app.db.models.invoice import InvoiceStatus
-
-
-class InvoiceCreate(BaseModel):
-    invoice_number: str | None = None
-    vendor_name: str | None = None
-    amount: float = 0
-    vat_amount: float = 0
-    date: dt.date | None = None
-
-
-class InvoiceUpdate(BaseModel):
-    invoice_number: str | None = None
-    vendor_name: str | None = None
-    amount: float | None = None
-    vat_amount: float | None = None
-    date: dt.date | None = None
-    status: InvoiceStatus | None = None
-
-
-class InvoiceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    invoice_number: str | None
-    vendor_name: str | None
-    amount: float
-    vat_amount: float
-    date: dt.date | None
-    status: InvoiceStatus
-    ocr_raw_text: str | None
-    file_url: str | None
-    created_at: dt.datetime
-
-
-class InvoiceListOut(BaseModel):
-    items: list[InvoiceOut]
-    total: int
-    page: int
-    page_size: int
+from pydantic import BaseModel, Field
 
 
 class OcrExtractField(BaseModel):

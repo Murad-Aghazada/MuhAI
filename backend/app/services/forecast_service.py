@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
-from app.schemas.transaction import ForecastPoint
+from app.schemas.compute import ForecastPoint
 
 logger = logging.getLogger(__name__)
 

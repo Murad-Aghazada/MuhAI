@@ -2,13 +2,10 @@
 ``Base.metadata`` (used by Alembic autogenerate). Kept separate from
 ``app.db.base`` to avoid a circular import between base and the models.
 
-Two families live here:
-
-* ``Company`` and the ``Company*`` tables are the current system of record —
-  the company workspace the web client reads and writes.
-* the older user-scoped tables (``Invoice``, ``Transaction``, …) back the
-  legacy ``/api/invoices``-style routes. They are deprecated; nothing in the
-  web app calls them any more.
+``Company`` and the ``Company*`` tables are the system of record; ``User`` is
+the account that signs in to one. The older user-scoped tables (``Invoice``,
+``Transaction``, …) and the ``/api/invoices``-style routes above them were
+deleted on 2026-09-13 -- nothing had called them since the workspace landed.
 """
 from app.db.models.company import (
     Company,
@@ -20,16 +17,6 @@ from app.db.models.company import (
     CompanyVendorCategory,
 )
 from app.db.models.user import User
-from app.db.models.invoice import Invoice
-from app.db.models.transaction import Transaction
-from app.db.models.employee import Employee
-from app.db.models.product import Product
-from app.db.models.muhai_score import MuhaiScore
-from app.db.models.compliance_alert import ComplianceAlert
-from app.db.models.inventory_movement import InventoryMovement
-from app.db.models.bank_transaction import BankTransaction
-from app.db.models.tax_obligation import TaxObligation
-from app.db.models.vendor_category import VendorCategory
 
 __all__ = [
     "Company",
@@ -40,14 +27,4 @@ __all__ = [
     "CompanyTaxObligation",
     "CompanyVendorCategory",
     "User",
-    "Invoice",
-    "Transaction",
-    "Employee",
-    "Product",
-    "MuhaiScore",
-    "ComplianceAlert",
-    "InventoryMovement",
-    "BankTransaction",
-    "TaxObligation",
-    "VendorCategory",
 ]

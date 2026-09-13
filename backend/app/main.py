@@ -5,25 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import (
-    auth,
-    bank,
-    cashflow,
-    chat,
-    compliance,
-    compute,
-    dashboard,
-    expenses,
-    inventory,
-    invoices,
-    muhai_score,
-    payroll,
-    predictions,
-    reminders,
-    tax,
-    transactions,
-    workspace,
-)
+from app.api.routes import auth, compute, workspace
 from app.core.config import settings
 from app.db.migrate import run_upgrade_to_head
 
@@ -75,24 +57,8 @@ async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-# Mount all routers under /api
-for router in (
-    auth,
-    workspace,
-    invoices,
-    transactions,
-    payroll,
-    tax,
-    inventory,
-    muhai_score,
-    dashboard,
-    compliance,
-    cashflow,
-    bank,
-    reminders,
-    predictions,
-    expenses,
-    chat,
-    compute,
-):
+# Mount all routers under /api. Three of them: the workspace holds the data,
+# compute does the maths over a posted snapshot, and auth issues the token that
+# scopes the first to a company.
+for router in (auth, workspace, compute):
     app.include_router(router.router, prefix=settings.API_PREFIX)

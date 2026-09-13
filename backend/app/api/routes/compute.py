@@ -34,7 +34,7 @@ from app.schemas.compute import (
     PayslipOut,
     TaxSummaryOut,
 )
-from app.schemas.invoice import OcrExtractResult
+from app.schemas.ocr import OcrExtractResult
 from app.services import compute_service as agg
 from app.services.chat_service import BusinessContext, get_chat_reply
 from app.services.compliance_service import InvoiceRecord, run_all_checks

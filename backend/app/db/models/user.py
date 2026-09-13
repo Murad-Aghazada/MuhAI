@@ -26,31 +26,3 @@ class User(Base, TimestampMixin):
     company: Mapped["Company | None"] = relationship(  # noqa: F821
         back_populates="members", foreign_keys=[company_id]
     )
-
-    invoices: Mapped[List["Invoice"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    transactions: Mapped[List["Transaction"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    employees: Mapped[List["Employee"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    products: Mapped[List["Product"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    muhai_scores: Mapped[List["MuhaiScore"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    compliance_alerts: Mapped[List["ComplianceAlert"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    bank_transactions: Mapped[List["BankTransaction"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    tax_obligations: Mapped[List["TaxObligation"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    vendor_categories: Mapped[List["VendorCategory"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )

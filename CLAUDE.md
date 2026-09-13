@@ -113,7 +113,7 @@ containers read. `backend/.env` is for running the API outside Docker;
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0010_company_vendor_categories`. **17 routers, 193 tests.**
+through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -147,12 +147,17 @@ through `0010_company_vendor_categories`. **17 routers, 193 tests.**
 - Muhai Score: 8 weighted categories. Tax engine: 2026 KDV / income / corporate
   / stopaj / SGK / stamp rates
 - The user-scoped routes from before the workspace (`/api/invoices`,
-  `/api/transactions`, …) still work on their own older tables. **Nothing calls
-  them.** They are deprecated and safe to delete; bank reconciliation and
-  vendor-category learning live only there (see open item 3)
+  `/api/transactions`, …) and their ten tables were **deleted on 2026-09-13**
+  — 14 routers, 10 models, 11 schemas, 4 services, dropped by migration `0011`.
+  The API went from 60 endpoints to 21. `tests/test_api_smoke.py` asserts both
+  that they are gone and that every mounted path belongs to one of the three
+  live routers, so a stray import cannot quietly restore a second, unscoped
+  data surface. **`bank_service.py` went with them** — the Turkish bank-CSV
+  parser and fuzzy matcher. Recover it from commit `5cb59c0` when bank
+  reconciliation gets built on the workspace
 
 **Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
-**487 kB (150 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**495 kB (153 kB gzipped)**, down from 973 kB when the Firebase SDK went.
 
 - Own JWT auth against `/api/auth`, token in localStorage, two-step company
   sign-up, protected `/app`. **There is no password reset** — Firebase used to
@@ -196,12 +201,11 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
    now — `compliance-test@example.com` / `TestParola2026!`, seeded.
 2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. Decide the fate of the legacy user-scoped routes and their tables. Now
-   only **bank reconciliation** is still trapped in there — `bank_service.py`
-   parses Turkish bank CSVs and fuzzy-matches rows to invoices, with no
-   workspace equivalent and no UI. Vendor-category learning was ported in
-   2026-09-13, so `vendor_categories` (0008) and `/api/expenses` are fully
-   superseded and safe to drop.
+3. Build bank reconciliation on the workspace if it earns its place: import a
+   statement CSV, match rows to invoices, show what did not match. The engine
+   was written and then deleted with the rest of the legacy code — start from
+   `git show 5cb59c0:backend/app/services/bank_service.py`, which already
+   parses Turkish bank CSVs and fuzzy-matches on amount, date and vendor.
 
 ## 6. TEKNOFEST claims that do not match the code
 
@@ -211,7 +215,7 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 17 routers, 193 tests | understated — pick the number you defend |
+| S18 **"13 servis geliştirildi"** | 3 routers, 21 endpoints, 194 tests. 17 routers existed until the legacy half was deleted | say "21 uç nokta, 194 test" — a small, defensible surface beats a big one you cannot explain |
 | S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
 | S3/S16 **GİB / SGK / bank APIs** | **No external API call exists anywhere.** `bank_service.py` parses an uploaded CSV; the tax routes read a local 2026 calendar and rate table | say "bank statement import + local tax engine — works with no internet". It is true and a stronger claim |
 

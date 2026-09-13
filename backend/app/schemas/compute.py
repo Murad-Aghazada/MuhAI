@@ -166,6 +166,16 @@ class MuhaiScoreOut(BaseModel):
 # ── Forecast ───────────────────────────────────────────────────────────
 
 
+class ForecastPoint(BaseModel):
+    """One predicted day. Produced by ``forecast_service``; ``ForecastPointOut``
+    below is the same shape as the API returns it."""
+
+    ds: dt.date
+    yhat: float
+    yhat_lower: float
+    yhat_upper: float
+
+
 class ForecastPointOut(BaseModel):
     ds: dt.date
     yhat: float

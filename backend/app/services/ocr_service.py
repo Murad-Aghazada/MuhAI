@@ -17,7 +17,7 @@ from datetime import datetime
 from dataclasses import asdict
 
 from app.core.config import settings
-from app.schemas.invoice import OcrExtractField, OcrExtractResult, ParsedInvoiceOut
+from app.schemas.ocr import OcrExtractField, OcrExtractResult, ParsedInvoiceOut
 from app.services.ocr_parser import parse_invoice_text
 
 CONFIDENCE_THRESHOLD = 0.7
