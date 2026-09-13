@@ -24,9 +24,6 @@ class Settings(BaseSettings):
     # runs them first and this is switched off.
     RUN_MIGRATIONS_ON_STARTUP: bool = True
 
-    # Redis / Celery
-    REDIS_URL: str = "redis://localhost:6379/0"
-
     # Security. Sessions are signed with this; changing it logs everyone out.
     # Generate with: openssl rand -hex 32
     SECRET_KEY: str = "change_me_in_production"

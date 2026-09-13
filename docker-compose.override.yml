@@ -6,8 +6,8 @@
 #     docker compose up -d
 #
 # is the development stack: source bind-mounted, uvicorn reloading, Postgres
-# and Redis reachable from the host, and the API published on :8000 for the
-# Vite dev server to call.
+# reachable from the host, and the API published on :8000 for the Vite dev
+# server to call.
 #
 # On the VPS this file must not apply. Deploy with the base file alone:
 #
@@ -31,10 +31,6 @@ services:
       # client, not from the network.
       - "127.0.0.1:5432:5432"
 
-  redis:
-    ports:
-      - "127.0.0.1:6379:6379"
-
   backend:
     # One reloading worker instead of several fixed ones.
     command: >
@@ -54,11 +50,6 @@ services:
       # No multi-worker race to avoid here, and it keeps a fresh clone working
       # even if someone skips the `migrate` service.
       RUN_MIGRATIONS_ON_STARTUP: "true"
-
-  worker:
-    volumes:
-      - ./backend:/app
-    user: root
 
   web:
     # The dev frontend is `npm --prefix web run dev` on the host, against the

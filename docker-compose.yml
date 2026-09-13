@@ -3,14 +3,19 @@
 #
 #     docker compose up -d --build
 #
-# brings up Postgres, Redis, the schema migration, the API, the Celery worker
-# and the web app. Nothing else has to be installed on the host: no Python, no
-# Node, no Postgres, no Firebase project. That is the point — a VPS needs only
-# Docker and this file.
+# brings up Postgres, the schema migration, the API and the web app. Nothing
+# else has to be installed on the host: no Python, no Node, no Postgres, no
+# Firebase project. That is the point — a VPS needs only Docker and this file.
 #
-# Ports: only the web app is published, on WEB_PORT (default 80). Postgres,
-# Redis and the API are reachable on the internal `muhai` network and nowhere
-# else, so nothing is exposed to the internet that does not need to be. nginx
+# There is no queue. A Celery worker and a Redis broker used to sit here; the
+# worker never received a task (server OCR answers in ~0.3 s, so nothing was
+# worth deferring) and Redis existed only to feed it. Both were removed on
+# 2026-09-13 — recover them from commit 5c91e18 if background jobs ever earn
+# their keep.
+#
+# Ports: only the web app is published, on WEB_PORT (default 80). Postgres and
+# the API are reachable on the internal `muhai` network and nowhere else, so
+# nothing is exposed to the internet that does not need to be. nginx
 # in the web container reverse-proxies /api to the backend, which is also why
 # the browser needs no CORS grant and no API hostname.
 #
@@ -37,7 +42,6 @@ x-backend-image: &backend-image
 
 x-backend-env: &backend-env
   DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-muhai}:${POSTGRES_PASSWORD:-muhai_secret}@postgres:5432/${POSTGRES_DB:-muhai}"
-  REDIS_URL: "redis://redis:6379/0"
   # Compose fails fast rather than starting the stack with an unset secret.
   SECRET_KEY: "${SECRET_KEY:?SECRET_KEY is missing from .env — generate one with `openssl rand -hex 32`}"
   ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}"
@@ -67,20 +71,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-muhai} -d ${POSTGRES_DB:-muhai}"]
       interval: 5s
       timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    networks: [muhai]
-
-  redis:
-    image: redis:7-alpine
-    container_name: muhai_redis
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
       retries: 10
     restart: unless-stopped
     networks: [muhai]
@@ -115,8 +105,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
       migrate:
         condition: service_completed_successfully
     healthcheck:
@@ -125,30 +113,6 @@ services:
       timeout: 5s
       start_period: 40s
       retries: 5
-    restart: unless-stopped
-    networks: [muhai]
-
-  worker:
-    <<: *backend-image
-    container_name: muhai_worker
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=${WORKER_CONCURRENCY:-2}
-    environment:
-      <<: *backend-env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    # The image's own healthcheck curls the API, which the worker does not
-    # serve — left alone it would report unhealthy forever. Ask Celery instead.
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping -d celery@$$HOSTNAME"]
-      interval: 30s
-      timeout: 10s
-      start_period: 45s
-      retries: 3
     restart: unless-stopped
     networks: [muhai]
 
@@ -175,4 +139,3 @@ networks:
 
 volumes:
   postgres_data:
-  redis_data:

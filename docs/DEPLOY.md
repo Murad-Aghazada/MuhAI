@@ -1,12 +1,12 @@
 # Deploying Muhai on a VPS
 
-Everything Muhai needs runs in containers: Postgres, Redis, the FastAPI
-service, the Celery worker and the web app. The server needs Docker and
+Everything Muhai needs runs in containers: Postgres, the FastAPI service and
+the web app, plus a one-shot migration job. The server needs Docker and
 nothing else — no Python, no Node, no Postgres, no third-party account.
 
 Target: a small VPS. 2 vCPU / 4 GB RAM is comfortable; 2 GB works if you drop
-`API_WORKERS` and `WORKER_CONCURRENCY` to 1. Prophet and Tesseract are the
-memory-hungry parts, and both live in the backend image.
+`API_WORKERS` to 1. Prophet and Tesseract are the memory-hungry parts, and
+both live in the backend image.
 
 ---
 
@@ -35,8 +35,8 @@ fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
-Firewall: only 22, 80 and 443 need to be open. Postgres, Redis and the API are
-on an internal Docker network and are not published at all.
+Firewall: only 22, 80 and 443 need to be open. Postgres and the API are on an
+internal Docker network and are not published at all.
 
 ```bash
 ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
@@ -78,9 +78,9 @@ bind-mounts, `--reload`, published database ports). Make it a habit, or export
 The first build takes several minutes — prophet and pandas compile.
 
 Order is enforced by the compose file: Postgres becomes healthy, the one-shot
-`migrate` service applies the Alembic revisions and exits, then the API and
-worker start. Migrations run exactly once, in one place, which is why the API
-can safely run several workers.
+`migrate` service applies the Alembic revisions and exits, then the API and the
+web app start. Migrations run exactly once, in one place, which is why the API
+can safely run several uvicorn workers.
 
 Check it:
 

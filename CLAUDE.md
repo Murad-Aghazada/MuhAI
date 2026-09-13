@@ -37,11 +37,18 @@ on it is the whole deployment target.
   Browser (React)
         │  nginx serves the bundle and proxies /api — one origin, no CORS
         ▼
-  FastAPI  ──▶  PostgreSQL 15 (system of record) · Redis 7 (Celery broker)
+  FastAPI  ──▶  PostgreSQL 15 (the only stateful service)
      │
      └── 2026 tax engine · Muhai Score · Prophet forecast · payroll
          Tesseract OCR · assistant (Gemini online, local BM25 offline)
 ```
+
+Everything is synchronous. A Celery worker and a Redis broker were removed on
+2026-09-13: the worker had executed **zero** tasks in its lifetime because
+nothing ever dispatched to it, and server OCR — the only plausible candidate —
+answers in ~0.3 s measured against `web/public/sample-invoice.png`. Redis
+existed solely as that worker's broker. Recover both from commit `5c91e18` if
+background work ever earns its keep.
 
 Two halves to the API:
 
@@ -87,7 +94,7 @@ curl http://localhost:8000/health     # -> {"status":"healthy"}
 ```
 
 A bare `docker compose` also applies `docker-compose.override.yml` — that is
-the development layer (bind-mounts, `--reload`, Postgres/Redis on localhost,
+the development layer (bind-mounts, `--reload`, Postgres on localhost,
 web container disabled behind the `ui` profile). **Deploying uses the base file
 alone**: `docker compose -f docker-compose.yml up -d --build`. Runbook in
 `docs/DEPLOY.md`.
@@ -105,9 +112,8 @@ containers read. `backend/.env` is for running the API outside Docker;
 
 ## 4. Current state
 
-**Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Celery 5.3,
-Redis 5, Alembic through `0010_company_vendor_categories`. **17 routers, 193
-tests.**
+**Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
+through `0010_company_vendor_categories`. **17 routers, 193 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -176,8 +182,9 @@ tests.**
 
 **Mobile** — there is **no native client**; the Expo/React Native app was lost
 and has not been rebuilt. The responsive web app is the mobile story. Landing
-and auth verified at 375 px on 2026-09-08; the signed-in screens have a drawer
-sidebar below 1000 px but were not verified (no test account).
+and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
+2026-09-13 (N17). The other signed-in screens have a drawer sidebar below
+1000 px and are still unverified — see open item 1.
 
 ## 5. Open items
 
@@ -195,8 +202,6 @@ sidebar below 1000 px but were not verified (no test account).
    workspace equivalent and no UI. Vendor-category learning was ported in
    2026-09-13, so `vendor_categories` (0008) and `/api/expenses` are fully
    superseded and safe to drop.
-4. Move server OCR onto the Celery worker so the request returns a job id.
-   The worker is running and idle; nothing dispatches to it.
 
 ## 6. TEKNOFEST claims that do not match the code
 
@@ -204,14 +209,14 @@ sidebar below 1000 px but were not verified (no test account).
 |---|---|---|
 | Slide 4 says **Django** | Code is FastAPI, and staying that way | fix the deck |
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
-| S2 **PostgreSQL 15 + Redis 7** | True as written | none |
-| S4 **Docker Compose, 4 services** | 5 — postgres, redis, backend, worker, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 17 routers, 175 tests | understated — pick the number you defend |
+| S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
+| S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
+| S18 **"13 servis geliştirildi"** | 17 routers, 193 tests | understated — pick the number you defend |
 | S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
-| S3/S16 **GİB / SGK / bank APIs** | Confirm whether `bank_service.py` and the tax routes hit live endpoints or stubs | phrase to match exactly |
+| S3/S16 **GİB / SGK / bank APIs** | **No external API call exists anywhere.** `bank_service.py` parses an uploaded CSV; the tax routes read a local 2026 calendar and rate table | say "bank statement import + local tax engine — works with no internet". It is true and a stronger claim |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
-/ Pydantic v2 / Celery), S5 (Tesseract 5 + Turkish pack, swappable `OcrEngine`),
+/ Pydantic v2 — drop Celery if the slide names it), S5 (Tesseract 5 + Turkish pack, swappable `OcrEngine`),
 S6 (Prophet), S7 (Gemini 2.5 Flash + RAG), S9 (per-field confidence, 0.7
 threshold with a working review queue).
 
