@@ -4,29 +4,29 @@
    reaches for window.localStorage and document.documentElement. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { getLocales } from 'expo-localization'
 
 import { translations } from '../shared/translations.js'
 
 const LanguageContext = createContext(null)
 const STORAGE_KEY = 'muhai.lang'
 
-/** The phone's own language, when it is one we speak. Turkish otherwise —
-    this is an app for Turkish SMEs, so TR is the right default, not English. */
-function deviceLanguage() {
-  try {
-    return getLocales()[0]?.languageCode === 'en' ? 'en' : 'tr'
-  } catch {
-    return 'tr'
-  }
+/** Turkish, always, until the user says otherwise.
+
+    This used to read the phone's locale and hand an English-language handset
+    an English app. That is the wrong default for Muhai: the product is for
+    Turkish SMEs, the invoices are Turkish, the tax vocabulary is Turkish, and
+    plenty of people in that market carry a phone set to English. The stored
+    choice still wins — see the effect below — so English remains one tap away
+    for anyone who wants it. */
+function defaultLanguage() {
+  return 'tr'
 }
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(deviceLanguage)
+  const [lang, setLang] = useState(defaultLanguage)
 
-  // AsyncStorage is async, so the stored choice arrives after the first paint.
-  // Starting from the device language rather than a hardcoded 'tr' keeps that
-  // first frame from flashing the wrong language for an English user.
+  // AsyncStorage is async, so a stored choice arrives after the first paint.
+  // Turkish renders first and is replaced only if this user picked English.
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {

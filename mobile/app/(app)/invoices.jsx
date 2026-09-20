@@ -5,13 +5,13 @@
    use. */
 import { useMemo, useState } from 'react'
 import { router } from 'expo-router'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useData } from '../../src/context/DataContext.jsx'
 import { useLang } from '../../src/i18n/LanguageContext.jsx'
 import { formatCurrency, formatDate } from '../../src/shared/format.js'
-import { markInvoicePaid } from '../../src/shared/db.js'
+import { COLLECTIONS, markInvoicePaid, removeItem } from '../../src/shared/db.js'
 import { Badge, Button, Card, Empty } from '../../src/ui/kit.jsx'
 import { color, radius, space, text } from '../../src/ui/theme.js'
 
@@ -41,6 +41,37 @@ export default function Invoices() {
     setBusyId(invoice.id)
     try {
       await markInvoicePaid(invoice)
+    } catch (err) {
+      Alert.alert(t('common.error'), err?.message || t('common.retry'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  /* Deleting is destructive and there is no undo, so it asks first — the same
+     bargain window.confirm() makes on the web screen, in the one dialog a
+     phone actually has. The scan flow makes invoices easy to create by
+     accident (a blurred shot saved anyway), which is exactly why removing one
+     had to stop being a web-only action. */
+  function confirmDelete(invoice) {
+    Alert.alert(
+      t('invoices.deleteConfirm'),
+      [invoice.vendor, invoice.number].filter(Boolean).join(' · ') || undefined,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete'), style: 'destructive', onPress: () => destroy(invoice) },
+      ],
+    )
+  }
+
+  async function destroy(invoice) {
+    setBusyId(invoice.id)
+    try {
+      // removeItem notifies db.js's onChange, so DataContext reloads and the
+      // row leaves the list without this screen tracking anything itself.
+      await removeItem(COLLECTIONS.invoices, invoice.id)
+    } catch (err) {
+      Alert.alert(t('common.error'), err?.message || t('common.retry'))
     } finally {
       setBusyId(null)
     }
@@ -109,6 +140,16 @@ export default function Invoices() {
                   style={styles.payBtn}
                 />
               )}
+              <Pressable
+                onPress={() => confirmDelete(item)}
+                disabled={busyId === item.id}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.delete')}
+                style={styles.delBtn}
+              >
+                <Text style={styles.delText}>{t('common.delete')}</Text>
+              </Pressable>
             </View>
           </Card>
         )}
@@ -147,4 +188,10 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: '700', color: color.ink },
   rowBottom: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   payBtn: { minHeight: 38, paddingHorizontal: space(3) },
+  delBtn: {
+    minHeight: 38,
+    paddingHorizontal: space(3),
+    justifyContent: 'center',
+  },
+  delText: { fontSize: 13, fontWeight: '600', color: color.neg },
 })

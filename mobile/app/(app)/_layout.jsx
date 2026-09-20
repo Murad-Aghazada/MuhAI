@@ -64,6 +64,14 @@ export default function AppLayout() {
             tabBarIcon: ({ focused }) => <Icon glyph="⇄" focused={focused} />,
           }}
         />
+        {/* Pushed from the dashboard and the invoice list, never a tab of its
+            own. It lives inside this group so it inherits DataProvider and the
+            sign-in guard above; href: null keeps it out of the bar, and hiding
+            the bar gives the camera the whole screen. */}
+        <Tabs.Screen
+          name="scan"
+          options={{ href: null, tabBarStyle: { display: 'none' } }}
+        />
       </Tabs>
     </DataProvider>
   )

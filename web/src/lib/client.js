@@ -146,7 +146,12 @@ export async function request(
       signal: controller.signal,
     })
 
-    if (res.status === 401) {
+    // A 401 only means "your session expired" when there *was* a session. On
+    // an unauthenticated call — sign-in, registration — it is the API saying
+    // the credentials are wrong, and it says so in Turkish in the body.
+    // Swallowing that detail told a user with a mistyped password to log in
+    // again, which is the one thing that could not help them.
+    if (res.status === 401 && token) {
       clearToken()
       onUnauthenticated?.()
       throw new ApiError('Oturumunuzun süresi doldu. Tekrar giriş yapın.', { status: 401 })

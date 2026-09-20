@@ -144,7 +144,7 @@ All four are git-ignored.
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 286 tests.**
+through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 296 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -184,7 +184,8 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 286 tests.**
   preprocessing (grayscale, upscale under 1600 px, autocontrast, unsharp).
   See N18 — the settings matter far more than the model does. The browser-side
   OCR mode is fully vendored under `web/public/tessdata`, so **neither OCR
-  path needs internet** (see N13)
+  path needs internet** (see N13). Confidence is **measured**, not assumed, and
+  the vendor is found by legal form rather than by position — see N23
 - Muhai Score: 8 weighted categories. Tax engine: 2026 KDV / income / corporate
   / stopaj / SGK / stamp rates
 - The user-scoped routes from before the workspace (`/api/invoices`,
@@ -236,12 +237,23 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 286 tests.**
 Expo SDK 57, React 19.2.3, RN 0.86.3, expo-router, Expo Go for now (no EAS
 build, no store account). Five screens: login/register, dashboard, invoices,
 camera→OCR scan, assistant, bank. Tax / Inventory / Payroll / Settings stay
-web-only on purpose.
+web-only on purpose. The invoice list can mark paid **and delete** (confirmed
+through `Alert`, the phone's only dialog) — a scan makes invoices easy to
+create by accident, so removing one could not stay web-only.
 
-It has been **bundled but never run on a device** — `npx expo export
---platform android` succeeds, which proves Metro resolution, the single React
-copy and that Hermes accepts `db.js`'s `\p{L}` regex. Everything else is open
-item 4.
+**It ran on a real Android phone through Expo Go on 2026-09-20**, against the
+dev stack over the LAN. Confirmed on the device: Metro resolves `../web/src`
+with a single React copy, Hermes accepts `db.js`'s `\p{L}` regex
+(`vendorKey('Teknopark Gayrimenkul A.Ş.')` → `teknopark gayrimenkul as`), Intl
+formats tr-TR (`₺12.350`, not `₺12,350`), sign-in works, and the
+camera→OCR→save path completes. The throwaway `app/setup-check.jsx` proved all
+three and was deleted.
+
+Four bugs only a device could find, all fixed that day: the 401 mislabel
+(N24), `scan.jsx` mounted outside the `(app)` group so it had neither
+`DataProvider` nor the sign-in guard, a camera screen that rendered `busy` but
+never `error` (so every failure looked like nothing happening), and the
+FormData upload break (N22).
 
 The responsive web app is still the mobile story for the screens the native
 app does not have. Landing and auth verified at 375 px on 2026-09-08; the
@@ -258,14 +270,11 @@ other signed-in screens are still unverified — see open item 1.
    now — `compliance-test@example.com` / `TestParola2026!`, seeded.
 2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. **Run the native app on a real phone.** `cd mobile && npm start`, scan the
-   QR with Expo Go. Nothing has ever executed on a device. `app/setup-check.jsx`
-   is a throwaway diagnostic screen that checks the three things that fail
-   silently — Metro resolution, Hermes' Unicode regex in `vendorKey()`, and
-   whether Intl really speaks Turkish. Open it first; delete it once it passes.
-   Expect the API address to be the sticking point: the phone needs the
-   laptop's LAN IP (derived automatically from Expo's `hostUri`) and Windows
-   Firewall has to allow inbound 8000 on a Private network.
+3. **Walk the remaining native screens.** The app runs on a phone now, and
+   dashboard, invoices, scan and login were exercised on 2026-09-20.
+   **Assistant and bank have not been opened on the device.** Also unverified:
+   what the app does when the API disappears mid-session — the shared client
+   falls back on web, and nothing has tested that path natively.
 4. **Run the bank client against a real sandbox.** The integration is built
    and tested against a scripted bank (90 tests), but no Turkish bank
    credential has ever been through it. When access arrives: set the `BANK_*`
@@ -281,14 +290,16 @@ other signed-in screens are still unverified — see open item 1.
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 286 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 286 test" — a small, defensible surface beats a big one you cannot explain |
-| S14 **Expo / React Native shipped** | A native Expo app now exists (`mobile/`, SDK 57, 5 screens, camera→OCR). It bundles but has **not run on a device yet**, and there is no store build. | say "Expo ile native mobil uygulama" once it has run on a phone — not before. Until then the honest line is the responsive web app plus a native build in progress |
+| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 296 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 296 test" — a small, defensible surface beats a big one you cannot explain |
+| S14 **Expo / React Native shipped** | A native Expo app runs on a real Android phone as of 2026-09-20 (`mobile/`, SDK 57, 5 screens, camera→OCR verified end to end over the LAN). Still **Expo Go only** — no EAS build, no store listing, and it has not run on iOS. | say "Expo ile native mobil uygulama" — it is now true. Do **not** say "yayında"/"mağazada": it runs through Expo Go on a development machine, not as an installable build |
 | S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
 / Pydantic v2 — drop Celery if the slide names it), S5 (Tesseract 5 + Turkish pack, swappable `OcrEngine`),
 S6 (Prophet), S7 (Gemini 2.5 Flash + RAG), S9 (per-field confidence, 0.7
-threshold with a working review queue).
+threshold with a working review queue) — S9 became true on 2026-09-20; until
+then the "confidence" was a table of constants (see N23), so if anyone has
+demoed that number before today, they demoed a literal.
 
 ## 7. Conventions and gotchas
 
@@ -443,6 +454,62 @@ threshold with a working review queue).
   transitive dependencies and leaves Metro unable to resolve `expo-asset`. If
   the bundler starts reporting a missing package nobody removed, delete
   `mobile/node_modules` and `package-lock.json` and install once.
+
+- **N22 — Expo SDK 57 killed React Native's `{uri, name, type}` upload.** SDK 57
+  replaces the global `fetch` with the winter runtime's, and its
+  `convertFormDataAsync()` accepts only a `Blob`, a `File`, or an object
+  exposing `bytes()`. Handed RN's long-standing `{uri}` part it throws
+  **"Unsupported FormDataPart implementation"** — in JS, *before any request
+  leaves the phone*, so the shared client reports it as
+  "Sunucuya ulaşılamıyor" and the server log stays empty. Two hours went into
+  the firewall, the file and the server before the message was traced to
+  `expo/src/winter/fetch/convertFormData.ts`, whose own comment says "`uri` is
+  not supported for React Native's FormData". The fix is
+  `new File(uri)` from **expo-file-system**, whose `File` implements `Blob` —
+  so `scanInvoice()` in the shared `api.js` still just appends what it is
+  handed, exactly as it does on the web with a `File` from an `<input>`.
+  A `Blob` would *not* work: RN's `FormData.getParts()` spreads it into an
+  empty object and you get the same error from the other end.
+
+- **N23 — OCR confidence is measured now; it used to be a table of constants.**
+  Every field returned a literal — vendor `0.6`, invoice no `0.85`, date and
+  total `0.8`, KDV `0.75` — and the review badge is
+  `min(vendor, number, total)`, so it read **exactly 60% on every invoice ever
+  scanned**, pristine or blurred. `image_to_data` gives per-word confidence
+  Tesseract was already computing and the code discarded; the engine now reads
+  the page **once** and returns lines with scores, and each field multiplies
+  the rule's own certainty by the measured quality of the line it came from.
+  Two traps if you touch this: an amount's parsed float (`14820.0`) never
+  appears in the text (`14.820,00`), so amount fields must carry their source
+  line or they silently keep the old constant; and `OcrEngine.image_to_lines()`
+  defaults to `[]` so a cloud provider can still be dropped in without it.
+  Vendor extraction changed with it — it was "first mostly-alphabetic line",
+  which is fine on a clean scan and wrong on a photo, where the top of the
+  frame is glare, the paper edge or the word "FATURA". It now matches the
+  legal form (`A.Ş.`, `Ltd. Şti.`, `San.`, `Tic.`), which is near-proof on a
+  Turkish invoice and indifferent to position. Measured against four capture
+  conditions: 4/4 fields on clean, handheld and dim (vendor ~0.84), collapsing
+  to 1/4 and 0.49 with `needs_review` on a too-distant shot. Re-run that
+  benchmark rather than assuming, exactly as N18 says.
+
+- **N24 — A 401 only means "session expired" when a token was sent.** The
+  client intercepted *every* 401 before reading the body and replaced it with
+  "Oturumunuzun süresi doldu. Tekrar giriş yapın." On `/api/auth/login`, which
+  is called with `auth: false`, that discarded the API's own
+  "E-posta veya şifre hatalı." and told someone with a mistyped password to
+  log in again — the one instruction that could not help. `request()` now
+  requires a token to have been sent before treating a 401 as session expiry.
+  Affected the web app just as much; it only surfaced on the phone because
+  that was the first time anyone mistyped the password.
+
+- **N25 — Mobile defaults to Turkish regardless of the phone's locale.** It
+  used to read `expo-localization` and hand an English-set handset an English
+  app. Wrong default for this product: the invoices, the tax vocabulary and
+  the customers are Turkish, and plenty of that market carries an English
+  phone. `LanguageContext` now starts at `tr` and only a stored choice moves
+  it. Because the native app has **no Settings screen**, that change would
+  have made English unreachable, so the `TR / EN` control on the login screen
+  is load-bearing — do not remove it without adding another way through.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

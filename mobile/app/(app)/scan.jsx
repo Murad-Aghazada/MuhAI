@@ -15,20 +15,21 @@ import { router } from 'expo-router'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
+import { File as FsFile } from 'expo-file-system'
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
   StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useData } from '../src/context/DataContext.jsx'
-import { useLang } from '../src/i18n/LanguageContext.jsx'
-import { scanInvoice } from '../src/shared/api.js'
-import { CONFIDENCE_THRESHOLD, ocrToDraft } from '../src/shared/invoiceDraft.js'
-import { COLLECTIONS, rememberVendorCategory, saveInvoiceWithLedger } from '../src/shared/db.js'
-import { formatCurrency } from '../src/shared/format.js'
-import { Badge, Button, Card, ErrorNote, Field } from '../src/ui/kit.jsx'
-import { color, radius, space, text } from '../src/ui/theme.js'
+import { useData } from '../../src/context/DataContext.jsx'
+import { useLang } from '../../src/i18n/LanguageContext.jsx'
+import { scanInvoice } from '../../src/shared/api.js'
+import { CONFIDENCE_THRESHOLD, ocrToDraft } from '../../src/shared/invoiceDraft.js'
+import { COLLECTIONS, rememberVendorCategory, saveInvoiceWithLedger } from '../../src/shared/db.js'
+import { formatCurrency } from '../../src/shared/format.js'
+import { Badge, Button, Card, ErrorNote, Field } from '../../src/ui/kit.jsx'
+import { color, radius, space, text } from '../../src/ui/theme.js'
 
 const MAX_WIDTH = 1600
 
@@ -41,27 +42,34 @@ export default function Scan() {
   const [permission, requestPermission] = useCameraPermissions()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [cause, setCause] = useState(null)
   const [draft, setDraft] = useState(null)
 
   async function process(uri) {
     setBusy(true)
     setError(null)
+    setCause(null)
     try {
       const shrunk = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: MAX_WIDTH } }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
       )
-      // React Native's FormData takes { uri, name, type }; the shared
-      // scanInvoice() appends whatever it is given, so it needs no change.
-      const result = await scanInvoice({
-        uri: shrunk.uri,
-        name: 'invoice.jpg',
-        type: 'image/jpeg',
-      })
+      // NOT { uri, name, type }. Expo SDK 57 replaces the global fetch with
+      // the winter runtime's, and its convertFormDataAsync() accepts only a
+      // Blob, a File, or an object exposing bytes() — it throws "Unsupported
+      // FormDataPart implementation" on the old React Native uri convention,
+      // before any request leaves the device. expo-file-system's File
+      // implements Blob (name, type, bytes()), so the shared scanInvoice()
+      // still just appends what it is handed, exactly as it does on the web
+      // with a File from an <input>. See N22.
+      const result = await scanInvoice(new FsFile(shrunk.uri))
       setDraft(ocrToDraft(result))
     } catch (err) {
       setError(err.message)
+      // status 0 is a transport failure: the underlying reason is the only
+      // thing that distinguishes a wrong network from a blocked port.
+      setCause(err?.status === 0 ? err?.cause?.message || 'fetch failed' : null)
     } finally {
       setBusy(false)
     }
@@ -69,8 +77,15 @@ export default function Scan() {
 
   async function capture() {
     if (!cameraRef.current || busy) return
-    const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 })
-    if (photo?.uri) process(photo.uri)
+    // takePictureAsync rejects on its own (no storage, camera grabbed by
+    // another app). Unhandled, that is a shutter sound and nothing else.
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 })
+      if (photo?.uri) process(photo.uri)
+      else setError('Fotoğraf alınamadı. Tekrar deneyin.')
+    } catch (err) {
+      setError(err?.message || 'Fotoğraf alınamadı. Tekrar deneyin.')
+    }
   }
 
   async function pick() {
@@ -187,8 +202,21 @@ export default function Scan() {
       )}
 
       <View style={[styles.frameHint, { top: insets.top + space(6) }]}>
-        <Text style={styles.frameText}>Faturayı çerçeveye sığdırın</Text>
+        {/* Not a gate — nothing measures the frame. The old copy promised one
+            and left people re-aiming at a camera that had already given up.
+            An invoice is read line by line (PSM 6, N18), so what matters is
+            that the totals are legible, not that the page fits. */}
+        <Text style={styles.frameText}>
+          Tutar satırları okunaklı olsun · tamamı sığmak zorunda değil
+        </Text>
       </View>
+
+      {error && !busy && (
+        <View style={[styles.errBanner, { top: insets.top + space(14) }]}>
+          <Text style={styles.errText}>{error}</Text>
+          {cause ? <Text style={styles.errCause}>{cause}</Text> : null}
+        </View>
+      )}
 
       <View style={[styles.controls, { paddingBottom: insets.bottom + space(6) }]}>
         <Pressable onPress={() => router.back()} style={styles.sideBtn}>
@@ -232,15 +260,40 @@ const styles = StyleSheet.create({
   },
   scrimText: { color: '#fff', fontSize: 14 },
 
-  frameHint: { position: 'absolute', alignSelf: 'center' },
+  // left+right rather than alignSelf: an absolutely positioned view with no
+  // horizontal anchors sizes to its content, and the text is then clipped at
+  // the screen edge instead of wrapping.
+  errBanner: {
+    position: 'absolute',
+    left: space(4),
+    right: space(4),
+    backgroundColor: 'rgba(190,30,45,0.95)',
+    paddingHorizontal: space(4),
+    paddingVertical: space(3),
+    borderRadius: radius.md,
+  },
+  errText: { color: '#fff', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  errCause: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'center',
+    marginTop: space(1),
+  },
+  frameHint: {
+    position: 'absolute',
+    left: space(4),
+    right: space(4),
+    alignItems: 'center',
+  },
   frameText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 12.5,
+    textAlign: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: space(3),
     paddingVertical: space(1.5),
     borderRadius: radius.full,
-    overflow: 'hidden',
   },
 
   controls: {

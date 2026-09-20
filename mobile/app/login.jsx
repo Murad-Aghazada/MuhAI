@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { router, Link } from 'expo-router'
 import {
-  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
+  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 
 import { useAuth, authErrorMessage } from '../src/shared/AuthContext.js'
@@ -11,7 +11,7 @@ import { color, space, text } from '../src/ui/theme.js'
 
 export default function Login() {
   const { login } = useAuth()
-  const { t, lang } = useLang()
+  const { t, lang, setLanguage } = useLang()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,6 +40,19 @@ export default function Login() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {/* The app defaults to Turkish for everyone. This is the only way back
+            to English on mobile, so it lives on the first screen rather than
+            behind a Settings page the native app does not have. */}
+        <View style={styles.langRow}>
+          {['tr', 'en'].map((code) => (
+            <Pressable key={code} onPress={() => setLanguage(code)} hitSlop={8}>
+              <Text style={[styles.langBtn, lang === code && styles.langBtnOn]}>
+                {code.toUpperCase()}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.brand}>
           <Text style={styles.logo}>Muhai</Text>
           <Text style={styles.tagline}>{t('common.tagline')}</Text>
@@ -94,6 +107,16 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
+  langRow: { flexDirection: 'row', alignSelf: 'flex-end', gap: space(2) },
+  langBtn: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: color.ink4,
+    paddingHorizontal: space(2),
+    paddingVertical: space(1),
+  },
+  langBtnOn: { color: color.brandDeep },
+
   screen: { flex: 1, backgroundColor: color.canvas },
   content: { flexGrow: 1, justifyContent: 'center', padding: space(6), gap: space(8) },
   brand: { alignItems: 'center', gap: space(1) },
