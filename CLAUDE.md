@@ -17,6 +17,7 @@ Last verified: **2026-09-20**.
 /
   backend/              FastAPI — data + compute API, Alembic migrations
   web/                  Vite + React 18 frontend (src/, own package.json)
+  mobile/               Expo SDK 57 native app — imports web/src/lib directly
   docs/                 DEPLOY.md — the VPS runbook
   db_backup/            pg_dump of an earlier development database
   docker-compose.yml            the deployable stack
@@ -72,6 +73,12 @@ Three surfaces to the API — two that own the product, one that is optional:
 
 Sessions are JWTs signed by the API (`SECRET_KEY`), passwords bcrypt hashes.
 
+**Two clients, one client layer.** `mobile/` does not copy the API client — it
+bundles the *actual* `web/src/lib/*.js` files through Metro `watchFolders`, via
+a one-line-per-file barrel in `mobile/src/shared/`. So the API client, the
+document shapes and the Turkish dictionary cannot drift between web and phone.
+See N20.
+
 ### Data model
 
 ```
@@ -115,9 +122,24 @@ docker compose exec backend pip install -r requirements-dev.txt
 docker compose exec backend python -m pytest
 ```
 
+The native app (Expo Go on a real phone, same Wi-Fi as the laptop):
+
+```bash
+npm --prefix mobile install       # .npmrc pins legacy-peer-deps, see N21
+cd mobile && npm start            # scan the QR with Expo Go
+```
+
+`mobile/src/boot.js` derives the API address from whichever machine serves the
+bundle, so nothing needs configuring — but Windows Firewall must allow inbound
+8000 on a Private network, or every request times out. Override with
+`EXPO_PUBLIC_API_URL` in `mobile/.env.local` to point at a deployed API.
+`npx expo export --platform android` bundles without a device and is the
+fastest way to prove the shared layer still resolves.
+
 Environment: root `.env` configures the whole stack and is the only file the
 containers read. `backend/.env` is for running the API outside Docker;
-`web/.env.local` for the Vite dev server. All three are git-ignored.
+`web/.env.local` for the Vite dev server, `mobile/.env.local` for the phone.
+All four are git-ignored.
 
 ## 4. Current state
 
@@ -210,11 +232,21 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 286 tests.**
   can forget one entry or all of them. Deliberately outside the `COLLECTIONS`
   object that "clear all data" iterates — learned knowledge is not demo data
 
-**Mobile** — there is **no native client**; the Expo/React Native app was lost
-and has not been rebuilt. The responsive web app is the mobile story. Landing
-and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
-2026-09-13 (N17). The other signed-in screens have a drawer sidebar below
-1000 px and are still unverified — see open item 1.
+**Mobile** — a native Expo app exists as of **2026-09-20**, in `mobile/`.
+Expo SDK 57, React 19.2.3, RN 0.86.3, expo-router, Expo Go for now (no EAS
+build, no store account). Five screens: login/register, dashboard, invoices,
+camera→OCR scan, assistant, bank. Tax / Inventory / Payroll / Settings stay
+web-only on purpose.
+
+It has been **bundled but never run on a device** — `npx expo export
+--platform android` succeeds, which proves Metro resolution, the single React
+copy and that Hermes accepts `db.js`'s `\p{L}` regex. Everything else is open
+item 4.
+
+The responsive web app is still the mobile story for the screens the native
+app does not have. Landing and auth verified at 375 px on 2026-09-08; the
+dashboard signed-in on 2026-09-13 (N17); the Bank screen on 2026-09-20. The
+other signed-in screens are still unverified — see open item 1.
 
 ## 5. Open items
 
@@ -226,7 +258,15 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
    now — `compliance-test@example.com` / `TestParola2026!`, seeded.
 2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. **Run the bank client against a real sandbox.** The integration is built
+3. **Run the native app on a real phone.** `cd mobile && npm start`, scan the
+   QR with Expo Go. Nothing has ever executed on a device. `app/setup-check.jsx`
+   is a throwaway diagnostic screen that checks the three things that fail
+   silently — Metro resolution, Hermes' Unicode regex in `vendorKey()`, and
+   whether Intl really speaks Turkish. Open it first; delete it once it passes.
+   Expect the API address to be the sticking point: the phone needs the
+   laptop's LAN IP (derived automatically from Expo's `hostUri`) and Windows
+   Firewall has to allow inbound 8000 on a Private network.
+4. **Run the bank client against a real sandbox.** The integration is built
    and tested against a scripted bank (90 tests), but no Turkish bank
    credential has ever been through it. When access arrives: set the `BANK_*`
    block, open `/app/bank`, and expect the first fix to be a field name — that
@@ -242,7 +282,7 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
 | S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 286 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 286 test" — a small, defensible surface beats a big one you cannot explain |
-| S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
+| S14 **Expo / React Native shipped** | A native Expo app now exists (`mobile/`, SDK 57, 5 screens, camera→OCR). It bundles but has **not run on a device yet**, and there is no store build. | say "Expo ile native mobil uygulama" once it has run on a phone — not before. Until then the honest line is the responsive web app plus a native build in progress |
 | S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
@@ -374,6 +414,35 @@ threshold with a working review queue).
   borç/alacak flag, nested amount) with no network, which is what to demo on;
   and CSV import is not a fallback bolted on, it is the same normaliser, so
   nothing about the feature depends on a bank saying yes.
+
+- **N20 — `web/src/lib/*` has two consumers now.** The Expo app bundles those
+  files directly (Metro `watchFolders` → `mobile/src/shared/`), so a change
+  there ships to the phone as well as the browser, and **no web test will
+  catch a break**. Three rules keep it working: no `import.meta` anywhere in
+  the shared files — Metro cannot *parse* it, so the whole mobile bundle dies
+  with a syntax error pointing at a web file; no `window`/`document`/
+  `localStorage` — put those in `main.jsx` or the page layer; and no importing
+  `ocr.js`, which `metro.config.js` blocks outright. The platform facts are
+  injected at boot instead: `configureClient({ baseUrl, tokenStore, token })`,
+  called from `web/src/main.jsx` and from `mobile/src/boot.js`. `apiBaseUrl`
+  is an `export let` live binding so the re-export in `api.js` and the read in
+  `Settings.jsx` needed no change — do not snapshot it at module scope.
+  Enforced, not just documented: **`npm --prefix mobile run check:shared`**
+  reads the barrel, follows it into `web/src`, strips comments and string
+  literals, and fails on `import.meta` or an un-feature-detected browser
+  global. A plain grep was tried first and was useless — it matched prose
+  about `localStorage` and the deliberate adapter in `client.js`, so it cried
+  wolf every run. `analytics.js` had a local `Set` named `window`; it is
+  `span` now, because shadowing a browser global in a shared file is a trap
+  for every future reader as well as the checker.
+
+- **N21 — `mobile/.npmrc` pins `legacy-peer-deps=true`, deliberately.** Expo 57
+  ships `react@19.2.3` while `@expo/devtools` pulls `react-dom@19.3.0`, which
+  peer-requires `react@^19.3.0`; npm's strict resolution refuses the tree.
+  Worse, *mixing* `npx expo install` with a plain `npm install` prunes
+  transitive dependencies and leaves Metro unable to resolve `expo-asset`. If
+  the bundler starts reporting a missing package nobody removed, delete
+  `mobile/node_modules` and `package-lock.json` and install once.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

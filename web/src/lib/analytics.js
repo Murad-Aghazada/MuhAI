@@ -74,10 +74,13 @@ export function kpiBlock(series) {
 
 /** Expense totals per category for the trailing `months` window. */
 export function expenseBreakdown(transactions = [], date = new Date(), months = 1) {
-  const window = new Set(monthSpan(date, months))
+  // Not named `window`: this file is bundled for the Expo app too, and
+  // shadowing a browser global is exactly what the shared-layer check looks
+  // for (N20).
+  const span = new Set(monthSpan(date, months))
   const totals = new Map()
   for (const t of transactions) {
-    if (t.type !== 'expense' || !window.has(monthKey(t.date))) continue
+    if (t.type !== 'expense' || !span.has(monthKey(t.date))) continue
     const key = t.category || 'other'
     totals.set(key, (totals.get(key) || 0) + (Number(t.amount) || 0))
   }

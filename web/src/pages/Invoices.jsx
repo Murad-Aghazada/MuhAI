@@ -21,35 +21,12 @@ import { scanInvoice } from '../lib/api.js'
 import { runOcr } from '../lib/ocr.js'
 import { isOverdue } from '../lib/analytics.js'
 import { splitVat } from '../lib/seed.js'
+import { CONFIDENCE_THRESHOLD, emptyInvoice, ocrToDraft } from '../lib/invoiceDraft.js'
 import Badge from '../components/ui/Badge.jsx'
 import InvoiceModal from '../components/invoices/InvoiceModal.jsx'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
 const STATUS_TONE = { paid: 'green', pending: 'amber', overdue: 'red' }
-const CONFIDENCE_THRESHOLD = 0.7
-
-const emptyInvoice = () => {
-  const today = new Date().toISOString().slice(0, 10)
-  return {
-    number: '',
-    vendor: '',
-    taxId: '',
-    direction: 'purchase',
-    issueDate: today,
-    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-    paidDate: null,
-    amount: 0,
-    netAmount: 0,
-    vatAmount: 0,
-    vatRate: 0.2,
-    status: 'pending',
-    category: 'other',
-    source: 'manual',
-    ocrConfidence: null,
-    needsReview: false,
-    currency: 'TRY',
-  }
-}
 
 export default function Invoices() {
   const { t, lang } = useLang()
@@ -114,36 +91,8 @@ export default function Invoices() {
       const draft = emptyInvoice()
 
       if (scanMode === 'server') {
-        const res = await scanInvoice(file)
-        const value = (f) => res[f]?.value ?? null
-        const conf = (f) => res[f]?.confidence ?? 0
-
-        const total = Number(value('total_amount')) || 0
-        const vat = Number(value('vat_amount')) || splitVat(total).vat
-
-        Object.assign(draft, {
-          vendor: value('vendor_name') || '',
-          number: value('invoice_number') || '',
-          issueDate: value('date') || draft.issueDate,
-          amount: total,
-          vatAmount: vat,
-          netAmount: Math.max(total - vat, 0),
-          source: 'ocr',
-          ocrConfidence: Math.min(
-            conf('vendor_name'),
-            conf('invoice_number'),
-            conf('total_amount'),
-          ),
-          needsReview: res.needs_review,
-          rawText: res.raw_text || '',
-          fieldConfidence: {
-            vendor: conf('vendor_name'),
-            number: conf('invoice_number'),
-            date: conf('date'),
-            amount: conf('total_amount'),
-            vat: conf('vat_amount'),
-          },
-        })
+        // Shared with the native app, which runs the same scan (lib/invoiceDraft.js).
+        Object.assign(draft, ocrToDraft(await scanInvoice(file)))
       } else {
         const res = await runOcr(file, setProgress)
         const total = res.fields.total || 0
