@@ -43,6 +43,12 @@ def test_all_expected_routers_are_mounted(client):
         "/api/compute/classify",
         "/api/compute/ocr",
         "/api/compute/chat",
+        "/api/bank/status",
+        "/api/bank/accounts",
+        "/api/bank/transactions",
+        "/api/bank/import",
+        "/api/bank/reconcile",
+        "/api/bank/sync",
     ):
         assert expected in paths, f"missing route: {expected}"
 
@@ -74,15 +80,23 @@ def test_the_legacy_user_scoped_routes_are_gone(client):
 
 
 def test_every_mounted_api_path_belongs_to_a_live_router(client):
-    """Three surfaces and nothing else."""
+    """Four surfaces and nothing else."""
     paths = [p for p in client.get("/openapi.json").json()["paths"] if p.startswith("/api/")]
     assert paths, "no API paths mounted at all"
     for path in paths:
-        assert path.startswith(("/api/auth", "/api/workspace", "/api/compute")), path
+        assert path.startswith(
+            ("/api/auth", "/api/workspace", "/api/compute", "/api/bank")
+        ), path
 
 
 def test_protected_endpoint_rejects_anonymous_request(client):
     assert client.post("/api/compute/dashboard", json={}).status_code in (401, 403)
+
+
+def test_bank_rejects_anonymous_request(client):
+    """The bank router holds the deployment's credentials; it is never open."""
+    assert client.get("/api/bank/status").status_code in (401, 403)
+    assert client.post("/api/bank/sync", json={}).status_code in (401, 403)
 
 
 def test_workspace_rejects_anonymous_request(client):

@@ -7,7 +7,7 @@ Application ID 4579275 · Baku Higher Oil School.
 Auto-loaded each session. Read it before starting; update it when facts change.
 **Keep it lean — delete finished work rather than striking it through.**
 
-Last verified: **2026-09-08**.
+Last verified: **2026-09-20**.
 
 ---
 
@@ -39,8 +39,11 @@ on it is the whole deployment target.
         ▼
   FastAPI  ──▶  PostgreSQL 15 (the only stateful service)
      │
-     └── 2026 tax engine · Muhai Score · Prophet forecast · payroll
-         Tesseract OCR · assistant (Gemini online, local BM25 offline)
+     ├── 2026 tax engine · Muhai Score · Prophet forecast · payroll
+     │   Tesseract OCR · assistant (Gemini online, local BM25 offline)
+     │
+     └── bank API (optional, config-driven) ──▶ the company's bank
+         no credentials → CSV statement import, same matcher
 ```
 
 Everything is synchronous. A Celery worker and a Redis broker were removed on
@@ -50,7 +53,7 @@ answers in ~0.3 s measured against `web/public/sample-invoice.png`. Redis
 existed solely as that worker's broker. Recover both from commit `5c91e18` if
 background work ever earns its keep.
 
-Two halves to the API:
+Three surfaces to the API — two that own the product, one that is optional:
 
 * **`/api/workspace`** — the data layer. Company profile plus five
   collections. The signed-in token *is* the company scope: every query is
@@ -60,6 +63,12 @@ Two halves to the API:
 * **`/api/compute`** — stateless. Reads no table; a pure function of the
   snapshot posted to it plus today's date. Authenticates the caller but never
   resolves a company.
+* **`/api/bank`** — the only surface that talks to anything outside this
+  stack, and the only optional one. Stateless like compute: the browser posts
+  the invoices it already holds and gets matches back, and a movement becomes
+  a ledger entry only when the user presses the button, through
+  `/api/workspace`. With no bank configured every endpoint but `/accounts`
+  still works, because CSV import lands in the same normaliser (N19).
 
 Sessions are JWTs signed by the API (`SECRET_KEY`), passwords bcrypt hashes.
 
@@ -113,7 +122,7 @@ containers read. `backend/.env` is for running the API outside Docker;
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
+through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 286 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -139,6 +148,13 @@ through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
   on any network, quota or key failure — it answers from a local BM25 knowledge
   base plus pre-answered questions and returns `source="offline"`, which the
   chat UI badges. Neither mode needs anything downloaded at runtime (N14)
+- `/api/bank/*` — statement import, live fetch and reconciliation. Built
+  2026-09-20 on the workspace; the deleted `bank_service.py` was recovered and
+  extended. `bank_providers.py` holds a preset per Turkish bank (auth style,
+  header names, field vocabulary) and `bank_client.py` the transport: stdlib
+  urllib, OAuth2 client-credentials with a cached token, mutual TLS, retry on
+  429/5xx and never on 4xx. **Connecting a real bank is an `.env` change, not
+  a code change** — see N19 and the `BANK_*` block in `.env.example`
 - Prophet 1.1.5 forecasting on real data, moving-average fallback under 10
   points and on any Prophet failure
 - Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7.
@@ -160,7 +176,7 @@ through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
   reconciliation gets built on the workspace
 
 **Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
-**495 kB (153 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**506 kB (156 kB gzipped)**, down from 973 kB when the Firebase SDK went.
 
 - Own JWT auth against `/api/auth`, token in localStorage, two-step company
   sign-up, protected `/app`. **There is no password reset** — Firebase used to
@@ -177,6 +193,12 @@ through `0011_drop_legacy_tables`. **3 routers, 21 endpoints, 194 tests.**
 - Falls back to local aggregation with a "hesaplama servisi çevrimdışı" badge
   when the API is unreachable — never a blank screen, never an invented number
 - `lib/seed.js` generates a deterministic demo dataset
+- **Banka Mutabakatı** (`pages/Bank.jsx`) shows one thing: which movements are
+  already in the books and which are not, unmatched first. It fetches when a
+  bank is connected and imports a CSV when one is not, and says plainly which
+  setting is missing rather than pretending. Verified end to end on
+  2026-09-20 against the seeded test company — 4 movements, 2 matched to real
+  invoices at %100 and %95, and "Deftere ekle" wrote the ledger entry
 - The dashboard's **Uyum & Risk** card renders those alerts, severity-marked,
   with a link back to the offending invoice. Headings and severities are
   TR/EN; the detail sentence is Turkish in both, exactly like the assistant
@@ -204,11 +226,12 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
    now — `compliance-test@example.com` / `TestParola2026!`, seeded.
 2. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. Build bank reconciliation on the workspace if it earns its place: import a
-   statement CSV, match rows to invoices, show what did not match. The engine
-   was written and then deleted with the rest of the legacy code — start from
-   `git show 5cb59c0:backend/app/services/bank_service.py`, which already
-   parses Turkish bank CSVs and fuzzy-matches on amount, date and vendor.
+3. **Run the bank client against a real sandbox.** The integration is built
+   and tested against a scripted bank (90 tests), but no Turkish bank
+   credential has ever been through it. When access arrives: set the `BANK_*`
+   block, open `/app/bank`, and expect the first fix to be a field name — that
+   is what `BANK_FIELD_MAP` is for, and it needs no deploy. Endpoint paths and
+   scopes come with the credentials; do not guess them into the presets.
 
 ## 6. TEKNOFEST claims that do not match the code
 
@@ -218,9 +241,9 @@ and auth verified at 375 px on 2026-09-08; the dashboard verified signed-in on
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 3 routers, 21 endpoints, 194 tests. 17 routers existed until the legacy half was deleted | say "21 uç nokta, 194 test" — a small, defensible surface beats a big one you cannot explain |
+| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 286 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 286 test" — a small, defensible surface beats a big one you cannot explain |
 | S14 **Expo / React Native shipped** | Mobile **works** — the responsive web app runs on a phone (landing and auth verified at 375 px). What does not exist is a *native* Expo/React Native build. | keep the mobile capability in the pitch; word it as the web app on mobile, not a native app |
-| S3/S16 **GİB / SGK / bank APIs** | **No external API call exists anywhere.** `bank_service.py` parses an uploaded CSV; the tax routes read a local 2026 calendar and rate table | say "bank statement import + local tax engine — works with no internet". It is true and a stronger claim |
+| S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
 / Pydantic v2 — drop Celery if the slide names it), S5 (Tesseract 5 + Turkish pack, swappable `OcrEngine`),
@@ -336,6 +359,21 @@ threshold with a working review queue).
   do revisit the model, re-run the benchmark rather than assuming — and
   remember any model must be baked into the image, never fetched at runtime
   (N13).
+
+- **N19 — A bank connection is configuration, not code.** Turkish banks hand
+  out the gateway host, the paths and the scopes *with* the credentials; they
+  are not published, and a hostname written from memory fails in front of the
+  audience. So `bank_providers.py` presets carry only what is stable — auth
+  style, header names, field vocabulary — and every endpoint detail comes from
+  `BANK_*` in the environment. Three consequences worth knowing before
+  touching that code: field lookup is **tolerant** (candidate keys, folded and
+  case-insensitive, descending into nested objects, covering Turkish, ISO
+  20022 and English at once), so an unfamiliar response shape usually works
+  first try and `BANK_FIELD_MAP` fixes the rest without a deploy; the
+  `mock` provider serves a deliberately awkward statement (Turkish decimals,
+  borç/alacak flag, nested amount) with no network, which is what to demo on;
+  and CSV import is not a fallback bolted on, it is the same normaliser, so
+  nothing about the feature depends on a bank saying yes.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

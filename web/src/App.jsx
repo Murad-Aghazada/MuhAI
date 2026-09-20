@@ -7,6 +7,7 @@ import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Invoices from './pages/Invoices.jsx'
 import Tax from './pages/Tax.jsx'
+import Bank from './pages/Bank.jsx'
 import Inventory from './pages/Inventory.jsx'
 import Payroll from './pages/Payroll.jsx'
 import Assistant from './pages/Assistant.jsx'
@@ -33,6 +34,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="tax" element={<Tax />} />
+            <Route path="bank" element={<Bank />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="payroll" element={<Payroll />} />
             <Route path="assistant" element={<Assistant />} />

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { LayoutDashboard, ReceiptText, Landmark, Boxes, Users, Sparkles, Settings, X } from 'lucide-react'
+import { LayoutDashboard, ReceiptText, Landmark, Banknote, Boxes, Users, Sparkles, Settings, X } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -35,6 +35,7 @@ export default function Sidebar({ open, onClose }) {
     { to: '/app', id: 'dashboard', icon: LayoutDashboard, end: true },
     { to: '/app/invoices', id: 'invoices', icon: ReceiptText, badge: unpaid || null },
     { to: '/app/tax', id: 'tax', icon: Landmark },
+    { to: '/app/bank', id: 'bank', icon: Banknote },
     { to: '/app/inventory', id: 'inventory', icon: Boxes, badge: lowStock || null },
     { to: '/app/payroll', id: 'payroll', icon: Users },
   ]

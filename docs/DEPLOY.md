@@ -60,6 +60,19 @@ Edit `.env`. Two values matter before the first start:
 `GEMINI_API_KEY` is optional: leave it empty and the assistant answers from its
 local knowledge base and says so in the UI.
 
+The `BANK_*` block is optional too. Leave `BANK_PROVIDER` empty and the Bank
+screen offers CSV statement import, which needs no contract and no internet;
+set it to `mock` for a demo with generated movements. With real API access,
+pick the bank's preset and paste the base URL, token URL and credentials from
+its developer portal — there is no code change, and the credentials never leave
+the API container. If the gateway requires mutual TLS, mount the PEMs read-only
+and point `BANK_CLIENT_CERT` / `BANK_CLIENT_KEY` at them:
+
+```yaml
+    volumes:
+      - /etc/muhai/bank:/certs:ro
+```
+
 Leave `VITE_API_URL` empty. The browser then calls `/api` on its own origin and
 the web container's nginx proxies it to the backend — no CORS to configure and
 no hostname baked into the JavaScript bundle.

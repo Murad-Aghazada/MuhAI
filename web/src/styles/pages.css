@@ -676,3 +676,92 @@
   .learned-row { flex-wrap: wrap; }
   .learned-row__vendor { flex-basis: 100%; }
 }
+
+/* ============================================================
+   Bank reconciliation
+   ============================================================ */
+
+/* The connection line. Reads top to bottom on a phone: the status sentence is
+   the point of it, and squeezing it beside a button makes it unreadable. */
+.bank-conn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.bank-conn__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  flex: none;
+}
+.bank-conn__dot--live {
+  background: var(--pos);
+  box-shadow: 0 0 0 4px var(--brand-glow);
+}
+.bank-conn__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.bank-conn__text strong { color: var(--ink); font-size: 14.5px; }
+.bank-conn__text span { color: var(--ink-3); font-size: 13px; }
+
+.bank-controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+/* Each control is a grid item, so its automatic minimum is its content's
+   min-content width — a date input and an IBAN would push the page sideways
+   on a phone without this (N17). */
+.bank-controls > * { min-width: 0; }
+@media (max-width: 760px) {
+  .bank-controls { grid-template-columns: 1fr; }
+}
+
+.bank-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 46px 24px;
+  color: var(--ink-3);
+}
+.bank-empty h3 { font-size: 16px; color: var(--ink); }
+.bank-empty p { font-size: 13.5px; max-width: 46ch; }
+
+.bank-row__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+.bank-row__sub--ok { color: var(--pos); }
+
+/* Direction is carried by colour *and* by an arrow, so it survives a
+   greyscale print and a colour-blind reader. */
+.bank-amt--in { color: var(--pos); }
+.bank-amt--out { color: var(--neg); }
+.bank-amt--in svg,
+.bank-amt--out svg { vertical-align: -1px; }
+
+/* On a phone the filter belongs on its own line. Sharing the header row with
+   the title squeezed it to 169px — scrollable, but nobody scrolls a segmented
+   control they cannot see the ends of. */
+@media (max-width: 760px) {
+  .bank-panel-head { flex-wrap: wrap; gap: 12px; }
+  .bank-panel-head .seg { width: 100%; }
+  /* Six columns need more than the shared 600px floor; the description is the
+     column that tells the user what the movement was. */
+  .bank-tbl { min-width: 680px; }
+}

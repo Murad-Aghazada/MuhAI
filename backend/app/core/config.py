@@ -42,6 +42,43 @@ class Settings(BaseSettings):
     # Empty falls back to chat_service.GEMINI_MODEL_DEFAULT.
     GEMINI_MODEL: str = ""
 
+    # ── Bank integration ───────────────────────────────────────────────
+    # Empty is a supported configuration: with no provider set, /api/bank
+    # reports "not configured" and the CSV statement import still works. That
+    # is the offline-first promise — a bank connection adds a convenience, it
+    # is never what the feature depends on.
+    #
+    # Hostnames, paths and scopes are issued with the credentials rather than
+    # published, so they belong here and not in the code. See
+    # services/bank_providers.py for the presets and the field-map override.
+    BANK_PROVIDER: str = ""  # custom | mock | garanti | isbank | akbank | …
+    BANK_AUTH_STYLE: str = ""  # overrides the preset's style when set
+    BANK_API_BASE_URL: str = ""
+    BANK_TOKEN_URL: str = ""
+    BANK_SCOPE: str = ""
+    BANK_CLIENT_ID: str = ""
+    BANK_CLIENT_SECRET: str = ""
+    BANK_API_KEY: str = ""
+    BANK_API_KEY_HEADER: str = ""
+    BANK_ACCESS_TOKEN: str = ""
+    BANK_CONSENT_ID: str = ""
+    BANK_ACCOUNTS_PATH: str = ""
+    BANK_TRANSACTIONS_PATH: str = ""
+    BANK_SINCE_PARAM: str = ""
+    BANK_UNTIL_PARAM: str = ""
+    BANK_DATE_FORMAT: str = ""
+    # JSON objects. Headers the gateway requires (channel code, request id…)
+    # and per-field key overrides for a response shape the defaults miss.
+    BANK_EXTRA_HEADERS: str = ""
+    BANK_FIELD_MAP: str = ""
+    # Mutual TLS — PEM paths inside the container.
+    BANK_CLIENT_CERT: str = ""
+    BANK_CLIENT_KEY: str = ""
+    BANK_CA_BUNDLE: str = ""
+    # Only ever false against a bank's own sandbox with a self-signed chain.
+    BANK_VERIFY_TLS: bool = True
+    BANK_TIMEOUT_SECONDS: float = 20.0
+
     # ── Compute layer ──────────────────────────────────────────────────
     # /api/compute reads no table, so it needs an identity but not a company.
     # Set false only for an offline demo: the endpoints then accept
