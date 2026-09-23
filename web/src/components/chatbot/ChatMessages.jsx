@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Sparkles, FileText, WifiOff } from 'lucide-react'
+import { FileText, WifiOff } from 'lucide-react'
+import { Spark } from '../../components/ui/icons.jsx'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 
 /* Render **bold** inline, leaving the rest as text. */
@@ -61,7 +62,7 @@ export default function ChatMessages({ messages, loading, welcome }) {
       {/* welcome message always first */}
       <div className="msg msg--bot">
         <span className="msg__av msg__av--bot">
-          <Sparkles size={15} strokeWidth={1.9} />
+          <Spark size={15} strokeWidth={1.5} />
         </span>
         <div className="msg__bubble">{welcome || t('assistant.welcome')}</div>
       </div>
@@ -75,13 +76,13 @@ export default function ChatMessages({ messages, loading, welcome }) {
           transition={{ duration: 0.3 }}
         >
           <span className={`msg__av msg__av--${m.role === 'user' ? 'user' : 'bot'}`}>
-            {m.role === 'user' ? 'EB' : <Sparkles size={15} strokeWidth={1.9} />}
+            {m.role === 'user' ? 'EB' : <Spark size={15} strokeWidth={1.5} />}
           </span>
           <div className="msg__bubble">
             <FormattedText text={m.text} />
             {m.source === 'offline' && (
               <div className="msg__offline">
-                <WifiOff size={10} strokeWidth={1.9} />
+                <WifiOff size={10} strokeWidth={1.5} />
                 {t('assistant.offlineBadge')}
               </div>
             )}
@@ -103,7 +104,7 @@ export default function ChatMessages({ messages, loading, welcome }) {
       {loading && (
         <div className="msg msg--bot">
           <span className="msg__av msg__av--bot">
-            <Sparkles size={15} strokeWidth={1.9} />
+            <Spark size={15} strokeWidth={1.5} />
           </span>
           <div className="msg__bubble" style={{ display: 'flex', alignItems: 'center' }}>
             <span className="typing">

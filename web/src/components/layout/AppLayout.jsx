@@ -2,7 +2,6 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import SideRail from './SideRail.jsx'
 import Topbar from './Topbar.jsx'
-import ChatWidget from '../chatbot/ChatWidget.jsx'
 import { DataProvider } from '../../context/DataContext.jsx'
 
 export default function AppLayout() {
@@ -11,10 +10,10 @@ export default function AppLayout() {
   return (
     <DataProvider>
       <div className="app-shell">
-        {/* Navigation moved off the bottom dock and onto a left rail. Two
-            navigation systems on one screen is one too many, so the dock is
-            gone rather than doubled up — `AppDock.jsx` is untouched if it
-            should come back. */}
+        {/* Navigation is the left rail and nothing else. The bottom dock and
+            the floating assistant launcher are both gone: the assistant has
+            its own room in the rail, and a launcher that opens a second copy
+            of it over the page was a third way to reach one screen. */}
         <SideRail />
 
         <div className="main-col">
@@ -31,8 +30,6 @@ export default function AppLayout() {
             </motion.main>
           </AnimatePresence>
         </div>
-
-        <ChatWidget />
       </div>
     </DataProvider>
   )

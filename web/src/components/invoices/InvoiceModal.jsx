@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Loader2, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { Spark } from '../../components/ui/icons.jsx'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
 import { splitVat } from '../../lib/vat.js'
@@ -149,7 +150,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
               to type="submit", which made this X the form's default button —
               so Enter anywhere in the form activated *close*, not save. */}
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={1.9} />
+            <X size={16} strokeWidth={1.5} />
           </button>
         </div>
 
@@ -157,7 +158,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
           <div className="modal__body">
             {lowFields.length > 0 && (
               <div className="review-banner" style={{ margin: 0 }}>
-                <AlertTriangle size={17} strokeWidth={1.9} />
+                <AlertTriangle size={17} strokeWidth={1.5} />
                 <span>
                   {lowFields.length} {t('invoices.reviewBody')}
                 </span>
@@ -243,7 +244,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
                 </span>
                 {suggestion && (
                   <span className="field__hint field__hint--learn">
-                    <Sparkles size={12} strokeWidth={1.9} />
+                    <Spark size={12} strokeWidth={1.5} />
                     {suggestion.source === 'learned'
                       ? t('invoices.catLearned')
                       : t('invoices.catSuggested')}

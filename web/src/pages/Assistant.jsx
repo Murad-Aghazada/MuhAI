@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { Sparkles, Database, Trash2, ArrowRight } from 'lucide-react'
+import { Database, Trash2, ArrowRight } from 'lucide-react'
+import { Spark } from '../components/ui/icons.jsx'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { useChat } from '../components/chatbot/useChat.js'
@@ -18,7 +19,7 @@ export default function Assistant() {
       <div className="page-head page-head-row">
         <div>
           <div className="page-eyebrow">
-            <Sparkles size={14} strokeWidth={1.9} />
+            <Spark size={14} strokeWidth={1.5} />
             <span className="label">{t('nav.groupAi')}</span>
           </div>
           <h1 className="page-title">{t('assistant.title')}</h1>
@@ -26,7 +27,7 @@ export default function Assistant() {
         </div>
         <div className="page-actions">
           <span className="rag-badge">
-            <Database size={13} strokeWidth={1.9} /> {apiOnline ? t('assistant.ragOn') : t('assistant.ragOffline')}
+            <Database size={13} strokeWidth={1.5} /> {apiOnline ? t('assistant.ragOn') : t('assistant.ragOffline')}
           </span>
           {messages.length > 0 && (
             <button className="btn btn--ghost btn--sm" onClick={clear}><Trash2 size={15} /> {t('assistant.clear')}</button>
@@ -41,9 +42,9 @@ export default function Assistant() {
             <div className="assistant-suggest-grid">
               {suggestions.map((s) => (
                 <button key={s} className="chat-suggest" onClick={() => send(t(s))}>
-                  <Sparkles size={15} strokeWidth={1.9} />
+                  <Spark size={15} strokeWidth={1.5} />
                   {t(s)}
-                  <ArrowRight size={14} strokeWidth={1.9} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                  <ArrowRight size={14} strokeWidth={1.5} style={{ marginLeft: 'auto', opacity: 0.5 }} />
                 </button>
               ))}
             </div>

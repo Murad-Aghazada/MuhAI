@@ -3,25 +3,22 @@ import { motion } from 'framer-motion'
 import {
   ArrowRight,
   ArrowUpRight,
-  CalendarClock,
   CalendarDays,
   Clock,
-  CreditCard,
   Gauge,
   Landmark,
   LayoutGrid,
-  LineChart,
-  PieChart,
-  Plus,
-  ReceiptText,
+  ChartLine,
+  ChartPie,
+  ChartSpline,
+  Receipt,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   TriangleAlert,
-  TrendingUp,
-  Wallet,
+  Banknote,
 } from 'lucide-react'
+import { Spark } from '../components/ui/icons.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -87,7 +84,7 @@ function TodayStrip({ counts, onOpen, t }) {
           className={`today-strip__item${alert ? ' is-alert' : ''}`}
           onClick={onOpen}
         >
-          <Icon size={16} strokeWidth={1.9} />
+          <Icon size={16} strokeWidth={1.5} />
           <span className="today-strip__label">{t(`dashboard.rail.${key}`)}</span>
           <span className="today-strip__count tnum">{value}</span>
         </button>
@@ -128,7 +125,7 @@ export default function Dashboard() {
     if (!kpis) return null
     return {
       hero: {
-        icon: TrendingUp,
+        icon: null,
         label: t('dashboard.kpiProfit'),
         value: kpis.profit,
         delta: kpis.profit_delta,
@@ -136,8 +133,8 @@ export default function Dashboard() {
         spark: monthly.map((m) => m.profit),
       },
       rows: [
-        { icon: Wallet, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: kpis.revenue_delta, positive: kpis.revenue_delta >= 0 },
-        { icon: CreditCard, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: kpis.expense_delta, positive: kpis.expense_delta <= 0 },
+        { icon: Banknote, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: kpis.revenue_delta, positive: kpis.revenue_delta >= 0 },
+        { icon: Receipt, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: kpis.expense_delta, positive: kpis.expense_delta <= 0 },
         { icon: Landmark, label: t('dashboard.kpiTax'), value: kpis.tax, delta: kpis.tax_delta, positive: kpis.tax_delta <= 0 },
       ],
     }
@@ -205,7 +202,7 @@ export default function Dashboard() {
       <div className="page-head page-head-row">
         <div>
           <div className="page-eyebrow">
-            <LayoutGrid size={14} strokeWidth={1.9} />
+            <LayoutGrid size={14} strokeWidth={1.5} />
             <span className="label">
               {formatDate(new Date(), lang)} · {company?.name || '—'}
             </span>
@@ -213,7 +210,7 @@ export default function Dashboard() {
         </div>
         <div className="page-actions">
           <button className="btn btn--ghost btn--sm" onClick={refresh} disabled={computing}>
-            <RefreshCw size={14} strokeWidth={1.9} className={computing ? 'spin' : ''} />
+            <RefreshCw size={14} strokeWidth={1.5} className={computing ? 'spin' : ''} />
             {computing ? t('common.computing') : t('common.refresh')}
           </button>
           <button className="btn btn--primary btn--sm" onClick={() => navigate('/app/invoices')}>
@@ -224,7 +221,7 @@ export default function Dashboard() {
 
       {!apiOnline && (
         <div className="banner banner--warn">
-          <span className="banner__icon"><TriangleAlert size={17} strokeWidth={2} /></span>
+          <span className="banner__icon"><TriangleAlert size={17} strokeWidth={1.5} /></span>
           <span className="banner__text">
             <strong>{t('common.offline')}</strong> — {t('common.offlineHint')}
           </span>
@@ -233,7 +230,7 @@ export default function Dashboard() {
 
       {urgent && (
         <div className="banner banner--warn">
-          <span className="banner__icon"><TriangleAlert size={17} strokeWidth={2} /></span>
+          <span className="banner__icon"><TriangleAlert size={17} strokeWidth={1.5} /></span>
           <span className="banner__text">
             <strong>{urgent.name}</strong>{' '}
             {urgent.days_remaining <= 0
@@ -262,7 +259,7 @@ export default function Dashboard() {
           <div className="insight-card__glow" />
           <div className="insight-card__head">
             <span className="insight-card__icon">
-              <Sparkles size={17} strokeWidth={1.9} />
+              <Spark size={17} strokeWidth={1.5} />
             </span>
             <span>{t('dashboard.insightTitle')}</span>
             <Badge tone="gray" dot={false}>{t('common.ai')}</Badge>
@@ -270,7 +267,7 @@ export default function Dashboard() {
           <p className="insight-card__body">{dashboard?.insight || t('dashboard.insightBody')}</p>
           <button className="insight-card__action" onClick={() => navigate('/app/assistant')}>
             {t('dashboard.insightAction')}
-            <ArrowRight size={15} strokeWidth={1.9} />
+            <ArrowRight size={15} strokeWidth={1.5} />
           </button>
         </motion.section>
 
@@ -287,7 +284,7 @@ export default function Dashboard() {
         <motion.section className="panel dash-cashflow" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><TrendingUp size={15} strokeWidth={1.9} />{t('dashboard.cashflowTitle')}</div>
+              <div className="panel-title"><ChartSpline size={16} strokeWidth={1.5} />{t('dashboard.cashflowTitle')}</div>
               <div className="panel-sub">{t('dashboard.cashflowSub')}</div>
             </div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -323,7 +320,7 @@ export default function Dashboard() {
           <motion.section className="panel dash-score" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.38 }}>
             <div className="panel-head">
               <div>
-                <div className="panel-title"><Gauge size={15} strokeWidth={1.9} />Muhai Score</div>
+                <div className="panel-title"><Gauge size={16} strokeWidth={1.5} />Muhai Score</div>
                 <div className="panel-sub">
                   {score
                     ? `${lang === 'en' ? 'Cash runway' : 'Nakit pisti'} · ${Math.round(score.cash_runway_days)} ${lang === 'en' ? 'days' : 'gün'}`
@@ -369,7 +366,7 @@ export default function Dashboard() {
           <motion.section className="panel" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.46 }}>
             <div className="panel-head">
               <div>
-                <div className="panel-title"><CalendarClock size={15} strokeWidth={1.9} />{t('dashboard.taxWidgetTitle')}</div>
+                <div className="panel-title"><CalendarDays size={16} strokeWidth={1.5} />{t('dashboard.taxWidgetTitle')}</div>
                 <div className="panel-sub">{t('dashboard.taxWidgetSub')}</div>
               </div>
             </div>
@@ -400,7 +397,7 @@ export default function Dashboard() {
           <motion.section className="panel" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.28 }}>
             <div className="panel-head">
               <div>
-                <div className="panel-title"><PieChart size={15} strokeWidth={1.9} />{t('dashboard.breakdownTitle')}</div>
+                <div className="panel-title"><ChartPie size={16} strokeWidth={1.5} />{t('dashboard.breakdownTitle')}</div>
                 <div className="panel-sub">{t('dashboard.breakdownSub')}</div>
               </div>
             </div>
@@ -428,13 +425,13 @@ export default function Dashboard() {
           <motion.section className="panel dash-compliance" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.36 }}>
             <div className="panel-head">
               <div>
-                <div className="panel-title"><ShieldAlert size={15} strokeWidth={1.9} />{t('dashboard.compliance.title')}</div>
+                <div className="panel-title"><ShieldAlert size={16} strokeWidth={1.5} />{t('dashboard.compliance.title')}</div>
                 <div className="panel-sub">{t('dashboard.compliance.sub')}</div>
               </div>
               {compliance?.total ? (
                 <Badge tone={compliance.high ? 'red' : 'amber'}>{compliance.total}</Badge>
               ) : (
-                <ShieldCheck size={18} strokeWidth={1.9} color={compliance ? 'var(--ok)' : 'var(--ink-4)'} />
+                <ShieldCheck size={18} strokeWidth={1.5} color={compliance ? 'var(--ok)' : 'var(--ink-4)'} />
               )}
             </div>
 
@@ -444,7 +441,7 @@ export default function Dashboard() {
               </div>
             ) : compliance.total === 0 ? (
               <div className="alert-clean">
-                <ShieldCheck size={18} strokeWidth={1.9} />
+                <ShieldCheck size={18} strokeWidth={1.5} />
                 <span>{t('dashboard.compliance.clean')}</span>
               </div>
             ) : (
@@ -457,7 +454,7 @@ export default function Dashboard() {
                         <span className="alert-row__mark" />
                         <div className="alert-row__body">
                           <div className="alert-row__head">
-                            <ShieldAlert size={14} strokeWidth={1.9} />
+                            <ShieldAlert size={14} strokeWidth={1.5} />
                             <span className="alert-row__type">{t(`dashboard.compliance.type.${a.type}`)}</span>
                             <Badge tone={SEVERITY_TONE[a.severity]}>
                               {t(`dashboard.compliance.sev.${a.severity}`)}
@@ -468,7 +465,7 @@ export default function Dashboard() {
                             <button className="link-btn" onClick={() => navigate('/app/invoices')}>
                               {t('dashboard.compliance.openInvoice')}
                               {invoice.number && <span className="alert-row__ref">· {invoice.number}</span>}
-                              <ArrowUpRight size={13} strokeWidth={1.9} />
+                              <ArrowUpRight size={13} strokeWidth={1.5} />
                             </button>
                           )}
                         </div>
@@ -492,7 +489,7 @@ export default function Dashboard() {
         <div className="panel-head">
           <div>
             <div className="panel-title">
-              <LineChart size={15} strokeWidth={1.9} />
+              <ChartLine size={16} strokeWidth={1.5} />
               {lang === 'en' ? '30-day cash-flow forecast' : '30 günlük nakit akışı tahmini'}
             </div>
             <div className="panel-sub">
@@ -527,11 +524,11 @@ export default function Dashboard() {
       <motion.section className="panel dash-invoices" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5 }}>
         <div className="panel-head">
           <div>
-            <div className="panel-title"><ReceiptText size={15} strokeWidth={1.9} />{t('dashboard.recentTitle')}</div>
+            <div className="panel-title"><Receipt size={16} strokeWidth={1.5} />{t('dashboard.recentTitle')}</div>
             <div className="panel-sub">{t('dashboard.recentSub')}</div>
           </div>
           <button className="link-btn" onClick={() => navigate('/app/invoices')}>
-            {t('common.viewAll')} <ArrowUpRight size={14} strokeWidth={1.9} />
+            {t('common.viewAll')} <ArrowUpRight size={14} strokeWidth={1.5} />
           </button>
         </div>
         <div className="tbl-scroll">
@@ -563,15 +560,6 @@ export default function Dashboard() {
           </table>
         </div>
       </motion.section>
-
-      <button
-        className="fab"
-        onClick={() => navigate('/app/invoices')}
-        aria-label={t('dashboard.newInvoice')}
-        title={t('dashboard.newInvoice')}
-      >
-        <Plus size={24} strokeWidth={2.2} />
-      </button>
     </div>
   )
 }

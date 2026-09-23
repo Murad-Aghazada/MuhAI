@@ -93,7 +93,6 @@ export default function AreaChart({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
-        height={H}
         onMouseMove={handleMove}
         onMouseLeave={() => setHover(null)}
         style={{ display: 'block', overflow: 'visible' }}

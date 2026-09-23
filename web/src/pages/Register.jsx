@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Building2, Loader2, Lock, Mail, User } from 'lucide-react'
+import { ArrowLeft, Building2, Loader2, Lock, Mail, User } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
 import GoogleButton from '../components/auth/GoogleButton.jsx'
+import { Btn } from '../components/ui/lp.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
 const LEGAL_FORMS = ['ltd', 'as', 'sahis', 'koop']
@@ -83,13 +84,17 @@ export default function Register() {
   }
 
   return (
-    <AuthShell title={t('auth.registerTitle')} subtitle={t('auth.registerSub')} wide>
-      <div className="auth-steps">
-        <span className={`auth-steps__item ${step === 1 ? 'is-active' : 'is-done'}`}>
+    <AuthShell
+      title={t('auth.registerTitle')}
+      subtitle={t('auth.registerSub')}
+      alt={{ to: '/login', quiet: t('auth.haveAccount'), cta: t('auth.signIn') }}
+    >
+      <div className="lp-steps">
+        <span className={`lp-steps__item ${step === 1 ? 'is-active' : 'is-done'}`}>
           <b>1</b> {t('auth.step1')}
         </span>
-        <span className="auth-steps__bar" />
-        <span className={`auth-steps__item ${step === 2 ? 'is-active' : ''}`}>
+        <span className="lp-steps__bar" />
+        <span className={`lp-steps__item ${step === 2 ? 'is-active' : ''}`}>
           <b>2</b> {t('auth.step2')}
         </span>
       </div>
@@ -104,7 +109,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.fullName')}</span>
             <span className="field__wrap">
-              <User size={16} strokeWidth={1.9} />
+              <User strokeWidth={1.6} />
               <input value={form.displayName} onChange={set('displayName')} autoComplete="name" required placeholder="Emin Baytar" />
             </span>
           </label>
@@ -112,7 +117,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.email')}</span>
             <span className="field__wrap">
-              <Mail size={16} strokeWidth={1.9} />
+              <Mail strokeWidth={1.6} />
               <input type="email" value={form.email} onChange={set('email')} autoComplete="email" required placeholder="ornek@sirket.com" />
             </span>
           </label>
@@ -120,7 +125,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.password')}</span>
             <span className="field__wrap">
-              <Lock size={16} strokeWidth={1.9} />
+              <Lock strokeWidth={1.6} />
               <input
                 type="password"
                 value={form.password}
@@ -135,14 +140,12 @@ export default function Register() {
           </label>
 
           {error && (
-            <motion.div className="auth-alert auth-alert--error" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div className="lp-alert lp-alert--error" role="alert" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
               {error}
             </motion.div>
           )}
 
-          <button className="btn btn--primary btn--block" type="submit">
-            {t('auth.next')} <ArrowRight size={16} strokeWidth={1.9} />
-          </button>
+          <Btn type="submit" variant="wide" label={t('auth.next')} />
         </form>
         </>
       ) : (
@@ -150,7 +153,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.companyName')}</span>
             <span className="field__wrap">
-              <Building2 size={16} strokeWidth={1.9} />
+              <Building2 strokeWidth={1.6} />
               <input value={form.companyName} onChange={set('companyName')} required placeholder="Atlas Ticaret Ltd. Şti." />
             </span>
           </label>
@@ -205,26 +208,44 @@ export default function Register() {
           </label>
 
           {error && (
-            <motion.div className="auth-alert auth-alert--error" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div className="lp-alert lp-alert--error" role="alert" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
               {error}
             </motion.div>
           )}
 
-          <div className="auth-actions">
-            <button className="btn btn--ghost" type="button" onClick={() => setStep(1)} disabled={busy}>
-              <ArrowLeft size={16} strokeWidth={1.9} /> {t('auth.back')}
-            </button>
-            <button className="btn btn--primary" type="submit" disabled={busy}>
-              {busy && <Loader2 size={16} className="spin" />}
-              {busy ? t('auth.registering') : t('auth.register')}
-            </button>
+          <div className="lp-auth__actions">
+            <Btn
+              type="button"
+              variant="quiet"
+              label={t('auth.back')}
+              icon={BackIcon}
+              onClick={() => setStep(1)}
+              disabled={busy}
+            />
+            <Btn
+              type="submit"
+              label={busy ? t('auth.registering') : t('auth.register')}
+              icon={busy ? SpinIcon : undefined}
+              disabled={busy}
+            />
           </div>
         </form>
       )}
 
-      <div className="auth-foot">
+      <div className="lp-auth__switch">
         {t('auth.haveAccount')} <Link to="/login">{t('auth.signIn')}</Link>
       </div>
     </AuthShell>
   )
+}
+
+/* The chip's glyph while the request is out, and the one on the way back —
+   both drawn on the same 24 grid as the arrow, so the chip does not resize
+   under the swap. */
+function SpinIcon() {
+  return <Loader2 className="spin" width="24" height="24" strokeWidth={1.5} />
+}
+
+function BackIcon() {
+  return <ArrowLeft width="24" height="24" strokeWidth={1.5} />
 }

@@ -14,8 +14,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
 import { formatCurrency, formatDate } from '../../lib/format.js'
 import { isOverdue } from '../../lib/analytics.js'
-import LanguageToggle from './LanguageToggle.jsx'
-import Logo from '../ui/Logo.jsx'
+import { LangFlags } from '../ui/lp.jsx'
 
 function initials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -30,7 +29,7 @@ function initials(name = '') {
  * what hands the full width of the window back to the work.
  */
 export default function Topbar() {
-  const { t, lang } = useLang()
+  const { t, lang, setLanguage } = useLang()
   const navigate = useNavigate()
   const { profile, company, user, logout } = useAuth()
   const { invoices, products, score, apiOnline } = useData()
@@ -109,19 +108,15 @@ export default function Topbar() {
 
   return (
     <header className="topbar" ref={rootRef}>
-      <Link to="/app" className="brand">
-        <span className="brand-glyph">
-          <Logo size={15} />
-        </span>
-        <span>
-          <span className="brand-name">Muhai</span>
-          <span className="brand-tag">{t('common.tagline')}</span>
-        </span>
+      {/* The logo is the word. No mark beside it — the letterforms carry
+          the brand here exactly as they do in the landing nav. */}
+      <Link to="/app" className="brand" aria-label="Muhai">
+        Muhai
       </Link>
 
       <div className="topbar__search-wrap">
         <label className="topbar__search">
-          <Search size={15} strokeWidth={1.9} />
+          <Search size={15} strokeWidth={1.5} />
           <input
             placeholder={t('common.search')}
             aria-label={t('common.search')}
@@ -154,19 +149,19 @@ export default function Topbar() {
       <div className="topbar-meta">
         {!apiOnline && (
           <span className="pill warn pill--icon" title={`${t('common.offline')} — ${t('common.offlineHint')}`}>
-            <WifiOff size={12} strokeWidth={1.9} />
+            <WifiOff size={12} strokeWidth={1.5} />
             <span className="pill__text">{t('common.offline')}</span>
           </span>
         )}
 
         {score && (
           <span className="chip optional" title="Muhai Score">
-            <Gauge size={13} strokeWidth={1.9} />
+            <Gauge size={13} strokeWidth={1.5} />
             Muhai Score <b>{score.total_score}</b>
           </span>
         )}
 
-        <LanguageToggle />
+        <LangFlags lang={lang} setLanguage={setLanguage} />
 
         <div className="topbar__pop-anchor">
           <button
@@ -177,7 +172,7 @@ export default function Topbar() {
               setMenuOpen(false)
             }}
           >
-            <Bell size={15} strokeWidth={1.9} />
+            <Bell size={15} strokeWidth={1.5} />
             {alerts.length > 0 && <span className="topbar__notif-dot" />}
           </button>
           <AnimatePresence>
@@ -231,7 +226,7 @@ export default function Topbar() {
                 transition={{ duration: 0.16, ease: [0.22, 0.8, 0.3, 1] }}
               >
                 <button className="popover__row" onClick={() => go('/app/settings')}>
-                  <SettingsIcon size={14} strokeWidth={1.9} />
+                  <SettingsIcon size={14} strokeWidth={1.5} />
                   <span className="popover__title">{t('nav.settings')}</span>
                 </button>
                 <button
@@ -241,7 +236,7 @@ export default function Topbar() {
                     navigate('/login', { replace: true })
                   }}
                 >
-                  <LogOut size={14} strokeWidth={1.9} />
+                  <LogOut size={14} strokeWidth={1.5} />
                   <span className="popover__title">{t('auth.logout')}</span>
                 </button>
               </motion.div>

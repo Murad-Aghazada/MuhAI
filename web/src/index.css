@@ -205,91 +205,6 @@
   --r-tray:   12px;
 }
 
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  /* Built on the inverted navy the landing slab already uses, so the
-     two themes are the same family rather than a black inversion. */
-  --surface-canvas: #161f33;
-  --surface-page:   #0e1524;
-  --surface-card:   #161f33;
-  --surface-sunken: #1b2540;
-  --surface-subtle: #1b2540;
-  --surface-tray:   #131c2e;
-  --surface-hover:  #1d283f;
-  --surface-row-hover:    #1d283f;
-  --surface-row-selected: #24304b;
-  --surface-inverted: #0a1120;
-
-  --tray-fill:  rgba(19, 28, 46, 0.72);
-  --tray-ring:  rgba(255, 255, 255, 0.07);
-  --glass-fill: rgba(22, 31, 51, 0.82);
-
-  --text-primary:    #f1f5f9;
-  --text-heading:    #f8fafc;
-  --text-subheading: #e2e8f0;
-  --text-secondary:  #cbd5e1;
-  --text-tertiary:   #a8b6ca;
-  --text-body:       #a8b6ca;
-  --text-muted:      #8695ab;
-
-  --border-subtle:  #1b2540;
-  --border-default: #27334d;
-  --border-strong:  #3a4864;
-
-  /* #d64126 goes muddy on navy; the accent lifts a step in the dark. */
-  --brand-red:    #ff6a4e;
-  --accent:       #e05237;
-  --accent-hover: #f26a4d;
-  --accent-ink:   #ff8a72;
-
-  --tag-red-ink:     #ff9c88;  --tag-red-tint:     rgba(255, 107,  78, 0.16);
-  --tag-amber-ink:   #f0b45f;  --tag-amber-tint:   rgba(240, 180,  95, 0.15);
-  --tag-green-ink:   #6ddba1;  --tag-green-tint:   rgba(109, 219, 161, 0.14);
-  --tag-blue-ink:    #8fbcf0;  --tag-blue-tint:    rgba(143, 188, 240, 0.15);
-  --tag-violet-ink:  #b9a4f5;  --tag-violet-tint:  rgba(185, 164, 245, 0.15);
-  --tag-indigo-ink:  #a3aaf7;  --tag-indigo-tint:  rgba(163, 170, 247, 0.15);
-  --tag-magenta-ink: #ef8fc2;  --tag-magenta-tint: rgba(239, 143, 194, 0.15);
-  --tag-slate-ink:   #cbd5e1;  --tag-slate-tint:   rgba(255, 255, 255, 0.08);
-
-  --tint-red:   rgba(255, 106, 78, 0.14);
-  --tint-green: rgba(109, 219, 161, 0.12);
-  --tint-amber: rgba(240, 180,  95, 0.12);
-  --tint-blue:  rgba(143, 188, 240, 0.12);
-  --tint-slate: rgba(255, 255, 255, 0.07);
-
-  --panel-steel: #2c3c57;
-  --panel-iris:  #35304d;
-  --panel-blush: #46303a;
-  --panel-mauve: #43304a;
-
-  --ink-4:  var(--slate-500);
-  --on-ink: #0a1120;
-
-  --focus: rgba(255, 106, 78, 0.28);
-
-  --shadow-1: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --shadow-2: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-3: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
-
-  --shadow-tray:  0 24px 48px rgba(0, 0, 0, 0.45);
-  --shadow-ring:  inset 0 0 0 1px rgba(255, 255, 255, 0.09);
-  --shadow-glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.06),
-                       inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-
-  /* The same eight hues, re-stepped for the dark surface. */
-  --d1: #4a8ad9;
-  --d2: #e06a38;
-  --d3: #1fae82;
-  --d4: #b08210;
-  --d5: #cf6d97;
-  --d6: #2b8c33;
-  --d7: #7c70dd;
-  --d8: #dd5858;
-
-  --trace: var(--slate-400);
-}
-
 /* ------------------------------------------------------------
    Compatibility aliases.
 
@@ -480,8 +395,6 @@ input, textarea, select {
   -webkit-backdrop-filter: none;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.09);
 }
-
-:root[data-theme='dark'] .tray--console { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
 
 .tray-grid { display: grid; gap: 8px; }
 

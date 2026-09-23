@@ -64,7 +64,7 @@ export default function Tax() {
     <div className="page">
       <div className="page-head">
         <div className="page-eyebrow">
-          <Landmark size={14} strokeWidth={1.9} />
+          <Landmark size={14} strokeWidth={1.5} />
           <span className="label">{t('nav.tax')}</span>
         </div>
         <h1 className="page-title">{t('tax.title')}</h1>
@@ -77,7 +77,7 @@ export default function Tax() {
         </div>
       )}
 
-      <div className="mini-stats" style={{ marginBottom: 20 }}>
+      <div className="mini-stats">
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('tax.kpiVat')}</div>
           <div className="mini-stats__value tnum">{taxSummary ? cur(taxSummary.kdv_payable) : '—'}</div>
@@ -104,7 +104,7 @@ export default function Tax() {
           <div className="panel-head">
             <div>
               <div className="panel-title">
-                <Landmark size={15} strokeWidth={1.9} />
+                <Landmark size={15} strokeWidth={1.5} />
                 {lang === 'en' ? 'VAT position' : 'KDV pozisyonu'} · {taxSummary?.period ?? '—'}
               </div>
               <div className="panel-sub">
@@ -136,7 +136,7 @@ export default function Tax() {
 
               <div className="panel-head" style={{ marginTop: 26 }}>
                 <div>
-                  <div className="panel-title"><PieChart size={15} strokeWidth={1.9} />{t('tax.breakdownTitle')}</div>
+                  <div className="panel-title"><PieChart size={15} strokeWidth={1.5} />{t('tax.breakdownTitle')}</div>
                   <div className="panel-sub">
                     {lang === 'en' ? 'Total due this period' : 'Bu dönem toplam yük'} · {cur(taxSummary.total_due)}
                   </div>
@@ -165,7 +165,7 @@ export default function Tax() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><Calculator size={15} strokeWidth={1.9} />{t('tax.calcTitle')}</div>
+              <div className="panel-title"><Calculator size={15} strokeWidth={1.5} />{t('tax.calcTitle')}</div>
               <div className="panel-sub">{t('tax.calcSub')}</div>
             </div>
             <Calculator size={20} color="var(--ink-4)" />
@@ -216,7 +216,7 @@ export default function Tax() {
         <motion.section className="panel dash-invoices" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.14 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><FileText size={15} strokeWidth={1.9} />{t('tax.filingsTitle')}</div>
+              <div className="panel-title"><FileText size={15} strokeWidth={1.5} />{t('tax.filingsTitle')}</div>
               <div className="panel-sub">{t('tax.timelineSub')}</div>
             </div>
             <CalendarClock size={20} color="var(--ink-4)" />
@@ -253,7 +253,7 @@ export default function Tax() {
                         <div className="row-actions">
                           {o.status !== 'filed' && (
                             <button className="icon-btn" onClick={() => markFiled(o)} disabled={busyId === o.id} title={t('tax.stFiled')}>
-                              <CheckCircle2 size={15} strokeWidth={1.9} />
+                              <CheckCircle2 size={15} strokeWidth={1.5} />
                             </button>
                           )}
                         </div>
@@ -270,10 +270,13 @@ export default function Tax() {
         </motion.section>
 
         {/* Statutory calendar from the backend */}
-        <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.2 }}>
+        {/* Full width: `.dash-grid`'s explicit placement leaves column 2 free
+            from row 3 down, so without this the calendar sat in half the page
+            with the other half empty. */}
+        <motion.section className="panel dash-wide" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.2 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><CalendarClock size={15} strokeWidth={1.9} />{t('tax.timelineTitle')}</div>
+              <div className="panel-title"><CalendarClock size={15} strokeWidth={1.5} />{t('tax.timelineTitle')}</div>
               <div className="panel-sub">
                 {lang === 'en' ? 'Statutory deadlines (2026 calendar)' : 'Yasal son tarihler (2026 takvimi)'}
               </div>

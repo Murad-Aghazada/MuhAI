@@ -67,24 +67,24 @@ export default function Payroll() {
       <div className="page-head page-head-row">
         <div>
           <div className="page-eyebrow">
-            <Users size={14} strokeWidth={1.9} />
+            <Users size={14} strokeWidth={1.5} />
             <span className="label">{t('nav.payroll')}</span>
           </div>
           <h1 className="page-title">{t('payroll.title')}</h1>
           <p className="page-sub">{t('payroll.subtitle')}</p>
         </div>
         <button className="btn btn--primary btn--sm" onClick={() => setModal(emptyEmployee())}>
-          <Plus size={14} strokeWidth={1.9} /> {lang === 'en' ? 'Add employee' : 'Çalışan ekle'}
+          <Plus size={14} strokeWidth={1.5} /> {lang === 'en' ? 'Add employee' : 'Çalışan ekle'}
         </button>
       </div>
 
       {!apiOnline && (
-        <div className="notice notice--warn" style={{ marginBottom: 18 }}>
+        <div className="notice notice--warn">
           <strong>{t('common.offline')}</strong> — {t('common.offlineHint')}
         </div>
       )}
 
-      <div className="mini-stats" style={{ marginBottom: 20 }}>
+      <div className="mini-stats">
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('payroll.kpiEmployees')}</div>
           <div className="mini-stats__value tnum">{employees.length}</div>
@@ -107,7 +107,7 @@ export default function Payroll() {
         <motion.section className="panel dash-cashflow" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><Users size={15} strokeWidth={1.9} />{t('payroll.tableTitle')}</div>
+              <div className="panel-title"><Users size={15} strokeWidth={1.5} />{t('payroll.tableTitle')}</div>
               <div className="panel-sub">
                 {lang === 'en'
                   ? '2026 rates: SGK, income tax and stamp duty'
@@ -155,7 +155,7 @@ export default function Payroll() {
                           disabled={busyId === employee.id}
                           title={t('common.delete')}
                         >
-                          <Trash2 size={14} strokeWidth={1.9} />
+                          <Trash2 size={14} strokeWidth={1.5} />
                         </button>
                       </div>
                     </td>
@@ -172,7 +172,7 @@ export default function Payroll() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.1 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><PieChart size={15} strokeWidth={1.9} />{t('payroll.breakdownTitle')}</div>
+              <div className="panel-title"><PieChart size={15} strokeWidth={1.5} />{t('payroll.breakdownTitle')}</div>
               <div className="panel-sub">{t('payroll.breakdownSub')}</div>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function Payroll() {
             <div className="panel-head">
               <div>
                 <div className="panel-title">
-                  <PiggyBank size={15} strokeWidth={1.9} />
+                  <PiggyBank size={15} strokeWidth={1.5} />
                   {lang === 'en' ? 'Severance provision' : 'Kıdem tazminatı karşılığı'}
                 </div>
                 <div className="panel-sub">
@@ -284,7 +284,7 @@ function EmployeeModal({ employee, onClose, onSave }) {
         <div className="modal__head">
           <div className="modal__title">{lang === 'en' ? 'Add employee' : 'Çalışan ekle'}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={1.9} />
+            <X size={16} strokeWidth={1.5} />
           </button>
         </div>
         <form onSubmit={submit}>

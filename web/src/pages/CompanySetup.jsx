@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Building2, Loader2, LogOut } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
+import { Btn } from '../components/ui/lp.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
 const LEGAL_FORMS = ['ltd', 'as', 'sahis', 'koop']
@@ -78,13 +78,12 @@ export default function CompanySetup() {
           ? `Signed in as ${user?.email}. This account has no company yet.`
           : `${user?.email} olarak giriş yaptınız. Bu hesaba bağlı bir işletme yok.`
       }
-      wide
     >
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <label className="field">
           <span className="field__label">{t('auth.companyName')}</span>
           <span className="field__wrap">
-            <Building2 size={16} strokeWidth={1.9} />
+            <Building2 strokeWidth={1.6} />
             <input value={form.companyName} onChange={set('companyName')} required placeholder="Atlas Ticaret Ltd. Şti." />
           </span>
         </label>
@@ -134,25 +133,34 @@ export default function CompanySetup() {
           </span>
         </label>
 
-        {error && <div className="auth-alert auth-alert--error">{error}</div>}
+        {error && <div className="lp-alert lp-alert--error" role="alert">{error}</div>}
 
-        <button className="btn btn--primary btn--block" type="submit" disabled={busy}>
-          {busy && <Loader2 size={16} className="spin" />}
-          {busy ? t('auth.registering') : t('auth.register')}
-        </button>
+        <Btn
+          type="submit"
+          variant="wide"
+          label={busy ? t('auth.registering') : t('auth.register')}
+          icon={busy ? SpinIcon : undefined}
+          disabled={busy}
+        />
       </form>
 
-      <div className="auth-foot">
+      <div className="lp-auth__switch">
         <button
-          className="link-btn"
+          type="button"
+          className="lp-auth__signout"
           onClick={async () => {
             await logout()
             navigate('/login', { replace: true })
           }}
         >
-          <LogOut size={14} strokeWidth={1.9} /> {t('auth.logout')}
+          <LogOut size={15} strokeWidth={1.6} /> {t('auth.logout')}
         </button>
       </div>
     </AuthShell>
   )
+}
+
+/* Same 24 grid as the arrow it replaces, so the chip does not resize. */
+function SpinIcon() {
+  return <Loader2 className="spin" width="24" height="24" strokeWidth={1.5} />
 }

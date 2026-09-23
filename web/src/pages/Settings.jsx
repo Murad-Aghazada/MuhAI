@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Building2, Database, Loader2, Plug, Settings as SettingsIcon, Sparkles, Trash2, X } from 'lucide-react'
+import { Building2, Database, Loader2, Plug, Settings as SettingsIcon, Trash2, X } from 'lucide-react'
+import { Spark } from '../components/ui/icons.jsx'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -126,7 +127,7 @@ export default function Settings() {
     <div className="page">
       <div className="page-head">
         <div className="page-eyebrow">
-          <SettingsIcon size={14} strokeWidth={1.9} />
+          <SettingsIcon size={14} strokeWidth={1.5} />
           <span className="label">{t('nav.settings')}</span>
         </div>
         <h1 className="page-title">{t('settings.title')}</h1>
@@ -138,7 +139,7 @@ export default function Settings() {
           className={`notice notice--${flash.tone === 'error' ? 'error' : 'info'}`}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          style={{ marginBottom: 18 }}
+         
         >
           {flash.message}
         </motion.div>
@@ -148,7 +149,7 @@ export default function Settings() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><Building2 size={15} strokeWidth={1.9} />{t('settings.companySection')}</div>
+              <div className="panel-title"><Building2 size={15} strokeWidth={1.5} />{t('settings.companySection')}</div>
               <div className="panel-sub">PostgreSQL · companies/{companyId?.slice(0, 8)}…</div>
             </div>
             <Building2 size={20} color="var(--ink-4)" />
@@ -213,7 +214,7 @@ export default function Settings() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><Plug size={15} strokeWidth={1.9} />{t('settings.connSection')}</div>
+              <div className="panel-title"><Plug size={15} strokeWidth={1.5} />{t('settings.connSection')}</div>
               <div className="panel-sub">{t('settings.counts')}</div>
             </div>
             <Plug size={20} color="var(--ink-4)" />
@@ -240,7 +241,7 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title"><Database size={15} strokeWidth={1.9} />{t('settings.counts')}</div>
+              <div className="panel-title"><Database size={15} strokeWidth={1.5} />{t('settings.counts')}</div>
             </div>
             <Database size={20} color="var(--ink-4)" />
           </div>
@@ -255,10 +256,10 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title"><Sparkles size={15} strokeWidth={1.9} />{t('settings.vendorSection')}</div>
+              <div className="panel-title"><Spark size={15} strokeWidth={1.5} />{t('settings.vendorSection')}</div>
               <div className="panel-sub">{t('settings.vendorSectionSub')}</div>
             </div>
-            <Sparkles size={20} color="var(--ink-4)" />
+            <Spark size={20} color="var(--ink-4)" />
           </div>
           {vendorCategories.length ? (
             <>
@@ -275,7 +276,7 @@ export default function Settings() {
                       aria-label={t('settings.vendorForget')}
                       title={t('settings.vendorForget')}
                     >
-                      {forgetting === v.id ? <Loader2 size={13} className="spin" /> : <X size={13} strokeWidth={1.9} />}
+                      {forgetting === v.id ? <Loader2 size={13} className="spin" /> : <X size={13} strokeWidth={1.5} />}
                     </button>
                   </li>
                 ))}
@@ -286,7 +287,7 @@ export default function Settings() {
                 onClick={handleForgetAll}
                 disabled={forgetting !== null}
               >
-                {forgetting === 'all' ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.9} />}
+                {forgetting === 'all' ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.5} />}
                 {t('settings.vendorForgetAll')}
               </button>
             </>
@@ -296,13 +297,13 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title"><Trash2 size={15} strokeWidth={1.9} />{t('settings.dataSection')}</div>
+              <div className="panel-title"><Trash2 size={15} strokeWidth={1.5} />{t('settings.dataSection')}</div>
               <div className="panel-sub">{t('settings.dataSectionHint')}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn btn--ghost btn--sm" onClick={handleClear} disabled={clearing}>
-              {clearing ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.9} />}
+              {clearing ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.5} />}
               {t('settings.clearBtn')}
             </button>
           </div>

@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { BarChart3, Bot, Check, ScanLine, ShieldCheck } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
-import LanguageToggle from '../layout/LanguageToggle.jsx'
-import Logo from '../ui/Logo.jsx'
+import { Btn, LangFlags } from '../ui/lp.jsx'
 
 const HIGHLIGHTS = [
   { icon: ScanLine, tr: 'Fatura OCR', en: 'Invoice OCR', trSub: 'Tutar, KDV ve tarih otomatik okunur', enSub: 'Amount, VAT and dates read automatically' },
@@ -13,67 +11,76 @@ const HIGHLIGHTS = [
 ]
 
 /**
- * The auth shell: a centred tray holding two cards — the pitch on the left,
- * the form on the right. Below 1000px the pitch drops and the form card
- * carries the tray on its own.
+ * The auth shell — the landing page's own language, one step in.
+ *
+ * The root is a `.lp` element on purpose: the wordmark, the nav pill, the
+ * chip button, the type pair and every token come from `styles/landing.css`
+ * rather than from a second palette that would drift from it. The card is
+ * the landing's slab geometry — 8px of padding around two panels, dark on
+ * the left, the form on the right. Below 940px the dark panel drops.
+ *
+ * `alt` names where the other door is: /login offers /register and back.
  */
-export default function AuthShell({ title, subtitle, wide = false, children }) {
-  const { lang } = useLang()
+export default function AuthShell({ title, subtitle, alt, children }) {
+  const { lang, setLanguage } = useLang()
+  const en = lang === 'en'
 
   return (
-    <div className="auth-page">
-      <div className="auth-page__bar">
-        <Link to="/" className="brand">
-          <span className="brand-glyph">
-            <Logo size={15} />
-          </span>
-          <span className="brand-name">Muhai</span>
-        </Link>
-        <LanguageToggle />
+    <div className="lp lp-auth">
+      <div className="lp-auth__nav">
+        <nav className="lp-nav">
+          <Link className="lp-nav__brand" to="/">
+            Muhai
+          </Link>
+
+          <span className="lp-auth__gap" />
+
+          <div className="lp-nav__right">
+            <LangFlags lang={lang} setLanguage={setLanguage} />
+            {alt && (
+              <>
+                <Link className="lp-nav__login" to={alt.to}>
+                  {alt.quiet}
+                </Link>
+                <Btn to={alt.to} label={alt.cta} size="sm" />
+              </>
+            )}
+          </div>
+        </nav>
       </div>
 
-      <div className="auth-page__body">
-        <motion.div
-          className={`tray auth-tray ${wide ? 'auth-tray--wide' : ''}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.44, 0, 0.56, 1] }}
-        >
-          <div className="auth-pitch">
-            <h2 className="auth-pitch__title">
-              {lang === 'en'
+      <div className="lp-auth__body">
+        <div className="lp-auth__card">
+          <aside className="lp-auth__pitch">
+            <h2 className="lp-d5">
+              {en
                 ? 'Your accounting, already done by the time you look at it.'
                 : 'Muhasebeniz, siz bakmadan önce yapılmış olsun.'}
             </h2>
 
-            <ul className="auth-highlights">
-              {HIGHLIGHTS.map((h, i) => (
-                <motion.li
-                  key={h.tr}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.45, delay: 0.1 + i * 0.08 }}
-                >
-                  <span className="auth-highlights__icon">
-                    <Check size={12} strokeWidth={2.4} />
+            <ul className="lp-auth__list">
+              {HIGHLIGHTS.map((h) => (
+                <li key={h.tr}>
+                  <span className="lp-auth__mark">
+                    <Check strokeWidth={2.2} />
                   </span>
                   <span>
-                    <strong>{lang === 'en' ? h.en : h.tr}</strong>
-                    <em>{lang === 'en' ? h.enSub : h.trSub}</em>
+                    <b>{en ? h.en : h.tr}</b>
+                    <span>{en ? h.enSub : h.trSub}</span>
                   </span>
-                </motion.li>
+                </li>
               ))}
             </ul>
 
-            <p className="auth-pitch__foot">TEKNOFEST 2026 · Team Nasimi BHOS</p>
-          </div>
+            <p className="lp-auth__foot">TEKNOFEST 2026 · Team Nasimi BHOS</p>
+          </aside>
 
-          <div className="auth-card">
-            <h1 className="auth-card__title">{title}</h1>
-            <p className="auth-card__sub">{subtitle}</p>
+          <div className="lp-auth__form">
+            <h1 className="lp-d4 lp-auth__title">{title}</h1>
+            <p className="lp-lead lp-auth__sub">{subtitle}</p>
             {children}
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   )

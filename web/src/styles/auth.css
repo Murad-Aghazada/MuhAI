@@ -1,208 +1,209 @@
 /* ============================================================
-   Auth screens: the centred tray, and the shared form controls.
+   Auth screens — the landing page's design language, signed out.
 
-   Two cards in one tray — the pitch and the form — exactly the
-   way the rest of the system composes a pair of panels. This
-   file also holds the field primitives used by the in-app
-   sheets, so a field looks identical whether it is on /register
-   or inside the invoice editor.
+   /login and /register are the seam between the marketing page and
+   the console, and they now render inside a `.lp` element: the
+   tokens, the type pair, the radii and the chip button all come
+   from `styles/landing.css` rather than being restated here. What
+   is in this file is only what the landing page does not already
+   have — the split card, the form fields and the alerts.
 
-   Fields are SUNKEN and borderless with a red focus ring. An
-   outlined input with a blue ring is the generic default this
-   replaces, and it is the single fastest way to lose the look.
+   The composition is the landing's own slab: one white container
+   at r24 with 8px of padding, holding two panels. The left panel
+   is the dark band (#35363b with lime marks), the right is white
+   and holds the form. Below 940px the dark panel drops and the
+   form carries the card alone.
+
+   This file also holds the field primitives that the in-app sheets
+   use (`.field`, `.checkbox-row`, `.field-row`), so an input looks
+   the same on /register as it does inside the invoice editor.
+   Those base rules read the console tokens, because they also
+   render outside `.lp`; the `.lp .field__*` block below is what
+   moves them onto the landing palette in here.
    ============================================================ */
 
-.auth-page {
+.lp-auth {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--surface-canvas);
+  background: var(--pg);
 }
 
-.auth-page__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
-  max-width: 1040px;
-  width: 100%;
-  margin: 0 auto;
+/* ---------------------------------------------------- the nav --
+   The landing pill, minus the section links: there is nothing on
+   this page to jump to, and a nav full of anchors that leave a
+   half-filled form is worse than no nav. */
+
+.lp-auth__nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 8px var(--edge) 0;
 }
 
-@media (min-width: 810px) { .auth-page__bar { padding: 20px 64px; } }
+.lp-auth__nav .lp-nav {
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(36, 36, 38, 0.05), 0 14px 34px rgba(36, 36, 38, 0.07);
+}
 
-.auth-page__body {
+/* The wordmark is the way back — it links to `/` — so the nav carries no
+   second "back to site". This is what keeps the right-hand group right. */
+.lp-auth__gap { flex: 1 1 auto; }
+
+/* --------------------------------------------------- the body -- */
+
+.lp-auth__body {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 24px 64px;
+  padding: 40px var(--edge) 64px;
 }
 
-@media (min-width: 810px) { .auth-page__body { padding: 24px 64px 80px; } }
+/* --------------------------------------------------- the card --
+   Geometry lifted from `.lp-slab__card`: 8px of padding around two
+   panels, r24 outside and r8 in, and the same two-layer shadow. */
 
-/* -------------------------------------------------- the tray -- */
-
-.tray.auth-tray {
+.lp-auth__card {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 0.86fr 1fr;
   width: 100%;
-  max-width: 940px;
-  align-items: stretch;
+  max-width: 1080px;
+  padding: 8px;
+  border-radius: var(--r-xl);
+  background: var(--card);
+  box-shadow: 0 2px 4px rgba(36, 36, 38, 0.05), 0 24px 70px rgba(36, 36, 38, 0.1);
 }
 
-.tray.auth-tray--wide { max-width: 1040px; }
+.lp-auth__card--solo { max-width: 560px; grid-template-columns: 1fr; }
 
-@media (max-width: 1000px) {
-  .tray.auth-tray { grid-template-columns: 1fr; max-width: 520px; }
-  .auth-pitch { display: none; }
-}
+/* -------------------------------------------------- the pitch --
+   The dark band, at panel scale. Its marks are lime discs, which is
+   the one place colour appears on this screen. */
 
-/* ------------------------------------------------- the pitch -- */
-
-.auth-pitch {
-  background: var(--panel-steel);
-  border-radius: var(--lp-r-slab-lg);
-  padding: 40px;
+.lp-auth__pitch {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 28px;
+  padding: 44px 40px;
+  border-radius: var(--r-xs);
+  background: var(--dark);
+  color: var(--on-dark);
 }
 
-.auth-pitch__title {
-  font-family: var(--display);
-  font-synthesis: none;
-  font-size: clamp(24px, 2.4vw, 30px);
-  line-height: 1.2;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  color: var(--slate-900);
-  max-width: 18ch;
-}
+.lp-auth__pitch h2 { max-width: 15ch; }
 
-:root[data-theme='dark'] .auth-pitch__title { color: var(--text-heading); }
+.lp-auth__list { display: flex; flex-direction: column; gap: 18px; }
 
-.auth-highlights { list-style: none; display: flex; flex-direction: column; gap: 16px; }
-.auth-highlights li { display: flex; gap: 12px; align-items: flex-start; }
+.lp-auth__list li { display: flex; gap: 14px; align-items: flex-start; }
 
-.auth-highlights__icon {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  margin-top: 2px;
-  border-radius: 50%;
-  background: var(--tag-green-tint);
-  color: var(--tag-green-ink);
+.lp-auth__mark {
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-xs);
+  background: var(--lime);
+  color: #242426;
 }
 
-.auth-highlights strong {
+.lp-auth__mark svg { width: 15px; height: 15px; }
+
+.lp-auth__list b {
   display: block;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: var(--slate-900);
-}
-
-.auth-highlights em {
-  display: block;
-  font-style: normal;
-  font-size: 13px;
-  letter-spacing: -0.03em;
-  color: var(--slate-700);
-  margin-top: 2px;
-  line-height: 1.45;
-}
-
-:root[data-theme='dark'] .auth-highlights strong { color: var(--text-heading); }
-:root[data-theme='dark'] .auth-highlights em { color: var(--text-body); }
-
-.auth-pitch__foot {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
-  letter-spacing: -0.003em;
-  color: var(--slate-600);
-  margin-top: auto;
+  letter-spacing: -0.01em;
+  color: var(--on-dark);
 }
 
-:root[data-theme='dark'] .auth-pitch__foot { color: var(--text-muted); }
+.lp-auth__list span {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--on-dark-50);
+}
 
-/* -------------------------------------------------- the form -- */
+.lp-auth__foot {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 13px;
+  color: var(--on-dark-50);
+}
 
-.auth-card {
-  background: var(--surface-canvas);
-  border-radius: var(--lp-r-slab-lg);
-  padding: 32px 28px;
+/* Below 940 the dark panel drops and the form carries the card alone.
+   This block has to sit AFTER `.lp-auth__pitch` above: same specificity,
+   so the later rule is the one that lands. */
+@media (max-width: 940px) {
+  .lp-auth__card { grid-template-columns: 1fr; max-width: 560px; }
+  .lp-auth__pitch { display: none; }
+}
+
+/* --------------------------------------------------- the form -- */
+
+.lp-auth__form {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 44px 40px;
+  min-width: 0;
 }
 
-@media (min-width: 810px) { .auth-card { padding: 40px; } }
+@media (max-width: 560px) { .lp-auth__form { padding: 32px 22px; } }
 
-.auth-card__title {
-  font-family: var(--display);
-  font-synthesis: none;
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  color: var(--text-heading);
-}
+.lp-auth__title { padding-bottom: 8px; }
+.lp-auth__sub { padding-bottom: 26px; }
 
-.auth-card__sub {
-  color: var(--text-body);
-  font-size: 15px;
-  letter-spacing: -0.03em;
-  margin: 8px 0 28px;
-}
+.auth-form { display: flex; flex-direction: column; gap: 18px; }
 
-/* ---------------------------------------------------- steps -- */
+/* ---------------------------------------------------- steps --
+   Two dots and a rule. The live one is the dark pill the buttons
+   are, the finished one is lime — the same two roles those colours
+   carry everywhere else in the language. */
 
-.auth-steps { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+.lp-steps { display: flex; align-items: center; gap: 12px; padding-bottom: 26px; }
 
-.auth-steps__item {
+.lp-steps__item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  letter-spacing: -0.006em;
-  color: var(--text-muted);
+  gap: 9px;
+  font-size: 14px;
+  color: var(--ink-50);
+}
+
+.lp-steps__item b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pill);
+  background: var(--ink-07);
+  color: var(--ink-50);
+  font-size: 12px;
   font-weight: 500;
 }
 
-.auth-steps__item b {
-  width: 21px;
-  height: 21px;
-  border-radius: 50%;
-  background: var(--surface-sunken);
-  color: var(--text-muted);
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 600;
-}
+.lp-steps__item.is-active { color: var(--ink); }
+.lp-steps__item.is-active b { background: var(--dark); color: var(--on-dark); }
+.lp-steps__item.is-done b { background: var(--lime); color: #242426; }
+.lp-steps__bar { flex: 1; height: 1px; background: var(--ink-12); }
 
-.auth-steps__item.is-active { color: var(--text-heading); }
-.auth-steps__item.is-active b { background: var(--accent); color: var(--text-inverted); }
-.auth-steps__item.is-done b { background: var(--tag-green-tint); color: var(--tag-green-ink); }
-.auth-steps__bar { flex: 1; height: 1px; background: var(--border-default); }
+/* ============================================================
+   Field primitives
 
-/* ----------------------------------------------------- form -- */
-
-.auth-form { display: flex; flex-direction: column; gap: 16px; }
+   Shared with the in-app sheets, so the base rules stay on the
+   console tokens. Inside `.lp` they are re-pointed onto the
+   landing palette a few rules down.
+   ============================================================ */
 
 .field { display: flex; flex-direction: column; gap: 8px; }
 
-/* Not uppercase: a plain small noun in secondary ink. */
 .field__label {
   font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   text-transform: none;
   color: var(--text-secondary);
 }
@@ -211,22 +212,20 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--surface-sunken);
-  border: none;
-  border-radius: var(--lp-r-media);
-  padding: 0 16px;
   height: 46px;
+  padding: 0 16px;
+  border-radius: var(--r-panel);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
   color: var(--text-muted);
-  transition: box-shadow 200ms var(--ease), background 200ms var(--ease);
+  transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease), background 200ms var(--ease);
 }
 
-.field__wrap:hover { background: var(--surface-subtle); }
+.field__wrap:hover { border-color: var(--border-strong); }
 
-/* A 2px red ring. No blue, no soft halo, no border colour change. */
 .field__wrap:focus-within {
-  background: var(--surface-sunken);
-  box-shadow: 0 0 0 2px var(--brand-red);
-  color: var(--text-tertiary);
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--focus);
 }
 
 .field__wrap input,
@@ -236,8 +235,9 @@
   border: none;
   outline: none;
   background: transparent;
+  font-family: inherit;
   font-size: 15px;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   min-width: 0;
   height: 100%;
@@ -245,7 +245,7 @@
 
 .field__wrap select { cursor: pointer; }
 .field__wrap input::placeholder { color: var(--text-muted); }
-.field__hint { font-size: 12.5px; letter-spacing: -0.003em; color: var(--text-muted); }
+.field__hint { font-size: 13px; letter-spacing: -0.005em; color: var(--text-muted); }
 
 /* The classifier explaining itself: why this category was pre-filled. */
 .field__hint--learn {
@@ -265,20 +265,20 @@
   gap: 11px;
   align-items: flex-start;
   padding: 14px;
-  border: none;
-  border-radius: var(--lp-r-media);
-  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-panel);
+  background: var(--surface-card);
   cursor: pointer;
-  transition: background 200ms var(--ease);
+  transition: border-color 200ms var(--ease);
 }
 
-.checkbox-row:hover { background: var(--surface-subtle); }
+.checkbox-row:hover { border-color: var(--border-strong); }
 .checkbox-row input { margin-top: 2px; width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
 .checkbox-row strong {
   display: block;
   font-size: 14px;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   color: var(--text-heading);
   font-weight: 600;
 }
@@ -287,39 +287,121 @@
   display: block;
   font-style: normal;
   font-size: 13px;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   color: var(--text-body);
   margin-top: 3px;
   line-height: 1.45;
 }
 
-.auth-actions { display: flex; gap: 10px; }
-.auth-actions .btn { flex: 1; justify-content: center; }
+/* ---------------------------------- the same fields, on `.lp` -- */
 
-/* Tint and ink, no outline — the same tag vocabulary as everywhere else. */
-.auth-alert {
-  border-radius: var(--r-panel);
-  padding: 12px 14px;
-  font-size: 13.5px;
+.lp .field__label { font-size: 14px; font-weight: 400; color: var(--ink-75); letter-spacing: 0; }
+
+.lp .field__wrap {
+  height: 50px;
+  border-radius: var(--r-sm);
+  background: var(--card);
+  border: 1px solid var(--ink-12);
+  color: var(--ink-25);
+}
+
+.lp .field__wrap:hover { border-color: var(--ink-25); }
+
+.lp .field__wrap:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--ink-07);
+  color: var(--ink-50);
+}
+
+.lp .field__wrap input,
+.lp .field__wrap select,
+.lp .field__wrap textarea { font-size: 15px; letter-spacing: 0; color: var(--ink); }
+
+.lp .field__wrap input::placeholder { color: var(--ink-25); }
+.lp .field__hint { font-size: 13px; color: var(--ink-50); }
+.lp .field__wrap svg { width: 17px; height: 17px; flex: 0 0 auto; }
+
+/* ------------------------------------------------- the actions -- */
+
+.lp-auth__actions { display: flex; gap: 12px; padding-top: 4px; }
+.lp-auth__actions .lp-btn { flex: 1 1 auto; }
+.lp-auth__actions .lp-btn--quiet { flex: 0 0 auto; }
+
+/* Tint and ink, no outline — the same tag vocabulary as the page. */
+.lp-alert {
+  border-radius: var(--r-sm);
+  padding: 13px 15px;
+  font-size: 14px;
   line-height: 1.45;
-  letter-spacing: -0.006em;
 }
 
-.auth-alert--error { background: var(--tag-red-tint); color: var(--tag-red-ink); }
-.auth-alert--ok { background: var(--tag-green-tint); color: var(--tag-green-ink); }
+.lp-alert--error { background: rgba(190, 70, 60, 0.11); color: #a4433a; }
+.lp-alert--ok { background: rgba(88, 150, 60, 0.13); color: #4a7c33; }
 
-.auth-link-center { align-self: center; }
-
-.auth-foot {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 13.5px;
-  letter-spacing: -0.03em;
-  color: var(--text-muted);
+.lp-auth__switch {
+  padding-top: 24px;
+  font-size: 14px;
+  color: var(--ink-50);
 }
 
-.auth-foot a { color: var(--accent); font-weight: 600; }
-.auth-foot a:hover { text-decoration: underline; }
+.lp-auth__switch a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ink-25); }
+.lp-auth__switch a:hover { border-bottom-color: var(--ink); }
+
+/* ============================================================
+   `.lp button` in landing.css strips every button to `background:
+   none; border: 0` at (0,1,1) — one class and one element — which
+   out-specifies any plain `.lp-*` class rule below it. The chip
+   button was only ever rendered as a link on the landing page, so
+   nothing noticed until the auth form needed a real `<button
+   type="submit">` and it came out white and borderless. Every
+   button rule in this file therefore carries the extra class.
+   ============================================================ */
+
+.lp button.lp-btn {
+  background: var(--b-bg);
+  color: var(--b-ink);
+}
+
+.lp button.lp-btn .lp-btn__chip { background: var(--b-chip); color: var(--b-chip-ink); }
+
+/* ------------------------------------------- sign in with Google --
+   A white pill held by a hairline, the way the landing page's quiet
+   button is. Google's own mark keeps its four colours: it is their
+   brand, not ours to restyle into the accent. */
+
+.lp .lp-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 50px;
+  border-radius: var(--r-sm);
+  background: var(--card);
+  border: 1px solid var(--ink-12);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.lp .lp-google:not(:disabled):hover { border-color: var(--ink-25); background: var(--pg); }
+.lp .lp-google:disabled { opacity: 0.5; cursor: not-allowed; }
+.lp .lp-google svg { flex: 0 0 auto; }
+
+/* A rule with the word sitting in a gap in it. */
+.lp-or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0;
+  color: var(--ink-50);
+  font-size: 13px;
+}
+
+.lp-or::before,
+.lp-or::after { content: ''; flex: 1; height: 1px; background: var(--ink-12); }
 
 /* -------------------------------------------- route splash -- */
 
@@ -344,42 +426,43 @@
   animation: muhai-spin 620ms linear infinite;
 }
 
-/* ------------------------------------------- sign in with Google -- */
+/* --------------------------------------------------- phone -- */
 
-/* A white button held by a hairline ring, the way every secondary action
-   here is. Google's own mark keeps its four colours: it is their brand,
-   not ours to restyle into the accent. */
-.btn--google {
-  gap: 10px;
-  height: 48px;
-  border-radius: var(--lp-r-media);
-  background: var(--surface-canvas);
-  color: var(--text-heading);
-  box-shadow: var(--shadow-ring);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+@media (max-width: 720px) {
+  .lp-auth { --edge: 16px; }
+  .lp-auth__body { padding: 24px var(--edge) 40px; }
+  .lp-auth__nav .lp-nav__login { display: none; }
 }
 
-.btn--google:not(:disabled):hover { background: var(--surface-hover); }
-.btn--google svg { flex: 0 0 auto; }
-
-/* A rule with the word sitting in a gap in it, rather than a line above
-   and a line below. */
-.auth-or {
-  display: flex;
+/* The sign-out on the recovery screen: a verb, not a button. */
+.lp .lp-auth__signout {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  letter-spacing: -0.03em;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink-50);
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
-.auth-or::before,
-.auth-or::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-default);
+.lp .lp-auth__signout:hover { color: var(--ink); }
+
+/* The in-app sheets (invoice, product, employee) still raise their errors
+   through `.auth-alert`. It is the same tint-and-ink tag as `.lp-alert`,
+   read through the console tokens because those sheets are not on `.lp`. */
+.auth-alert {
+  border-radius: var(--r-panel);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
 }
+
+.auth-alert--error { background: var(--tag-red-tint); color: var(--tag-red-ink); }
+.auth-alert--ok { background: var(--tag-green-tint); color: var(--tag-green-ink); }
+
+/* A disabled chip button: the sweep is what says "this does something",
+   so it has to stop with the pointer events. */
+.lp .lp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lp .lp-btn:disabled:hover .lp-btn__chip { width: var(--bc); }
+.lp .lp-btn:disabled:hover .lp-btn__label { opacity: 1; transform: none; }

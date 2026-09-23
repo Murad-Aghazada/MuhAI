@@ -12,14 +12,12 @@ import Payroll from './pages/Payroll.jsx'
 import Assistant from './pages/Assistant.jsx'
 import Settings from './pages/Settings.jsx'
 
-import './styles/dock.css'
 import './styles/components.css'
 import './styles/layout.css'
 import './styles/chat.css'
 import './styles/landing.css'
 import './styles/pages.css'
 import './styles/auth.css'
-import './styles/site-chat.css'
 // Last, so the console skin wins over the component defaults it overrides.
 // Scoped to `.app-shell`; the landing page and auth screens are unaffected.
 import './styles/console.css'

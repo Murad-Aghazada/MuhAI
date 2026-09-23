@@ -7,7 +7,7 @@ Application ID 4579275 · Baku Higher Oil School.
 Auto-loaded each session. Read it before starting; update it when facts change.
 **Keep it lean — delete finished work rather than striking it through.**
 
-Last verified: **2026-09-20**.
+Last verified: **2026-09-24**.
 
 ---
 
@@ -199,7 +199,55 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 296 tests.**
   reconciliation gets built on the workspace
 
 **Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
-**506 kB (156 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**553 kB (171 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+
+**One design language, everywhere (2026-09-24).** The marketing page and
+the product used to be two products: `.lp` on the landing page (Inter
+Tight, #ebeff5 ground, #35363b ink-dark, #d9ff5c lime) and a blue-forward
+console on Cal Sans + Manrope. The console and the auth screens now render
+the landing language.
+
+- `styles/console.css` is still a **token override scoped to `.app-shell`**
+  — that is what moves 3,000 lines of component CSS at once — but the
+  tokens it sets are the landing page's, restated. Read its header before
+  changing a colour in here
+- **Dark acts, lime marks.** A button, the avatar, the compose tile: dark.
+  The live rail tile, the selected segment, the assistant's icon: lime.
+  Neither is decoration and neither appears twice in one card
+- `styles/auth.css` is the landing language too, and `/login`, `/register`
+  and the company-setup screen render **inside a `.lp` element** so they
+  read landing.css directly rather than restating it
+- `components/ui/lp.jsx` holds the landing primitives — the arrow, the
+  chip button, the eyebrow pill, the two flags — extracted from
+  `Landing.jsx` because the auth screens render the same controls and a
+  second copy would drift (see N26)
+- **The logo is the word.** `components/ui/Logo.jsx` (the "M" glyph) is
+  deleted; the wordmark is Syne at -0.02em and nothing sits beside it.
+  `LanguageToggle.jsx` went with it — the language control is the landing
+  page's two drawn flags, on every surface
+- The console's bar is **flush and full width**, not the landing's floating
+  pill: a rounded slab hovering over the work reads as a card competing
+  with the real ones. Its contents are padded to line up with `--measure`
+- `--measure` is **1640px**. At 1280 a 1920 window had ~300px of dead page
+  either side while the invoice table wrapped its date columns
+- **One theme: light.** The dark palette, `ThemeContext`, the rail's theme
+  tile, the landing footer's toggle and the pre-paint script in
+  `index.html` were all deleted on 2026-09-24. Do not re-add a toggle
+- **One gap: 16px.** `.page` is a flex column and every grid on it takes
+  the same 16, so a two-column row and the stack around it share a rhythm.
+  Ad-hoc block margins are zeroed at the top level (`.page > *`) rather
+  than hunted down — see N28
+- Icons are **Lucide at stroke 1.5 on the 24 grid**, the weight
+  `landing.css` sets for its own. The assistant's mark is not Lucide:
+  `components/ui/icons.jsx` draws `Spark`, one **filled** four-point star.
+  Filled matters — a stroked star at 15px is four thin outlines and a
+  hole, and it is the hole you see. `Sparkles` appears nowhere now
+- **Nothing floats over the page.** The bottom dock (`Dock.jsx`,
+  `AppDock.jsx`, `dock.css`), the assistant launcher and its popover
+  (`ChatWidget.jsx`, `SiteChat.jsx`, `site-chat.css`) and the dashboard's
+  compose FAB are deleted. The assistant has its own room in the rail; the
+  rail's "Oluştur" tile only went to `/app/invoices`, which is the tile
+  directly beneath it
 
 - Own JWT auth against `/api/auth`, token in localStorage, two-step company
   sign-up, protected `/app`. **There is no password reset** — Firebase used to
@@ -262,20 +310,29 @@ other signed-in screens are still unverified — see open item 1.
 
 ## 5. Open items
 
-1. **Walk the signed-in screens on a phone while logged in.** The dashboard
-   was measured with a real signed-in account on 2026-09-13 and two more
-   overflows were fixed (N17). What is still unchecked is every *other*
-   signed-in screen at 375 px with real data: touch targets, the sidebar
-   drawer, modals and long lists. There is a test account in the dev database
-   now — `compliance-test@example.com` / `TestParola2026!`, seeded.
-2. Grow the offline knowledge base. 20 passages cover the common ground; add a
+1. **Web `/app/bank` does not exist.** `web/src/pages/Bank.jsx` was deleted
+   in `96fe445` and `App.jsx` has no route for it, so the Banka Mutabakatı
+   screen described under "Web frontend" is not reachable — the backend's
+   `/api/bank` and the native app's bank screen are both still there.
+   Recover the page from `46b6d80` and re-skin it to the console language,
+   or drop the claim.
+2. **Touch targets and drawers on a phone.** All seven signed-in screens
+   plus `/login` and `/register` were measured at 375px on 2026-09-24 with
+   a real signed-in account and real data: nothing scrolls sideways, every
+   table scrolls inside `.tbl-scroll` (N15/N17 hold). What that pass did
+   *not* judge is touch-target size, the modals, or long lists under a
+   thumb. Test account in the dev database: `ui-test@example.com` /
+   `TestParola2026!`, filled by
+   `docker compose exec backend python -m scripts.seed_demo --email
+   ui-test@example.com --password 'TestParola2026!'`.
+3. Grow the offline knowledge base. 20 passages cover the common ground; add a
    passage whenever a plausible question falls through to the default reply.
-3. **Walk the remaining native screens.** The app runs on a phone now, and
+4. **Walk the remaining native screens.** The app runs on a phone now, and
    dashboard, invoices, scan and login were exercised on 2026-09-20.
    **Assistant and bank have not been opened on the device.** Also unverified:
    what the app does when the API disappears mid-session — the shared client
    falls back on web, and nothing has tested that path natively.
-4. **Run the bank client against a real sandbox.** The integration is built
+5. **Run the bank client against a real sandbox.** The integration is built
    and tested against a scripted bank (90 tests), but no Turkish bank
    credential has ever been through it. When access arrives: set the `BANK_*`
    block, open `/app/bank`, and expect the first fix to be a field name — that
@@ -510,6 +567,40 @@ demoed that number before today, they demoed a literal.
   it. Because the native app has **no Settings screen**, that change would
   have made English unreachable, so the `TR / EN` control on the login screen
   is load-bearing — do not remove it without adding another way through.
+
+- **N26 — `.lp button` out-specifies every `.lp-*` class.** landing.css
+  strips buttons to `background: none; border: 0` at (0,1,1) — one class
+  and one element — which beats a plain `.lp-btn` or `.lp-google` at
+  (0,1,0). Nothing noticed for as long as the chip button was only ever a
+  `<Link>`; the first real `<button type="submit">` on /login came out
+  white and borderless. Any button rule written for a `.lp` surface needs
+  the extra class (`.lp button.lp-btn`, `.lp .lp-google`). The same trap
+  caught a media query in auth.css: `@media { .lp-auth__pitch {
+  display: none } }` sat *above* the block that sets `display: flex`, same
+  specificity, so the later rule won and the dark panel stayed on phones.
+
+- **N27 — The console's chip button carries one label, not two.** The
+  landing control renders its label twice so the lime chip can sweep the
+  second copy into view. `<button class="btn">` in the console has one
+  child list and no chip, so it runs the same idea with a `::before` lime
+  panel inset 3px that scales from the left under the text. `isolation`
+  on the button plus `z-index: -1` on the sweep is what keeps it behind a
+  label nobody had to wrap in a span — do not remove either.
+
+- **N28 — Spacing is a flex gap, not a pile of margins.** Measured on the
+  dashboard before this: the banner sat 10px above the figure band, the
+  band 21px above the insight card, that 12px above the day strip and the
+  strip 25px above the chart — four gaps, four values, none chosen.
+  `.app-shell .page` is `display: flex; gap: 16px` and
+  `.app-shell .page > *` zeroes top-level margins, so a stray
+  `margin-bottom` in `pages.css` or an inline `style={{ marginBottom: 20 }}`
+  cannot add to the gap. If a block needs different air, it does not.
+  Two related traps found the same day: `.dash-cols` on the dashboard had
+  **no rule anywhere**, so its four half-width cards stacked at full page
+  width with a gauge adrift in each; and the charts carried a fixed pixel
+  `height` beside an 880-unit `viewBox`, so a wide card letterboxed the
+  drawing *and* mis-mapped the crosshair, which reads the pointer through
+  `rect.width` — the whole element, letterbox included.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

@@ -486,9 +486,6 @@
 .lp-navwrap.is-dark .lp-nav__login { color: var(--on-dark-50); }
 .lp-navwrap.is-dark .lp-nav__login:hover { color: var(--on-dark); }
 
-/* the language control is the console's, reskinned to sit in the pill */
-.lp-nav__right .lang-toggle { transform: scale(0.88); transform-origin: right center; }
-
 .lp-burger {
   display: none;
   width: 40px;
@@ -1764,7 +1761,6 @@
 @media (max-width: 560px) {
   .lp-nav { padding-left: 14px; }
   .lp-nav__right .lp-btn { display: none; }
-  .lp-nav .lang-toggle { display: none; }
 
   .lp-hero__cta { flex-direction: column; gap: 18px; }
   .lp-btn--lg { --bc: 44px; height: 56px; font-size: 16px; padding-right: 22px; }
@@ -1823,23 +1819,3 @@
 .lp-bcard.lp-rv { transform: translateY(var(--rv-y, 24px)) scale(0.96); transform-origin: 50% 100%; }
 .lp-bcard.lp-rv.is-in { transform: none; }
 
-/* ------------------------------------------------------------
-   The language control is the console's component, so it reads
-   the console tokens and flips with the app theme. This page
-   carries one fixed palette, so a dark-theme visitor got a dark
-   pill sitting on a light nav. Redefining the four tokens it
-   uses, scoped to `.lp`, keeps it on the landing palette without
-   touching the component or the console.
-   ------------------------------------------------------------ */
-.lp .lang-toggle {
-  --surface-sunken: var(--ink-07);
-  --text-muted: var(--ink-50);
-  --text-primary: var(--dark);
-  --on-ink: #ffffff;
-}
-.lp-navwrap.is-dark .lang-toggle {
-  --surface-sunken: rgba(255, 255, 255, 0.14);
-  --text-muted: var(--on-dark-50);
-  --text-primary: #ffffff;
-  --on-ink: #242426;
-}

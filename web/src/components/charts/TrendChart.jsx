@@ -206,7 +206,6 @@ export default function TrendChart({
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
           width="100%"
-          height={H}
           role="img"
           className="ck__svg"
           onPointerDown={onPointerDown}

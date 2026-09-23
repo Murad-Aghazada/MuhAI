@@ -1,451 +1,220 @@
 /* ============================================================
-   The console skin.
+   The console skin — the landing page's design language, signed in.
 
-   The signed-in app follows a different design language from the
-   marketing pages: the blue-forward, roomy, white-card look of the
-   reference dashboard, in place of Repilay's warm red on slate.
+   The marketing page and the product are one thing now. Everything
+   here is the language `styles/landing.css` already states: the
+   #ebeff5 ground under white panels, #242426 ink at four opacities,
+   #35363b for anything that acts and #d9ff5c for whatever is live,
+   Inter Tight throughout, and radii that run 8 / 12 / 16 / 20 / 24.
 
-   **Everything here is scoped to `.app-shell`.** The landing page
-   and the auth screens keep the Repilay language untouched, which
-   is why this is a token override on the shell rather than an edit
-   to `:root` — custom properties inherit, so repointing them here
-   moves the whole console and nothing outside it.
+   **Everything is scoped to `.app-shell`.** Custom properties
+   inherit, so repointing them on the shell moves the whole console
+   and nothing outside it — which is why this is a token override
+   rather than an edit to `:root`. The rules under the tokens are
+   only the places where a repointed token is not enough: the rail,
+   the nav pill, the buttons and the tags each have a shape in this
+   language, not just a colour.
 
    The language, in five rules:
 
-     1. Blue is the voice. Titles, links, active states and the
-        primary action are all `--accent`; slate is for body text.
-        This is the inverse of Repilay, where the accent was rare.
-     2. A card is white, hairline-bordered, 8px, and barely raised.
-        No trays, no inset rings, no tinted beds.
-     3. A card header is its icon plus a **blue, semibold** title.
-        That pairing is the strongest signature in the reference and
-        it is what makes a screen read as this product.
-     4. Inter at 14px, and rooms rather than density — 20px card
-        padding, 16px gutters, 40px+ control heights.
-     5. Status keeps its colour: green means money in and a positive
-        action, amber warns, red stops.
+     1. The ground is tinted and the cards are white. That contrast
+        is the structure; a card needs no shadow to be found.
+     2. An edge is one hairline of `--ink-07`. No inset rings, no
+        drop shadows except on things that genuinely float — the
+        nav pill, a popover, the sheet.
+     3. Dark is what acts: buttons, the avatar, the compose button.
+        Lime is what is live: the current rail tile, the selected
+        segment, the mark on a done thing. Neither is decoration and
+        neither appears twice in one card.
+     4. Inter Tight everywhere, tracking negative and tightening as
+        the size grows: -0.01em at 14px, -0.03em at 30px.
+     5. Status keeps colour, muted to the page: #4a7c33 ok,
+        #9a6420 warn, #a4433a stop. A status is a tint pill and the
+        word, nothing else.
    ============================================================ */
 
 .app-shell {
-  /* ------------------------------------------------ blue ramp -- */
-  --blue-50:  #eff6ff;
-  --blue-100: #dbeafe;
-  --blue-200: #bfdbfe;
-  --blue-300: #93c5fd;
-  --blue-400: #60a5fa;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
-  --blue-800: #1e40af;
-  --blue-900: #1e3a8a;
+  /* -------------------------------------------- the landing set --
+     Verbatim from `.lp` in landing.css. Restated rather than
+     inherited because the console is not inside `.lp`; if one of
+     these moves there, move it here in the same commit. */
+  --pg: #ebeff5;
+  --pg-deep: #e3e8f1;
+  --card: #ffffff;
 
-  /* The reference's own primary, and the navy it darkens to. */
-  --console-primary:      #4d80ee;
-  --console-primary-deep: #25408f;
+  --ink: #242426;
+  --ink-75: rgba(36, 36, 38, 0.75);
+  --ink-50: rgba(36, 36, 38, 0.5);
+  --ink-25: rgba(36, 36, 38, 0.25);
+  --ink-12: rgba(36, 36, 38, 0.12);
+  --ink-07: rgba(36, 36, 38, 0.07);
 
-  /* Green is a peer here, not a status afterthought: it carries every
-     affirmative action in the reference, and money coming in. */
-  --console-green:       #349020;
-  --console-green-light: #68cf4c;
-  --console-green-hover: #2a7519;
+  --dark: #35363b;
+  --dark-2: #4d4f57;
+  --on-dark: #ffffff;
+  --on-dark-75: rgba(255, 255, 255, 0.75);
+  --on-dark-50: rgba(255, 255, 255, 0.5);
 
-  /* ------------------------------------------- accent, repointed --
-     Every rule in 3,000 lines of component CSS that reads --accent
-     turns blue at this line. */
-  --accent:       var(--console-primary);
-  --accent-hover: var(--blue-600);
-  --accent-ink:   var(--console-primary-deep);
-  --brand-red:    var(--console-primary);
-  --focus:        rgba(77, 128, 238, 0.24);
+  --lime: #d9ff5c;
+  --lime-deep: #c7f03f;
+  --clay: #e0c5b6;
+  --mist: #c9d3e0;
 
-  /* ------------------------------------------------- surfaces -- */
-  --surface-page:   #f6f8fb;
-  --surface-card:   #ffffff;
-  --surface-canvas: #ffffff;
-  --surface-sunken: #f8fafc;
-  --surface-subtle: #f1f5f9;
-  --surface-hover:  #f6f9ff;
-  --surface-tray:   #ffffff;
-  --surface-row-hover: #f6f9ff;
+  --pill: 999px;
 
-  /* The tray motif is off in here. Cards sit on the page with a
-     hairline each, which is the reference's structure. */
+  /* ---------------------------------------- surfaces, repointed -- */
+  --surface-page:   var(--pg);
+  --surface-card:   var(--card);
+  --surface-canvas: var(--card);
+  --surface-sunken: var(--pg);
+  --surface-subtle: var(--pg-deep);
+  --surface-hover:  var(--pg);
+  --surface-tray:   var(--card);
+  --surface-row-hover: var(--pg);
+  --surface-row-selected: var(--pg-deep);
+  --surface-inverted: var(--dark);
+
+  /* The tray motif is off in here, the way it was: a card is a white
+     panel on the tinted ground with one hairline. */
   --tray-fill: transparent;
-  --tray-ring: var(--border-default);
+  --tray-ring: var(--ink-07);
+  --glass-fill: rgba(255, 255, 255, 0.86);
 
-  --border-subtle:  #eef2f7;
-  --border-default: #e2e8f0;
-  --border-strong:  #cbd5e1;
+  /* -------------------------------------------- ink, repointed -- */
+  --text-primary:    var(--ink);
+  --text-heading:    var(--ink);
+  --text-subheading: var(--ink);
+  --text-secondary:  var(--ink-75);
+  --text-body:       var(--ink-75);
+  --text-tertiary:   var(--ink-50);
+  --text-muted:      var(--ink-50);
+  --text-inverted:   var(--on-dark);
+  --text-inverted-secondary: var(--on-dark-75);
+  --text-inverted-muted:     var(--on-dark-50);
+
+  --ink-2: var(--ink-75);
+  --ink-3: var(--ink-50);
+  --ink-4: var(--ink-25);
+  --on-ink: var(--on-dark);
+
+  --border-subtle:  var(--ink-07);
+  --border-default: var(--ink-07);
+  --border-strong:  var(--ink-25);
+  --rule:      var(--ink-07);
+  --rule-hard: var(--ink-12);
+  --line:      var(--ink-07);
+
+  /* ----------------------------------------- accent, repointed --
+     Dark acts, lime marks. Every rule in 3,000 lines of component
+     CSS that reads --accent turns into the dark pill at this line. */
+  --accent:       var(--dark);
+  --accent-hover: var(--ink);
+  --accent-ink:   var(--ink);
+  --brand:        var(--dark);
+  --brand-red:    var(--dark);
+  --brand-tint:   var(--ink-07);
+  --focus:        rgba(36, 36, 38, 0.10);
+
+  /* ------------------------------------------------------ status --
+     Muted to the page, exactly as `.lp-tag` states them. */
+  --ok:   #4a7c33;  --ok-bg:   rgba(88, 150, 60, 0.13);  --ok-line:   transparent;
+  --warn: #9a6420;  --warn-bg: rgba(186, 120, 40, 0.14); --warn-line: transparent;
+  --stop: #a4433a;  --stop-bg: rgba(190, 70, 60, 0.13);  --stop-line: transparent;
+  --cool: #3f5f86;  --cool-bg: rgba(63, 95, 134, 0.12);  --cool-line: transparent;
+
+  --tag-green-ink: #4a7c33;  --tag-green-tint: rgba(88, 150, 60, 0.13);
+  --tag-amber-ink: #9a6420;  --tag-amber-tint: rgba(186, 120, 40, 0.14);
+  --tag-red-ink:   #a4433a;  --tag-red-tint:   rgba(190, 70, 60, 0.13);
+  --tag-blue-ink:  #3f5f86;  --tag-blue-tint:  rgba(63, 95, 134, 0.12);
+  --tag-slate-ink: var(--ink-75);  --tag-slate-tint: var(--ink-07);
+
+  --tint-red:   rgba(190, 70, 60, 0.13);
+  --tint-green: rgba(88, 150, 60, 0.13);
+  --tint-amber: rgba(186, 120, 40, 0.14);
+  --tint-blue:  rgba(63, 95, 134, 0.12);
+  --tint-slate: var(--ink-07);
+
+  --pos: var(--ok);
+  --neg: var(--stop);
 
   /* ----------------------------------------------------- type -- */
-  --sans:    'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --display: 'Inter', system-ui, -apple-system, sans-serif;
+  --sans:    'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --display: 'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: var(--display);
+  --font-body: var(--sans);
+  --font-logo: 'Syne', 'Inter Tight', system-ui, sans-serif;
 
-  /* ------------------------------------------------- geometry -- */
-  --r-control: 6px;
-  --r-card:    8px;
-  --r-panel:   8px;
-  --r-tray:   10px;
+  /* ------------------------------------------------- geometry --
+     The landing's ladder: 8 inside 12 inside 16 inside 20/24. */
+  --r-control: 10px;
+  --r-card:    12px;
+  --r-panel:   16px;
+  --r-tray:    20px;
+  --r-xs:  8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 24px;
 
-  /* Raised, not inset. Repilay separated with a hairline ring; this
-     language uses a real, very soft shadow over a light border. */
-  --shadow-1: 0 0 0 1px var(--border-default);
-  --shadow-2: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* A hairline, not a ring and not a lift. */
+  --shadow-1: 0 0 0 1px var(--ink-07);
+  --shadow-2: 0 0 0 1px var(--ink-07);
+  --shadow-3: 0 2px 4px rgba(36, 36, 38, 0.05), 0 24px 60px rgba(36, 36, 38, 0.12);
+  --shadow-ring: 0 0 0 1px var(--ink-07);
+  --shadow-tray: 0 24px 60px rgba(36, 36, 38, 0.1);
+  --shadow-button: none;
+  --sh-xs: var(--shadow-1);
+  --sh-sm: var(--shadow-1);
+  --sh-md: var(--shadow-1);
+  --sh-lg: var(--shadow-3);
+  --sh-brand: none;
+
+  --gutter: 28px;
+  /* 1280 was the old measure and it left ~300px of empty page either side
+     of the cards on a 1920 window while the invoice table wrapped its date
+     and number columns inside it. The work gets the width; the gutter is
+     what keeps it off the edge. */
+  --measure: 1640px;
 
   font-family: var(--sans);
+  font-weight: 400;
   background: var(--surface-page);
+  color: var(--ink);
+  letter-spacing: -0.01em;
 }
 
-.app-shell :is(h1, h2, h3, h4) { font-family: var(--sans); letter-spacing: -0.018em; }
-
-/* ============================================================
-   Cards
-   ============================================================ */
-
-.app-shell .panel,
-.app-shell .stat-card {
-  background: var(--surface-card);
-  border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-  padding: 18px 20px;
-}
-
-.app-shell .panel-warm {
-  background: var(--surface-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
-/* The signature. Icon, then a blue semibold title — the one thing that
-   most makes a screen read as this product rather than a generic admin. */
-.app-shell .panel-title {
-  font-size: 15px;
-  font-weight: 650;
-  color: var(--accent);
-  letter-spacing: -0.014em;
-}
-
-.app-shell .panel-title svg { color: var(--accent); opacity: 0.85; }
-
-.app-shell .panel-head {
-  align-items: center;
-  padding-bottom: 14px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.app-shell .panel-sub {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  font-weight: 450;
-}
-
-/* ============================================================
-   Page furniture
-   ============================================================ */
-
-.app-shell .page-title {
-  font-size: 23px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.021em;
-}
-
-.app-shell .page-eyebrow .label { color: var(--text-muted); font-weight: 500; }
-.app-shell .page-eyebrow svg { color: var(--accent); }
-.app-shell .page-sub { color: var(--text-muted); font-size: 13.5px; }
-
-/* ============================================================
-   Controls
-   ============================================================ */
-
-.app-shell .btn {
-  border-radius: var(--r-control);
-  font-weight: 550;
-  letter-spacing: -0.008em;
-}
-
-.app-shell .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(37, 64, 143, 0.18);
-}
-
-.app-shell .btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-/* Affirmative actions are green in this language — "buy", "get help",
-   "confirm". Blue is navigation and identity; green is yes. */
-.app-shell .btn--go {
-  background: var(--console-green);
-  border: 1px solid var(--console-green);
-  color: #fff;
-  border-radius: var(--r-control);
-  font-weight: 550;
-}
-
-.app-shell .btn--go:hover:not(:disabled) {
-  background: var(--console-green-hover);
-  border-color: var(--console-green-hover);
-}
-
-.app-shell .btn--ghost {
-  background: #fff;
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-}
-
-.app-shell .btn--ghost:hover:not(:disabled) {
-  background: var(--blue-50);
-  border-color: var(--blue-200);
-  color: var(--accent);
-}
-
-.app-shell input,
-.app-shell select,
-.app-shell textarea {
-  border-radius: var(--r-control);
+/* index.css sets the display face and a colour on bare headings at
+   (0,0,1). Reset once here rather than at every call site (N6b). */
+.app-shell :is(h1, h2, h3, h4, h5) {
   font-family: var(--sans);
+  font-weight: 500;
+  font-synthesis: none;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* Lucide ships stroke-width as a presentation attribute, which any CSS
+   declaration outranks. 1.5 on the 24 grid is what keeps the icons from
+   reading heavier than the type beside them — the same value landing.css
+   sets, and for the same reason. Charts keep their own weights. */
+.app-shell :is(.rail, .topbar, .panel-head, .page-head, .btn, .icon-btn, .chip) svg {
+  stroke-width: 1.6;
 }
 
 /* ============================================================
-   Display type
+   NAVIGATION RAIL
 
-   `--display` was Cal Sans, which ships a single weight — so every
-   title in the app asks for `font-weight: 400` and gets Cal Sans's
-   only cut. Here `--display` resolves to Inter, where 400 is a
-   genuine regular and a 42px figure set in it looks anaemic.
-   Every display-face element therefore needs its weight named.
-   ============================================================ */
-
-.app-shell :is(
-  .page-title,
-  .figure-hero__value,
-  .stat-card__value,
-  .gauge__value,
-  .mini-stats__value,
-  .modal__title,
-  .empty-state h2,
-  .calc-input
-) {
-  font-weight: 680;
-  letter-spacing: -0.022em;
-}
-
-.app-shell .gauge__value { font-weight: 700; }
-.app-shell .mini-stats__value,
-.app-shell .modal__title { font-size: 20px; }
-
-/* ============================================================
-   Segmented control
-
-   One control, two jobs: the chart's range switch and the list
-   filters. The reference draws these as separate bordered buttons
-   with a solid fill on the live one, not as a pill with a sliding
-   thumb — so the container loses its own background entirely.
-   ============================================================ */
-
-.app-shell .seg {
-  display: inline-flex;
-  gap: 4px;
-  flex: 0 0 auto;
-  padding: 0;
-  background: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.app-shell .seg button {
-  min-width: 40px;
-  height: 30px;
-  padding: 0 11px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-control);
-  background: var(--surface-card);
-  color: var(--text-muted);
-  font-family: var(--sans);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 140ms var(--ease), color 140ms var(--ease),
-              border-color 140ms var(--ease);
-}
-
-.app-shell .seg button:hover {
-  background: var(--blue-50);
-  color: var(--accent);
-  border-color: var(--blue-200);
-}
-
-.app-shell .seg button.is-active,
-.app-shell .seg button[aria-pressed='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: none;
-}
-
-/* ============================================================
-   Inputs
-
-   Repilay's field is sunken, borderless, with a 2px red ring on
-   focus — and CLAUDE.md is right that putting an outlined input
-   back is the fastest way to lose *that* look. This is the other
-   language: the reference outlines every field and rings it blue,
-   so inside the console that is what a field is.
-   ============================================================ */
-
-.app-shell .field__wrap,
-.app-shell .search-inline {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-control);
-  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
-}
-
-.app-shell .field__wrap { height: 40px; padding: 0 12px; }
-.app-shell .search-inline { height: 34px; }
-
-.app-shell .field__wrap:hover,
-.app-shell .search-inline:hover { background: var(--surface-card); border-color: var(--border-strong); }
-
-.app-shell .field__wrap:focus-within,
-.app-shell .search-inline:focus-within {
-  background: var(--surface-card);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--focus);
-}
-
-.app-shell .field__wrap input,
-.app-shell .field__wrap select,
-.app-shell .field__wrap textarea { font-size: 13.5px; letter-spacing: -0.008em; }
-
-.app-shell .field__label { font-size: 13px; letter-spacing: -0.008em; color: var(--text-secondary); }
-
-/* The OCR review flag keeps its amber, but as a ring rather than a fill —
-   a filled field reads as disabled. */
-.app-shell .field--flag .field__wrap {
-  background: var(--surface-card);
-  border-color: #f0b429;
-  box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.16);
-}
-
-/* ============================================================
-   Tables
-
-   The blurred sticky head belonged to a language where panels were
-   translucent. Here the card is opaque, so the head is simply the
-   card's own surface with a rule under it — and the rule is what
-   the rows scroll beneath.
-   ============================================================ */
-
-.app-shell .tbl th {
-  background: var(--surface-card);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: inset 0 -1px 0 var(--border-default);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  padding: 11px 12px;
-}
-
-.app-shell .tbl td { font-size: 13px; padding: 11px 12px; }
-.app-shell .tbl .strong { color: var(--text-primary); font-weight: 600; }
-.app-shell .tbl tbody tr:hover td { background: var(--blue-50); }
-
-/* ============================================================
-   Sheets
-   ============================================================ */
-
-.app-shell ~ .modal-scrim .modal,
-.modal { border-radius: var(--r-card) 0 0 var(--r-card); }
-
-.app-shell .modal__title,
-.modal__title { letter-spacing: -0.018em; }
-
-/* ============================================================
-   Summary strip
-
-   It was a tray: a tinted bed holding white tiles at an 8px gutter.
-   Trays are off in here, so it becomes what every other group of
-   cards is — separate white cards with a hairline each.
-   ============================================================ */
-
-.app-shell .mini-stats {
-  background: none;
-  box-shadow: none;
-  border-radius: 0;
-  padding: 0;
-  gap: 12px;
-}
-
-.app-shell .mini-stats__item {
-  background: var(--surface-card);
-  border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-  padding: 14px 16px;
-}
-
-.app-shell .mini-stats__label { font-size: 12.5px; color: var(--text-muted); letter-spacing: -0.008em; }
-
-/* ============================================================
-   Notice banner  ·  amber, thick left edge, action on the right
-   ============================================================ */
-
-.app-shell .notice,
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: var(--r-card);
-  border: 1px solid var(--border-default);
-  border-left: 4px solid var(--border-strong);
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  font-size: 13.5px;
-  color: var(--text-secondary);
-}
-
-.banner__icon {
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-}
-
-.banner__text { flex: 1 1 auto; line-height: 1.5; }
-.banner__text strong { font-weight: 650; }
-
-.banner--warn { border-left-color: #f0b429; background: #fffdf5; }
-.banner--warn .banner__icon { background: rgba(240, 180, 41, 0.18); color: #b45309; }
-
-.banner--info { border-left-color: var(--accent); background: var(--blue-50); }
-.banner--info .banner__icon { background: rgba(77, 128, 238, 0.16); color: var(--accent); }
-
-.app-shell .notice--warn { border-left-color: #f0b429; background: #fffdf5; }
-
-/* ============================================================
-   Navigation rail
-
-   88px of icon-and-label down the left edge. The width is set by
-   the longest label at 10.5px, not by the icon — which is why the
-   labels are short words rather than phrases.
+   The landing hero's mock has one: a narrow column of tiles with
+   the live one filled lime. This is that, with the labels the
+   console needs under each glyph.
    ============================================================ */
 
 .app-shell {
-  --rail-w: 88px;
-  /* The dock reserved 148px of bottom padding on every page (N6d). With
-     navigation on the left there is nothing down there to clear, so the
-     pages get that space back — but the token stays, because the assistant
-     launcher and the FAB still position against it. */
-  --dock-clearance: 72px;
+  --rail-w: 92px;
+  /* Nothing floats over the foot of the window any more — no dock, no
+     compose button, no assistant launcher. This is just the air under a
+     page's last card. */
+  --dock-clearance: 40px;
 }
 
 .rail {
@@ -459,120 +228,102 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  /* The last tile is the theme switch and its label is the longest; the
-     extra bottom padding is what keeps it off the edge when the rail has
-     to scroll on a short window. */
-  padding: 12px 5px 22px;
-  background: var(--surface-card);
-  border-right: 1px solid var(--border-default);
+  padding: 16px 6px 22px;
+  background: var(--card);
+  border-right: 1px solid var(--ink-07);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .rail::-webkit-scrollbar { width: 0; }
 
-.rail__brand {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: #fff;
-  margin-bottom: 8px;
-  flex: 0 0 auto;
-}
-
-.rail__group { display: flex; flex-direction: column; width: 100%; }
+.rail__group { display: flex; flex-direction: column; width: 100%; gap: 2px; }
 .rail__group--foot { margin-top: auto; }
 
-.rail__item,
-.rail__new {
+.rail__item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
-  padding: 6px 2px 7px;
+  padding: 7px 2px 8px;
   border: 0;
   background: none;
-  border-radius: var(--r-card);
-  color: var(--text-secondary);
+  border-radius: var(--r-sm);
+  color: var(--ink-50);
   text-decoration: none;
   cursor: pointer;
   font-family: var(--sans);
-  transition: color 140ms var(--ease);
+  transition: color 180ms var(--ease);
 }
 
-.rail__tile,
-.rail__new-glyph {
+.rail__tile {
   position: relative;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 32px;
-  border-radius: 9px;
-  transition: background 140ms var(--ease), color 140ms var(--ease);
+  width: 40px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  color: var(--ink-50);
+  transition: background 180ms var(--ease), color 180ms var(--ease);
 }
 
-.rail__new-glyph { border: 1.5px solid var(--border-strong); border-radius: 999px; width: 34px; }
 
 .rail__label {
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: -0.008em;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   text-align: center;
-  color: var(--text-secondary);
-  /* Two lines at most, ellipsed after — "Koyu tema" and "Genel bakış" are
-     the long ones, and a third line pushes the last tile off the rail. */
+  color: var(--ink-50);
+  /* Two lines at most — a third pushes the last tile off the rail. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 100%;
+  transition: color 180ms var(--ease);
 }
 
-.rail__item:hover .rail__tile,
-.rail__new:hover .rail__new-glyph { background: var(--blue-50); color: var(--accent); }
-.rail__item:hover .rail__label,
-.rail__new:hover .rail__label { color: var(--accent); }
-.rail__new:hover .rail__new-glyph { border-color: var(--blue-200); }
+.rail__item:hover .rail__tile { background: var(--pg); color: var(--ink); }
+.rail__item:hover .rail__label { color: var(--ink); }
 
-/* The filled tile is the "you are here" mark — legible peripherally in a way
-   a recoloured glyph is not. */
-.rail__item.is-live .rail__tile { background: var(--accent); color: #fff; }
-.rail__item.is-live .rail__label { color: var(--accent); font-weight: 650; }
+/* Lime is "you are here" — the same mark the hero mock's rail carries,
+   and legible peripherally in a way a recoloured glyph is not. */
+.rail__item.is-live .rail__tile { background: var(--lime); color: #242426; }
+.rail__item.is-live .rail__label { color: var(--ink); }
 
 .rail__badge {
   position: absolute;
-  top: -3px;
-  right: 1px;
-  min-width: 16px;
-  height: 16px;
+  top: -5px;
+  right: -2px;
+  min-width: 17px;
+  height: 17px;
   padding: 0 4px;
-  border-radius: 999px;
-  background: var(--tag-red-ink);
-  color: #fff;
+  border-radius: var(--pill);
+  background: var(--dark);
+  color: var(--on-dark);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   display: grid;
   place-items: center;
-  border: 2px solid var(--surface-card);
+  border: 2px solid var(--card);
   box-sizing: content-box;
 }
 
+.rail__item.is-live .rail__badge { background: var(--ink); }
+
 .rail__rule {
-  width: 52px;
+  width: 44px;
   height: 1px;
-  background: var(--border-default);
-  margin: 8px 0;
+  background: var(--ink-07);
+  margin: 10px 0;
   flex: 0 0 auto;
 }
 
-/* The rail is fixed, so the shell is inset by its width rather than the two
-   being laid out as a grid — that keeps the topbar's own sticky positioning
-   working, and the rail scrolls independently of the page. */
+/* The rail is fixed, so the shell is inset by its width rather than the
+   two being laid out as a grid — that keeps the nav pill's own sticky
+   positioning working and lets the rail scroll independently. */
 .app-shell { padding-left: var(--rail-w); }
 
 @media (max-width: 860px) {
@@ -581,24 +332,678 @@
 }
 
 /* ============================================================
-   Dashboard shell
+   THE TOP BAR
 
-   No side rail. It was a fixed 340px column of shortcuts, and it
-   took that width off every chart on the page — at half width the
-   cash-flow card's month labels and axis figures stop being
-   readable, which is the only thing the card is for. Two of its
-   four cards repeated links the left navigation already carries.
-
-   So the page is one column now: the wide cards run its full
-   width, and the ones that do not need it pair up below.
+   The landing page floats its nav as a 1200px pill. Indoors it is
+   a flush bar instead: edge to edge beside the rail, square, and
+   held by one hairline rather than a shadow. A rounded slab that
+   hovers over the work reads as a second card competing with the
+   real ones, and the console already has a floating element in
+   every corner.
    ============================================================ */
 
-.console-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  margin: 0;
+  /* The bar runs edge to edge but its contents line up with the page
+     below it, which is centred on `--measure`. Without this the wordmark
+     sat 34px left of the first card on a wide window. */
+  padding: 0 max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  border-radius: 0;
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 -1px 0 var(--ink-07);
+}
 
-/* ---------------------------------------------- today strip -- */
+/* The wordmark carries the brand on its own, the way it does on the
+   landing page — Syne at 21/-0.02em, no mark beside it. `.lp-nav__brand`
+   in landing.css is the same declaration; this is the console's copy
+   because the console is not inside `.lp`. */
+.app-shell .brand {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  font-family: var(--font-logo);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--ink);
+  text-decoration: none;
+  transition: opacity 200ms var(--ease);
+}
 
-/* What survived the rail: three counts, as one row across the top.
-   Each is a button, because each is a way into the work. */
+.app-shell .brand:hover { opacity: 0.65; }
+
+.topbar__search-wrap { position: relative; flex: 1; max-width: 360px; min-width: 0; }
+
+.app-shell .topbar__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: var(--pill);
+  background: var(--card);
+  border: 1px solid var(--ink-07);
+  color: var(--ink-25);
+  transition: border-color 180ms var(--ease);
+}
+
+.app-shell .topbar__search:hover { background: var(--card); border-color: var(--ink-25); }
+.app-shell .topbar__search:focus-within {
+  background: var(--card);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--ink-07);
+}
+
+.app-shell .topbar__search input {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.app-shell .topbar__search input::placeholder { color: var(--ink-25); }
+
+.topbar-meta { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* A chip is a fact worth reading without hunting for it: the landing's
+   own eyebrow pill, at console scale. */
+.app-shell .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--pill);
+  background: var(--pg);
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink-75);
+  white-space: nowrap;
+}
+
+.app-shell .chip:hover { background: var(--pg-deep); color: var(--ink); }
+.app-shell .chip svg { color: var(--ink-50); }
+.app-shell .chip b { font-weight: 500; color: var(--ink); }
+
+.app-shell .topbar__icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--pill);
+  color: var(--ink-50);
+}
+
+.app-shell .topbar__icon-btn:hover { background: var(--pg); color: var(--ink); }
+
+.topbar__notif-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--stop);
+  border: 1.5px solid var(--card);
+}
+
+.app-shell .topbar__avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 12px 3px 3px;
+  border-radius: var(--pill);
+  transition: background 180ms var(--ease);
+}
+
+.app-shell .topbar__avatar:hover { background: var(--pg); }
+
+/* The mock's own avatar: a clay-to-mist gradient disc, no initials
+   floating on a grey circle. The initials stay for the person who has
+   to tell two accounts apart. */
+.app-shell .topbar__avatar-img {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--pill);
+  background: linear-gradient(140deg, var(--clay), var(--mist));
+  color: #242426;
+  display: grid;
+  place-items: center;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.app-shell .topbar__avatar-name { font-size: 13.5px; font-weight: 400; color: var(--ink); }
+.app-shell .topbar__avatar-role { font-size: 11.5px; color: var(--ink-50); }
+
+/* ---------------------------------------------- language flags --
+   The same two drawn flags the landing nav carries. They are
+   rectangles on purpose: a pill crops the crescent and the cross
+   into mush at 22px. `landing.css` styles `.lp-flags`, and the
+   console is not inside `.lp`, so the rules are restated. */
+
+.app-shell .lp-flags { display: inline-flex; align-items: center; gap: 8px; }
+
+.app-shell .lp-flags button {
+  display: block;
+  padding: 0;
+  border-radius: 3px;
+  line-height: 0;
+  cursor: pointer;
+  opacity: 0.34;
+  filter: saturate(0.08);
+  transition: opacity 0.22s ease, filter 0.22s ease;
+}
+
+.app-shell .lp-flags button:hover { opacity: 0.8; filter: saturate(0.7); }
+.app-shell .lp-flags button.on { opacity: 1; filter: none; }
+.app-shell .lp-flags svg { display: block; width: 24px; height: 16px; border-radius: 2px; }
+
+/* ============================================================
+   PAGE FRAME
+
+   The mock's header: a 30px title, a muted line under it with a dot
+   in front, and the actions on the right.
+   ============================================================ */
+
+.app-shell .page {
+  max-width: var(--measure);
+  padding: 26px var(--gutter) var(--dock-clearance);
+}
+
+.app-shell .page-head {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ink-07);
+}
+
+.app-shell .page-title {
+  font-family: var(--sans);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.app-shell .page-eyebrow { color: var(--ink-50); margin-bottom: 10px; }
+.app-shell .page-eyebrow .label,
+.app-shell .label,
+.app-shell .eyebrow {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink-50);
+}
+
+.app-shell .page-eyebrow svg { color: var(--ink-50); }
+.app-shell .page-sub { font-size: 14px; letter-spacing: -0.01em; color: var(--ink-50); }
+
+/* ============================================================
+   RHYTHM
+
+   Every page was a stack of blocks whose spacing came from
+   whichever margin each block happened to carry: measured on the
+   dashboard, the banner sat 10px above the figure band, the band
+   21px above the insight card, that 12px above the day strip and
+   the strip 25px above the chart. Four gaps, four values, none of
+   them chosen.
+
+   The page is a flex column now and there is one number: 16px
+   between anything and the thing under it, and the same 16 inside
+   every grid, so a two-column row and the stack it sits in share a
+   rhythm. Block margins are zeroed at the top level rather than
+   hunted down one by one — a stray `margin-bottom` in pages.css
+   would otherwise add to the gap rather than replace it.
+   ============================================================ */
+
+.app-shell .page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-shell .page > * { margin-top: 0; margin-bottom: 0; }
+
+/* The head keeps its rule and the air under it, and the flex gap
+   supplies the rest. */
+.app-shell .page-head { padding-bottom: 20px; margin-bottom: 0; }
+
+.app-shell :is(.dash-grid, .dash-cols, .tax-grid, .inv-grid, .pay-grid, .settings-grid, .assistant-shell, .figures, .today-strip, .ocr-grid) {
+  gap: 16px;
+}
+
+/* `.dash-cols` wraps the dashboard's four half-width cards — the score,
+   the tax calendar, the expense donut and the compliance list — and had
+   no rule anywhere, so all four stacked at full page width with a gauge
+   or a donut adrift in the middle of each. Two columns is what the
+   markup was written for. */
+.app-shell .dash-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+/* `.dash-score` and `.dash-compliance` carry `grid-column` for the *other*
+   grid on this page (`.dash-grid`, which Tax and Inventory use). Left in
+   force here they pinned two of the four cards and auto-placement dealt the
+   other two around them, which is how the calendar ended up under the score
+   with the donut alone beside it. In here the four cards flow in the order
+   they are written. */
+.app-shell .dash-cols > * { grid-column: auto; grid-row: auto; }
+
+@media (max-width: 1100px) {
+  .app-shell .dash-cols { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .dash-cols > * { grid-column: 1; }
+}
+
+.app-shell .section { margin-top: 0; }
+.app-shell .toolbar { margin-bottom: 0; }
+
+/* ============================================================
+   CARDS
+
+   White panel, one hairline, r16. The tinted ground is what makes
+   it a card; nothing here lifts.
+   ============================================================ */
+
+.app-shell :is(.panel, .stat-card, .panel-warm, .insight-card, .empty-state) {
+  background: var(--card);
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-panel);
+  box-shadow: none;
+  padding: 20px;
+}
+
+.app-shell .panel-head {
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ink-07);
+}
+
+.app-shell .panel-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.app-shell .panel-title svg { color: var(--ink-50); opacity: 1; }
+.app-shell .panel-sub { font-size: 13px; font-weight: 400; color: var(--ink-50); letter-spacing: -0.01em; }
+.app-shell .divider { background: var(--ink-07); }
+
+/* ---------------------------------------------------- figures -- */
+
+.app-shell .stat-card { transition: border-color 200ms var(--ease); }
+.app-shell .stat-card:hover { background: var(--card); border-color: var(--ink-12); }
+
+.app-shell .stat-card__icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--r-sm);
+  background: var(--pg);
+  color: var(--ink-50);
+}
+
+.app-shell .stat-card__label { font-size: 13px; font-weight: 400; color: var(--ink-50); letter-spacing: -0.01em; }
+
+/* The mock's figure: 34px, tracked -0.03em, tabular so it does not
+   twitch as the digits change. */
+.app-shell :is(.stat-card__value, .figure-hero__value, .mini-stats__value, .gauge__value, .calc-input, .modal__title, .empty-state h2) {
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.app-shell .stat-card__value { font-size: 32px; line-height: 1.05; }
+.app-shell .figure-hero__value { font-size: 40px; }
+.app-shell .gauge__value { font-size: 40px; }
+.app-shell :is(.mini-stats__value, .modal__title) { font-size: 20px; }
+
+/* A delta is a tag, so it is the tag: tint, ink, pill, no outline. */
+.app-shell .delta { font-weight: 400; padding: 3px 9px; }
+
+/* ============================================================
+   TAGS
+
+   `.lp-tag` verbatim: 22px tall, r999, a tint and a word.
+   ============================================================ */
+
+.app-shell :is(.badge, .pill) {
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--pill);
+  border: 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.app-shell .pill--icon { height: 24px; }
+
+/* ============================================================
+   BUTTONS
+
+   The landing page's control is a pill with a lime chip inside it
+   that sweeps the label into view. That needs two copies of the
+   label in the markup, which the console's `<button class="btn">`
+   does not have — so the console runs the same idea with one: a
+   lime panel inset 3px that grows from the left edge on hover,
+   under the label, which turns to ink as it arrives.
+
+   `isolation` plus a negative z-index on the sweep is what keeps it
+   behind the text without wrapping every label in a span.
+   ============================================================ */
+
+.app-shell .btn {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition: background 220ms var(--ease), color 220ms var(--ease),
+              border-color 220ms var(--ease), opacity 140ms var(--ease);
+}
+
+.app-shell .btn::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 3px;
+  border-radius: 9px;
+  background: var(--lime);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-shell .btn:not(:disabled):hover::before { transform: scaleX(1); }
+.app-shell .btn:active:not(:disabled) { transform: scale(0.985); }
+.app-shell .btn:disabled { opacity: 0.45; }
+
+.app-shell .btn--primary {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--on-dark);
+  box-shadow: none;
+}
+
+.app-shell .btn--primary:not(:disabled):hover {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: #242426;
+}
+
+/* Affirmative actions — "confirm", "add to the ledger" — take the lime
+   outright rather than sweeping into it. */
+.app-shell .btn--go {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #242426;
+}
+
+.app-shell .btn--go::before { background: var(--lime-deep); }
+
+.app-shell .btn--ghost {
+  background: var(--card);
+  border-color: var(--ink-12);
+  color: var(--ink-75);
+}
+
+.app-shell .btn--ghost::before { background: var(--pg); }
+.app-shell .btn--ghost:not(:disabled):hover { background: var(--card); border-color: var(--ink-25); color: var(--ink); }
+
+.app-shell .btn--quiet { background: none; border-color: transparent; color: var(--ink-50); padding: 0 12px; }
+.app-shell .btn--quiet::before { background: var(--pg); }
+.app-shell .btn--quiet:not(:disabled):hover { background: none; color: var(--ink); }
+
+.app-shell .btn--danger { background: var(--stop-bg); color: var(--stop); border-color: transparent; }
+.app-shell .btn--danger::before { background: rgba(190, 70, 60, 0.2); }
+.app-shell .btn--danger:not(:disabled):hover { background: var(--stop-bg); color: var(--stop); }
+
+.app-shell .btn--sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: var(--r-control); }
+.app-shell .btn--sm::before { inset: 2px; border-radius: 8px; }
+.app-shell .btn--lg { height: 48px; padding: 0 24px; font-size: 15px; border-radius: var(--r-md); }
+.app-shell .btn--block { width: 100%; height: 46px; }
+
+.app-shell .icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-control);
+  color: var(--ink-50);
+}
+
+.app-shell .icon-btn:hover { background: var(--pg); color: var(--ink); }
+.app-shell .icon-btn--danger:hover { background: var(--stop-bg); color: var(--stop); }
+
+.app-shell .link-btn {
+  color: var(--ink-75);
+  font-size: 13.5px;
+  font-weight: 400;
+  border-radius: var(--r-control);
+}
+
+.app-shell .link-btn:hover { color: var(--ink); }
+.app-shell .link-btn svg { color: var(--ink-50); }
+.app-shell .link-btn:hover svg { color: var(--ink); }
+
+/* ============================================================
+   SEGMENTED CONTROL
+
+   A row of pills. The live one is lime, the way the mock's day
+   picker marks the day you are on.
+   ============================================================ */
+
+.app-shell .seg {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 3px;
+  background: var(--pg);
+  border-radius: var(--pill);
+  box-shadow: none;
+}
+
+.app-shell .seg button {
+  min-width: 40px;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pill);
+  background: none;
+  color: var(--ink-50);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 180ms var(--ease), color 180ms var(--ease);
+}
+
+.app-shell .seg button:hover { background: rgba(255, 255, 255, 0.7); color: var(--ink); }
+
+.app-shell .seg button.is-active,
+.app-shell .seg button[aria-pressed='true'] {
+  background: var(--lime);
+  color: #242426;
+  box-shadow: none;
+}
+
+/* ============================================================
+   INPUTS
+
+   The mock's own picker: white, one hairline, pill or r12, 40 tall.
+   Focus darkens the edge and lays a soft ink ring outside it —
+   there is no second colour in this language to ring with.
+   ============================================================ */
+
+.app-shell :is(.field__wrap, .search-inline) {
+  background: var(--card);
+  border: 1px solid var(--ink-12);
+  border-radius: var(--r-sm);
+  transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+
+.app-shell .field__wrap { height: 44px; padding: 0 14px; color: var(--ink-25); }
+.app-shell .search-inline { height: 38px; border-radius: var(--pill); }
+
+.app-shell :is(.field__wrap, .search-inline):hover { background: var(--card); border-color: var(--ink-25); }
+
+.app-shell :is(.field__wrap, .search-inline):focus-within {
+  background: var(--card);
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--ink-07);
+}
+
+.app-shell :is(.field__wrap input, .field__wrap select, .field__wrap textarea) {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.app-shell .field__label { font-size: 13.5px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink-75); }
+.app-shell .field__hint { font-size: 12.5px; color: var(--ink-50); }
+.app-shell .checkbox-row { background: var(--card); border-color: var(--ink-12); border-radius: var(--r-sm); }
+.app-shell .checkbox-row input { accent-color: var(--dark); }
+
+/* The OCR review flag keeps its amber, as a ring rather than a fill —
+   a filled field reads as disabled. */
+.app-shell .field--flag .field__wrap {
+  background: var(--card);
+  border-color: #c09030;
+  box-shadow: 0 0 0 3px rgba(186, 120, 40, 0.16);
+}
+
+/* ============================================================
+   TABLES
+
+   Opaque card, so the head is the card's own surface with a rule
+   under it — and the rule is what the rows scroll beneath.
+   ============================================================ */
+
+.app-shell .tbl th {
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 -1px 0 var(--ink-07);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink-50);
+  padding: 12px;
+}
+
+.app-shell .tbl td {
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  padding: 12px;
+  color: var(--ink-75);
+  border-bottom: 1px solid var(--ink-07);
+}
+
+.app-shell .tbl .strong { color: var(--ink); font-weight: 500; }
+.app-shell .tbl tbody tr:hover td { background: var(--pg); }
+.app-shell .tbl tbody td:first-child { border-radius: var(--r-xs) 0 0 var(--r-xs); }
+.app-shell .tbl tbody td:last-child { border-radius: 0 var(--r-xs) var(--r-xs) 0; }
+
+/* A table runs edge to edge inside its panel — that is what lets a
+   hovered row read as one band rather than a stripe with a gap each
+   side — so the panel's gutter belongs to the first and last cell.
+   It used to be an inline `paddingLeft: 22` on some cells of two of
+   the five tables: the other three sat flush against the card, and
+   every table's right edge was 10px tighter than its left. */
+.app-shell .tbl :is(th, td):first-child { padding-left: 22px; }
+.app-shell .tbl :is(th, td):last-child { padding-right: 22px; }
+
+/* Any panel holding a table gives its horizontal padding to the table,
+   so the cells above own the gutter and a hovered row can run the full
+   width of the card. Matched with `:has()` rather than by class: it used
+   to be `.dash-invoices`, which four of the five table panels wore and
+   the payroll one did not — so that table alone sat at a 42px gutter.
+   The card rule above sets `padding: 20px` on every panel at the same
+   specificity and later in the file, which is why this restates it. */
+.app-shell .panel:has(.tbl-scroll) { padding-left: 0; padding-right: 0; }
+.app-shell .panel:has(.tbl-scroll) > .panel-head { padding: 0 22px 14px; }
+
+@media (max-width: 760px) {
+  .app-shell .tbl :is(th, td):first-child { padding-left: 16px; }
+  .app-shell .tbl :is(th, td):last-child { padding-right: 16px; }
+}
+
+/* ============================================================
+   SHEETS AND POPOVERS
+
+   The two things in the console that genuinely float, and the only
+   two that carry a real shadow.
+   ============================================================ */
+
+.app-shell ~ .modal-scrim .modal,
+.modal {
+  border-radius: var(--r-xl) 0 0 var(--r-xl);
+  background: var(--surface-card);
+}
+
+.modal__title { letter-spacing: -0.03em; }
+
+.app-shell .popover {
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-md);
+  box-shadow: 0 2px 4px rgba(36, 36, 38, 0.05), 0 18px 44px rgba(36, 36, 38, 0.12);
+  padding: 6px;
+}
+
+.app-shell .popover__row { border-radius: var(--r-xs); padding: 9px 11px; }
+.app-shell .popover__row:hover { background: var(--pg); }
+.app-shell .popover__title { font-size: 13.5px; font-weight: 400; }
+.app-shell .popover__meta { font-size: 12.5px; color: var(--ink-50); }
+
+/* ============================================================
+   SUMMARY STRIP  ·  TODAY STRIP  ·  NOTICES
+   ============================================================ */
+
+.app-shell .mini-stats {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 12px;
+}
+
+.app-shell .mini-stats__item {
+  background: var(--card);
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-panel);
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+.app-shell .mini-stats__label { font-size: 13px; color: var(--ink-50); letter-spacing: -0.01em; }
+.app-shell .mini-stats__value--pos { color: var(--ok); }
+.app-shell .mini-stats__value--neg { color: var(--stop); }
+
 .today-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -609,373 +1014,348 @@
 .today-strip__item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 16px;
-  border: 0;
-  border-radius: var(--r-card);
-  background: var(--surface-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-  color: var(--accent);
+  gap: 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-panel);
+  background: var(--card);
+  color: var(--ink-75);
   font-family: var(--sans);
-  font-size: 13.5px;
-  font-weight: 550;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   cursor: pointer;
   text-align: left;
-  transition: background 140ms var(--ease), box-shadow 140ms var(--ease);
+  transition: border-color 180ms var(--ease), background 180ms var(--ease);
 }
 
-.today-strip__item:hover {
-  background: var(--blue-50);
-  box-shadow: 0 0 0 1px var(--blue-200), 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
+.today-strip__item:hover { background: var(--pg); border-color: var(--ink-12); }
+.today-strip__item svg { color: var(--ink-50); flex: 0 0 auto; }
 .today-strip__label { flex: 1 1 auto; }
 
 .today-strip__count {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 /* Something actually overdue is the one place this strip raises its
-   voice — and it says so with the icon and the count, not the fill. */
-.today-strip__item.is-alert { color: var(--tag-red-ink); }
-.today-strip__item.is-alert .today-strip__count { color: var(--tag-red-ink); }
-.today-strip__item.is-alert:hover {
-  background: var(--tag-red-tint);
-  box-shadow: 0 0 0 1px var(--tag-red-tint), 0 1px 2px rgba(15, 23, 42, 0.03);
+   voice — and it says so with the count, not with a fill. */
+.today-strip__item.is-alert { color: var(--stop); }
+.today-strip__item.is-alert svg,
+.today-strip__item.is-alert .today-strip__count { color: var(--stop); }
+.today-strip__item.is-alert:hover { background: var(--stop-bg); border-color: transparent; }
+
+@media (max-width: 720px) { .today-strip { grid-template-columns: minmax(0, 1fr); } }
+
+/* A notice is a tinted slab, not a bordered banner with a coloured rib:
+   there is one hairline vocabulary in here and a 4px edge is not it. */
+.app-shell .notice,
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--r-panel);
+  background: var(--pg);
+  box-shadow: none;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--ink-75);
 }
 
-@media (max-width: 720px) {
-  .today-strip { grid-template-columns: minmax(0, 1fr); }
+.app-shell .notice > svg { color: var(--ink-50); }
+.app-shell .notice strong,
+.banner__text strong { color: var(--ink); font-weight: 500; }
+
+.banner__icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink-50);
 }
+
+.banner__text { flex: 1 1 auto; line-height: 1.5; }
+
+.app-shell .notice--warn,
+.banner--warn { background: var(--warn-bg); color: var(--warn); }
+.banner--warn .banner__icon { background: rgba(255, 255, 255, 0.55); color: var(--warn); }
+
+.app-shell .notice--info,
+.banner--info { background: var(--pg); color: var(--ink-75); }
+.banner--info .banner__icon { background: var(--card); color: var(--ink); }
+
+.app-shell .notice--error { background: var(--stop-bg); color: var(--stop); }
+
+/* A banner already carries a tone. Its action takes the dark pill rather
+   than the lime one, or the row reads as two accents arguing. */
+.banner .btn--go {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--on-dark);
+}
+
+.banner .btn--go::before { background: var(--lime); }
+.banner .btn--go:not(:disabled):hover { background: var(--dark); color: #242426; }
 
 /* ============================================================
-   Charts
+   CHARTS
 
-   One anatomy for every plot on the console: a centred legend
-   above, a left value axis over hairline gridlines, a crosshair
-   chipped on both axes, and a readout card beside the cursor.
-   The grid is the lightest ink on the card and the data the
-   darkest; everything between is furniture.
+   One anatomy for every plot: a centred legend above, a left value
+   axis over hairline gridlines, a crosshair chipped on both axes,
+   and a readout card beside the cursor.
+
+   The categorical ramp is the landing page's own — the six hues its
+   expense breakdown is drawn in, plus two more in the same register.
+   Re-ordering them means re-validating them.
    ============================================================ */
 
 .app-shell {
-  --ck-grid:  #eef2f7;
-  --ck-cross: #94a3b8;
-  --ck-chip:  #334155;
-  --ck-zero:  #cbd5e1;
+  --ck-grid:  rgba(36, 36, 38, 0.07);
+  --ck-cross: rgba(36, 36, 38, 0.3);
+  --ck-chip:  #35363b;
+  --ck-zero:  rgba(36, 36, 38, 0.18);
 
-  /* Money in / money out. Teal rather than green: the dataviz checker
-     scores green-red at deutan ΔE 5.0 — effectively one colour to a
-     deuteranope — against 13.1 for this pair, on both surfaces. */
-  --trend-up:   #0d9488;
-  --trend-down: #dc2626;
+  /* Money in / money out. Teal against rust rather than green against
+     red: the pair has to survive deuteranopia, and green-red does not. */
+  --trend-up:   #5aa9a2;
+  --trend-down: #c9764a;
 
-  /* The forecast is one series, so it takes the console's own blue
-     rather than spending a categorical slot on it. */
-  --trend-line: #4d80ee;
-  --ck-band:    rgba(77, 128, 238, 0.14);
+  /* One series carries no identity, so the forecast is drawn in ink
+     with the lime band under it — the mock's own spark. */
+  --trend-line: #242426;
+  --ck-band:    rgba(217, 255, 92, 0.3);
+
+  --d1: #8b86c9;
+  --d2: #6aa5e0;
+  --d3: #5aa9a2;
+  --d4: #9db45f;
+  --d5: #e2c24f;
+  --d6: #c9764a;
+  --d7: #b9718f;
+  --d8: #6f7b8c;
+  --trace: var(--ink-75);
 }
 
-:root[data-theme='dark'] .app-shell {
-  --ck-grid:  rgba(255, 255, 255, 0.07);
-  --ck-cross: rgba(255, 255, 255, 0.34);
-  --ck-chip:  #475569;
-  --ck-zero:  rgba(255, 255, 255, 0.22);
-  --trend-line: #6c9bff;
-  --ck-band:    rgba(108, 155, 255, 0.16);
-}
+/* The plots carry a fixed 880-unit viewBox and used to carry a fixed pixel
+   height beside it. On a card wider than that ratio the browser letterboxed
+   the drawing — bars of empty card either side of the chart — and, worse,
+   the crosshair maths maps the pointer through `rect.width`, which is the
+   whole element including the letterbox. So the readout drifted from the
+   cursor on any wide window. Height comes from the viewBox ratio now and
+   the drawing fills the card. */
+.app-shell .ck__svg { width: 100%; height: auto; display: block; }
 
-.ck__top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 22px;
-  margin-bottom: 2px;
-}
+.ck-axis-text,
+.ck-chip-text { font-family: var(--sans); font-size: 11px; }
+.ck-axis-text { fill: var(--ink-50); }
+.ck-chip-text { fill: #fff; }
 
-.ck__plot { position: relative; }
+.ck-legend__name { font-size: 13px; font-weight: 400; color: var(--ink-75); letter-spacing: -0.01em; }
+.ck-legend__band { border-radius: 4px; }
 
-.ck__svg {
-  display: block;
-  overflow: visible;
-  cursor: crosshair;
-  touch-action: none;   /* the chart owns the gesture, not the page */
-}
-
-.ck-axis-text {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  fill: var(--text-muted);
-  user-select: none;
-}
-
-.ck-chip-text {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  fill: #fff;
-  user-select: none;
-}
-
-/* ---------------------------------------------------- legend -- */
-
-/* Centred over the plot, and marked with the rule the chart actually
-   draws rather than a bare swatch. */
-.ck-legend {
-  flex: 1 1 auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 22px;
-  flex-wrap: wrap;
-}
-
-.ck-legend__item { display: inline-flex; align-items: center; gap: 7px; }
-.ck-legend__mark { flex: 0 0 auto; display: block; }
-
-.ck-legend__band {
-  width: 22px;
-  height: 11px;
-  border-radius: 3px;
-  flex: 0 0 auto;
-}
-
-.ck-legend__name {
-  font-size: 12.5px;
-  font-weight: 550;
-  color: var(--text-secondary);
-  letter-spacing: -0.008em;
-}
-
-/* --------------------------------------------------- tooltip -- */
-
-/* Beside the crosshair, never under the pointer — pointer-events off,
-   or it would steal the move events that position it. */
 .ck-tip {
-  position: absolute;
-  top: 45%;
-  z-index: 5;
-  pointer-events: none;
-  min-width: 132px;
-  padding: 11px 13px;
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-card);
-  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.16), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+  background: var(--card);
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-sm);
+  box-shadow: 0 2px 4px rgba(36, 36, 38, 0.05), 0 18px 44px rgba(36, 36, 38, 0.12);
 }
 
-.ck-tip__head {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-bottom: 7px;
-}
-
-.ck-tip__row {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  font-size: 12.5px;
-  margin-top: 3px;
-}
-
-.ck-tip__label { color: var(--text-muted); }
-.ck-tip__value {
-  margin-left: auto;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
+.ck-tip__head { font-size: 12.5px; font-weight: 400; color: var(--ink-50); }
+.ck-tip__label { color: var(--ink-50); }
+.ck-tip__value { font-weight: 500; color: var(--ink); }
 
 .ck__reset {
-  flex: 0 0 auto;
-  border: 1px solid var(--border-default);
-  background: var(--surface-card);
-  border-radius: var(--r-control);
-  padding: 3px 9px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-muted);
+  border: 1px solid var(--ink-12);
+  background: var(--card);
+  border-radius: var(--pill);
+  padding: 4px 12px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-50);
   cursor: pointer;
 }
 
-.ck__reset:hover { color: var(--accent); border-color: var(--blue-200); background: var(--blue-50); }
+.ck__reset:hover { color: var(--ink); border-color: var(--ink-25); }
+
+.app-shell .chart-empty { background: var(--pg); border-radius: var(--r-sm); font-size: 13px; color: var(--ink-50); }
+
+.app-shell .legend__left { color: var(--ink-75); }
+.app-shell .legend__swatch { border-radius: 3px; }
+.app-shell .legend__val { font-weight: 500; color: var(--ink); }
+
+.app-shell .score-cats__bar { background: var(--pg); }
+.app-shell .score-cats__label { color: var(--ink-75); }
+.app-shell .score-cats__val { font-weight: 500; }
+.app-shell .score-reco { border-top-color: var(--ink-07); color: var(--ink-50); font-size: 13px; }
+.app-shell .gauge__label { color: var(--ink-50); }
 
 /* ============================================================
-   Insight card
+   INSIGHT CARD
 
-   It arrived from the Repilay language as a sunken, bordered slab —
-   the one card on the page that did not look like the others. Here
-   every card is the same white panel with a blue header, so it joins
-   them and keeps only its icon tile to mark whose voice it is.
+   The assistant's voice on the dashboard. It joins the other cards
+   and keeps only its icon tile to mark whose voice it is — and the
+   tile is lime, because this is the one card the product wrote.
    ============================================================ */
-
-.app-shell .insight-card {
-  background: var(--surface-card);
-  border: 0;
-  border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-  padding: 18px 20px;
-}
 
 .app-shell .insight-card__head {
   font-size: 15px;
-  font-weight: 650;
-  color: var(--accent);
-  letter-spacing: -0.014em;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.02em;
   padding-bottom: 14px;
   margin-bottom: 14px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--ink-07);
 }
 
 .app-shell .insight-card__icon {
-  background: var(--blue-50);
+  background: var(--lime);
   border: 0;
-  color: var(--accent);
-  border-radius: 7px;
+  color: #242426;
+  border-radius: var(--r-xs);
 }
 
-.app-shell .insight-card__body { color: var(--text-secondary); font-size: 13.5px; }
+.app-shell .insight-card__body { color: var(--ink-75); font-size: 14px; }
 
-.app-shell .insight-card__action { background: var(--accent); }
-.app-shell .insight-card__action:hover { background: var(--accent-hover); }
-
-/* ============================================================
-   Floating action button
-   ============================================================ */
-
-.fab {
-  position: fixed;
-  right: 26px;
-  bottom: calc(var(--dock-clearance) + 6px);
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  border: 0;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 6px 20px -4px rgba(37, 64, 143, 0.45);
-  transition: transform 160ms var(--ease), background 160ms var(--ease);
-  z-index: 40;
+.app-shell .insight-card__action {
+  background: var(--dark);
+  color: var(--on-dark);
+  border-radius: var(--r-control);
 }
 
-.fab:hover { background: var(--accent-hover); transform: translateY(-2px); }
+.app-shell .insight-card__action:hover { background: var(--ink); }
 
-@media (max-width: 720px) { .fab { right: 16px; } }
+/* ---------------------------------------------- alerts, rows -- */
+
+.app-shell :is(.alert-row, .tax-timeline__row, .review-card, .ocr-item, .learned-row, .run-card, .kdv-row, .figure-row) {
+  border-radius: var(--r-sm);
+}
+
+.app-shell .alert-row { background: var(--pg); border: 0; }
+.app-shell .alert-row--high .alert-row__mark { background: var(--stop-bg); color: var(--stop); }
+.app-shell .alert-row--medium .alert-row__mark { background: var(--warn-bg); color: var(--warn); }
+.app-shell .alert-row--low .alert-row__mark { background: var(--ink-07); color: var(--ink-50); }
 
 /* ============================================================
-   Assistant
-
-   The chat already reads through the tokens, so the accent turned
-   blue on its own. What is left is the shell it sits in and the
-   two places that name ink directly.
+   FLOATING ACTION BUTTON  ·  ASSISTANT
    ============================================================ */
+
+
 
 .app-shell .assistant-main {
-  border: 0;
-  border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(15, 23, 42, 0.03);
-  /* The dock is gone, so the chat reclaims that height. */
-  height: calc(100vh - 230px);
+  border: 1px solid var(--ink-07);
+  border-radius: var(--r-panel);
+  box-shadow: none;
+  background: var(--card);
+  height: calc(100vh - 240px);
 }
 
 .app-shell .chat-input-row {
-  border-radius: var(--r-card);
-  border-color: var(--border-default);
+  border-radius: var(--r-md);
+  border-color: var(--ink-12);
+  background: var(--card);
 }
 
-.app-shell .chat-input-row:hover { border-color: var(--border-strong); }
-.app-shell .chat-input-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+.app-shell .chat-input-row:hover { border-color: var(--ink-25); }
+.app-shell .chat-input-row:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--ink-07); }
 
-.app-shell .chat-send { border-radius: var(--r-control); }
-.app-shell .msg__bubble { border-radius: var(--r-card); }
-.app-shell .msg--bot .msg__bubble { border-top-left-radius: 3px; background: var(--surface-sunken); }
-.app-shell .msg--user .msg__bubble { border-top-right-radius: 3px; }
-.app-shell .msg__av { border-radius: 7px; }
-.app-shell .msg__av--bot { background: var(--blue-50); color: var(--accent); }
+.app-shell .chat-send { border-radius: var(--r-control); background: var(--dark); color: var(--lime); }
+.app-shell .chat-send:hover:not(:disabled) { background: var(--ink); }
 
-.app-shell .chat-suggest { border-radius: var(--r-card); border-color: var(--border-default); }
-.app-shell .chat-suggest:hover {
-  border-color: var(--blue-200);
-  background: var(--blue-50);
-  color: var(--accent);
+.app-shell .msg__bubble { border-radius: var(--r-md); font-size: 14px; }
+.app-shell .msg--bot .msg__bubble { border-top-left-radius: 4px; background: var(--pg); color: var(--ink); }
+.app-shell .msg--user .msg__bubble { border-top-right-radius: 4px; background: var(--dark); color: var(--on-dark); }
+.app-shell .msg__av { border-radius: var(--r-xs); }
+.app-shell .msg__av--bot { background: var(--lime); color: #242426; }
+.app-shell .msg__av--user { background: linear-gradient(140deg, var(--clay), var(--mist)); color: #242426; }
+
+.app-shell .chat-suggest {
+  border-radius: var(--pill);
+  border-color: var(--ink-12);
+  color: var(--ink-75);
+  font-size: 13px;
 }
-.app-shell .chat-suggest:hover svg { color: var(--accent); }
+
+.app-shell .chat-suggest:hover { border-color: var(--ink-25); background: var(--pg); color: var(--ink); }
+.app-shell .chat-suggest:hover svg { color: var(--ink); }
 
 .app-shell .rag-badge {
-  border-radius: var(--r-control);
-  border-color: var(--border-default);
-  background: var(--surface-sunken);
+  border-radius: var(--pill);
+  border-color: var(--ink-07);
+  background: var(--pg);
+  color: var(--ink-50);
 }
 
 /* ============================================================
-   Remaining Repilay leftovers
-
-   Anything still carrying a tray fill, a 999px pill or an inset
-   ring inside the console. Cards here are square-ish and outlined;
-   these are the last few that were not.
+   EMPTY STATE  ·  SKELETON
    ============================================================ */
 
-.app-shell :is(.alert-row, .tax-timeline__row, .review-card, .ocr-item) {
-  border-radius: var(--r-card);
+.app-shell .empty-state { border-radius: var(--r-tray); padding: 48px 28px; }
+.app-shell .empty-state__icon { border-radius: var(--r-md); background: var(--pg); color: var(--ink-50); }
+.app-shell .empty-state h2 { font-size: 21px; }
+.app-shell .empty-state p { color: var(--ink-50); font-size: 14px; }
+
+.app-shell .skel {
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--pg) 25%, var(--pg-deep) 50%, var(--pg) 75%);
+  background-size: 400% 100%;
 }
-
-.app-shell .insight-card__action,
-.app-shell .link-btn { border-radius: var(--r-control); }
-
-.app-shell .link-btn { color: var(--accent); font-weight: 550; }
-
-/* Status stays a tint pill with no outline — that part of the language
-   survives, because the reference does the same thing. */
-.app-shell .pill,
-.app-shell .badge { border-radius: var(--r-control); font-weight: 600; }
 
 /* ============================================================
-   Dark mode
+   DARK MODE
+
+   Built on the landing page's own dark band rather than on a black
+   inversion: #2a2b2f under #35363b panels, lime unchanged — it is
+   drawn to sit on that ground and needs no restepping.
    ============================================================ */
 
-:root[data-theme='dark'] .app-shell {
-  --console-primary: #6c9bff;
-  --accent:       var(--console-primary);
-  --accent-hover: #8ab0ff;
-  --accent-ink:   #a9c6ff;
-  --focus:        rgba(108, 155, 255, 0.28);
+/* The chip on the crosshair is lime in the dark, so its text has to
+   be ink rather than white. */
 
-  --surface-page:   #0e1524;
-  --surface-card:   #161f33;
-  --surface-canvas: #161f33;
-  --surface-hover:  #1d283f;
-  --surface-tray:   #161f33;
-  --surface-row-hover: #1d283f;
+/* `--dark` is the lime in here, which is what turns every acting
+   control lime — but the sweep under a lime button then has nothing
+   to sweep to. It sweeps to white instead. */
 
-  --border-subtle:  rgba(255, 255, 255, 0.07);
-  --border-default: rgba(255, 255, 255, 0.11);
-  --border-strong:  rgba(255, 255, 255, 0.18);
+/* `--dark` resolves to the lime in here, which would paint the launcher
+   lime-on-lime — an unreadable disc. It takes the raised surface instead,
+   so the two floating buttons stay tellable apart. */
 
-  --console-green:       #4aa832;
-  --console-green-hover: #57bd3d;
+/* ============================================================
+   PHONE
+
+   The nav pill loses its margins and its search; the rail is
+   already gone at 860.
+   ============================================================ */
+
+@media (max-width: 860px) {
+  .app-shell { --gutter: 16px; }
+  .topbar { padding: 0 var(--gutter); gap: 12px; }
+  .app-shell .brand { font-size: 19px; }
+  .app-shell .page-title { font-size: 25px; }
+  .app-shell .page { padding-top: 20px; }
 }
 
-:root[data-theme='dark'] .app-shell .panel,
-:root[data-theme='dark'] .app-shell .stat-card,
-:root[data-theme='dark'] .today-strip__item {
-  background: var(--surface-card);
-  box-shadow: 0 0 0 1px var(--border-default);
+@media (max-width: 760px) {
+  .topbar__search-wrap { display: none; }
+  .app-shell .topbar__avatar-name,
+  .app-shell .topbar__avatar-role { display: none; }
+  .app-shell .topbar__avatar { padding: 3px; }
+  .topbar-meta .chip.optional { display: none; }
+  /* "Hesaplama servisi çevrimdışı" is 200px of nowrap text, which at
+     375px stretched the bar to 518px and took the whole page sideways
+     with it (N15). The glyph carries the state. */
+  .topbar-meta .pill__text { display: none; }
+  .topbar-meta .pill { padding: 0 7px; }
+  .topbar-meta { gap: 6px; }
 }
 
-:root[data-theme='dark'] .app-shell .btn--ghost,
-:root[data-theme='dark'] .seg__btn { background: var(--surface-card); }
-
-:root[data-theme='dark'] .app-shell .btn--ghost:hover:not(:disabled),
-:root[data-theme='dark'] .app-shell .seg button:hover,
-:root[data-theme='dark'] .today-strip__item:hover { background: rgba(108, 155, 255, 0.12); }
-
-:root[data-theme='dark'] .banner,
-:root[data-theme='dark'] .app-shell .notice { background: var(--surface-card); }
-:root[data-theme='dark'] .banner--warn { background: rgba(240, 180, 41, 0.08); }
-:root[data-theme='dark'] .banner--info { background: rgba(108, 155, 255, 0.10); }
+@media (max-width: 600px) {
+  .app-shell .panel { padding: 16px; }
+}

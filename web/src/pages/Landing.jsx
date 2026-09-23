@@ -16,15 +16,12 @@ import {
   ListChecks,
   Menu,
   MessagesSquare,
-  Moon,
   Percent,
   Plus,
   Recycle,
-  ReceiptText,
   ScanLine,
   Server,
   Share2,
-  Sun,
   Tag,
   Tags,
   Target,
@@ -34,7 +31,11 @@ import {
   X,
 } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
-import { useTheme } from '../context/ThemeContext.jsx'
+/* The arrow, the chip button, the eyebrow pill and the flags live in
+   `components/ui/lp.jsx` now: the auth screens render the same design
+   language, and a second copy of the chip button would drift from this
+   one the first time either was touched. */
+import { Arrow, Btn, Eyebrow, LangFlags } from '../components/ui/lp.jsx'
 
 /* ============================================================
    Reveal.
@@ -220,43 +221,6 @@ function Rv({ as: As = 'div', y, delay = 0, now = false, className = '', childre
   )
 }
 
-function Btn({ to, href, label, variant = '', size = '', onClick, icon: Icon = Arrow, ...rest }) {
-  const cls = ['lp-btn', variant && 'lp-btn--' + variant, size && 'lp-btn--' + size]
-    .filter(Boolean)
-    .join(' ')
-
-  /* The label is rendered twice on purpose. The copy inside the chip
-     is what the hover sweep reveals; the outer one is what fades out
-     under it. Both are the same string at the same size, so the swap
-     lands on itself rather than shifting. The duplicate is hidden
-     from assistive tech. */
-  const inner = (
-    <>
-      <span className="lp-btn__chip" aria-hidden="true">
-        <span>{label}</span>
-        <i className="lp-btn__ico">
-          <Icon />
-        </i>
-      </span>
-      <span className="lp-btn__ghost" aria-hidden="true" />
-      <span className="lp-btn__label">{label}</span>
-    </>
-  )
-
-  if (href) {
-    return (
-      <a className={cls} href={href} onClick={onClick} {...rest}>
-        {inner}
-      </a>
-    )
-  }
-  return (
-    <Link className={cls} to={to || '/register'} onClick={onClick} {...rest}>
-      {inner}
-    </Link>
-  )
-}
-
 /* ============================================================
    Count-up.
 
@@ -328,96 +292,6 @@ function Count({ to, on, pre = '', ms }) {
       {pre}
       {tl.format(Math.round(n))}
     </span>
-  )
-}
-
-/* The reference draws its arrow across the whole 24 grid — x 3 to
-   21, 1.5 stroke, round caps — which is where its buttons get their
-   length. Lucide's ArrowRight is inset to 5 → 19 and reads stubby
-   beside it. Geometry lifted from the reference's own sprite. */
-function Arrow(props) {
-  return (
-    <svg
-      className="lucide"
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M3 12h18m0 0-7-7m7 7-7 7" />
-    </svg>
-  )
-}
-
-function Eyebrow({ icon: Icon = ReceiptText, tone = '', children }) {
-  return (
-    <span className={'lp-eyebrow' + (tone ? ' lp-eyebrow--' + tone : '')}>
-      <span className="lp-eyebrow__ico">
-        <Icon />
-      </span>
-      {children}
-    </span>
-  )
-}
-
-/* ---------- language ----------
-   Two flags, drawn rather than fetched: an emoji flag is a font
-   lottery (Windows has no flag glyphs at all and renders "TR"), and
-   an image would be two more requests for 22×15 of colour. */
-function FlagTR() {
-  return (
-    <svg viewBox="0 0 30 20" aria-hidden="true">
-      <rect width="30" height="20" fill="#e30a17" />
-      <circle cx="11.5" cy="10" r="5" fill="#fff" />
-      <circle cx="13.2" cy="10" r="4" fill="#e30a17" />
-      <path
-        d="M18.6 7.6 19.19 9.19 20.88 9.26 19.55 10.31 20.01 11.94 18.6 11 17.19 11.94 17.65 10.31 16.32 9.26 18.01 9.19Z"
-        fill="#fff"
-      />
-    </svg>
-  )
-}
-
-function FlagEN() {
-  return (
-    <svg viewBox="0 0 30 20" aria-hidden="true">
-      <rect width="30" height="20" fill="#012169" />
-      <path d="M0 0 30 20M30 0 0 20" stroke="#fff" strokeWidth="4" />
-      <path d="M0 0 30 20M30 0 0 20" stroke="#c8102e" strokeWidth="2" />
-      <path d="M15 0V20M0 10H30" stroke="#fff" strokeWidth="6" />
-      <path d="M15 0V20M0 10H30" stroke="#c8102e" strokeWidth="3.4" />
-    </svg>
-  )
-}
-
-function LangFlags({ lang, setLanguage }) {
-  return (
-    <div className="lp-flags" role="group" aria-label="Language">
-      <button
-        className={lang === 'tr' ? 'on' : ''}
-        onClick={() => setLanguage('tr')}
-        aria-pressed={lang === 'tr'}
-        aria-label="Türkçe"
-        title="Türkçe"
-      >
-        <FlagTR />
-      </button>
-      <button
-        className={lang === 'en' ? 'on' : ''}
-        onClick={() => setLanguage('en')}
-        aria-pressed={lang === 'en'}
-        aria-label="English"
-        title="English"
-      >
-        <FlagEN />
-      </button>
-    </div>
   )
 }
 
@@ -970,7 +844,6 @@ const SHOW_ICON = [LayoutDashboard, LineChart, ListChecks]
 
 export default function Landing() {
   const { t, lang, setLanguage } = useLang()
-  const { theme, toggleTheme } = useTheme()
   const en = lang === 'en'
 
   const page = useRef(null)
@@ -1553,13 +1426,6 @@ export default function Landing() {
                     Muhai
               </Link>
               <p>{foot.tagline}</p>
-              <button
-                className="lp-burger"
-                onClick={toggleTheme}
-                aria-label={en ? 'Toggle theme' : 'Temayı değiştir'}
-              >
-                {theme === 'dark' ? <Sun style={{ width: 16, height: 16 }} /> : <Moon style={{ width: 16, height: 16 }} />}
-              </button>
             </div>
             {foot.cols.map((c) => (
               <div className="lp-foot__col" key={c.h}>

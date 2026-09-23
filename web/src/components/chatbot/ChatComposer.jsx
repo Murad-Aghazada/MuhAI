@@ -40,7 +40,7 @@ export default function ChatComposer({ onSend, loading, showDisclaimer = true })
           aria-label={t('assistant.placeholder')}
         />
         <button className="chat-send" onClick={submit} disabled={!value.trim() || loading} aria-label={t('assistant.send')}>
-          <ArrowUp size={18} strokeWidth={1.9} />
+          <ArrowUp size={18} strokeWidth={1.5} />
         </button>
       </div>
       {showDisclaimer && <p className="chat-disclaimer">{t('assistant.disclaimer')}</p>}

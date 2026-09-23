@@ -3,18 +3,13 @@ import {
   Boxes,
   LayoutGrid,
   Landmark,
-  Moon,
-  Plus,
   ReceiptText,
   Settings,
-  Sparkles,
-  Sun,
   Users,
 } from 'lucide-react'
+import { Spark } from '../../components/ui/icons.jsx'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
-import { useTheme } from '../../context/ThemeContext.jsx'
-import Logo from '../ui/Logo.jsx'
 
 /**
  * The navigation rail: a column of icons, each with its name underneath.
@@ -33,7 +28,6 @@ export default function SideRail() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { invoices, products } = useData()
-  const { theme, toggle } = useTheme()
 
   const unpaid = invoices.filter((i) => i.status !== 'paid').length
   const lowStock = products.filter((p) => (p.stock ?? 0) <= (p.minStock ?? 0)).length
@@ -44,7 +38,7 @@ export default function SideRail() {
     { to: '/app/tax', id: 'tax', icon: Landmark },
     { to: '/app/inventory', id: 'inventory', icon: Boxes, badge: lowStock },
     { to: '/app/payroll', id: 'payroll', icon: Users },
-    { to: '/app/assistant', id: 'assistant', icon: Sparkles },
+    { to: '/app/assistant', id: 'assistant', icon: Spark },
   ]
 
   const isLive = (to, end) => (end ? pathname === to : pathname.startsWith(to))
@@ -59,15 +53,9 @@ export default function SideRail() {
 
   return (
     <nav className="rail" aria-label={t('nav.primary')}>
-      <a className="rail__brand" href="/app" onClick={follow('/app')} aria-label="Muhai">
-        <Logo size={19} />
-      </a>
-
-      <button className="rail__new" onClick={() => navigate('/app/invoices')}>
-        <span className="rail__new-glyph"><Plus size={19} strokeWidth={2.1} /></span>
-        <span className="rail__label">{t('nav.create')}</span>
-      </button>
-
+      {/* No wordmark and no compose tile up here. The nav pill carries the
+          logo, and "Oluştur" only went to /app/invoices — which is the tile
+          directly under it, with the page's own upload button on arrival. */}
       <div className="rail__group">
         {destinations.map(({ to, id, icon: Icon, end, badge }) => (
           <a
@@ -78,7 +66,7 @@ export default function SideRail() {
             aria-current={isLive(to, end) ? 'page' : undefined}
           >
             <span className="rail__tile">
-              <Icon size={19} strokeWidth={1.8} />
+              <Icon size={19} strokeWidth={1.5} />
               {badge ? <span className="rail__badge tnum">{badge > 99 ? '99+' : badge}</span> : null}
             </span>
             <span className="rail__label">{t(`dock.${id}`)}</span>
@@ -94,20 +82,9 @@ export default function SideRail() {
           onClick={follow('/app/settings')}
           className={`rail__item${isLive('/app/settings') ? ' is-live' : ''}`}
         >
-          <span className="rail__tile"><Settings size={19} strokeWidth={1.8} /></span>
+          <span className="rail__tile"><Settings size={19} strokeWidth={1.5} /></span>
           <span className="rail__label">{t('dock.settings')}</span>
         </a>
-
-        <button
-          className="rail__item"
-          onClick={toggle}
-          aria-label={t(theme === 'dark' ? 'common.lightMode' : 'common.darkMode')}
-        >
-          <span className="rail__tile">
-            {theme === 'dark' ? <Sun size={19} strokeWidth={1.8} /> : <Moon size={19} strokeWidth={1.8} />}
-          </span>
-          <span className="rail__label">{t(theme === 'dark' ? 'common.lightMode' : 'common.darkMode')}</span>
-        </button>
       </div>
     </nav>
   )

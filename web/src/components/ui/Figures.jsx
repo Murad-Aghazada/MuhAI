@@ -22,7 +22,7 @@ function Delta({ value, label, positive, className = '' }) {
 
   return (
     <span className={`figure-delta ${positive ? 'is-good' : 'is-bad'} ${className}`.trim()}>
-      <Arrow size={13} strokeWidth={1.9} />
+      <Arrow size={13} strokeWidth={1.5} />
       {sign}
       {numeric}%{label ? <small>{label}</small> : null}
     </span>
@@ -39,7 +39,7 @@ export function FigureBand({ hero, rows, format, vsLabel }) {
     >
       <div className="figure-hero">
         <div className="figure-hero__head">
-          {hero.icon ? <hero.icon size={14} strokeWidth={1.9} /> : null}
+          {hero.icon ? <hero.icon size={14} strokeWidth={1.5} /> : null}
           <span className="label">{hero.label}</span>
         </div>
 
@@ -55,7 +55,7 @@ export function FigureBand({ hero, rows, format, vsLabel }) {
       <ol className="figure-rows">
         {rows.map((r) => (
           <li className="figure-row" key={r.label}>
-            {r.icon ? <r.icon size={14} strokeWidth={1.9} className="figure-row__icon" /> : null}
+            {r.icon ? <r.icon size={14} strokeWidth={1.5} className="figure-row__icon" /> : null}
             <span className="figure-row__label label">{r.label}</span>
             <span className="figure-row__value num">{format(r.value)}</span>
             <Delta value={r.delta} positive={r.positive} className="figure-row__delta" />

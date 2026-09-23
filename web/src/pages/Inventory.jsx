@@ -90,18 +90,18 @@ export default function Inventory() {
       <div className="page-head page-head-row">
         <div>
           <div className="page-eyebrow">
-            <Boxes size={14} strokeWidth={1.9} />
+            <Boxes size={14} strokeWidth={1.5} />
             <span className="label">{t('nav.inventory')}</span>
           </div>
           <h1 className="page-title">{t('inventory.title')}</h1>
           <p className="page-sub">{t('inventory.subtitle')}</p>
         </div>
         <button className="btn btn--primary btn--sm" onClick={() => setModal(emptyProduct())}>
-          <Plus size={14} strokeWidth={1.9} /> {t('inventory.addProduct')}
+          <Plus size={14} strokeWidth={1.5} /> {t('inventory.addProduct')}
         </button>
       </div>
 
-      <div className="mini-stats" style={{ marginBottom: 20 }}>
+      <div className="mini-stats">
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('inventory.kpiSku')}</div>
           <div className="mini-stats__value tnum">{products.length}</div>
@@ -126,7 +126,7 @@ export default function Inventory() {
 
       {critical.length > 0 && (
         <div className="review-banner">
-          <Boxes size={18} strokeWidth={1.9} />
+          <Boxes size={18} strokeWidth={1.5} />
           <span>
             <strong>{t('inventory.kpiLow')}</strong> — {critical.map((p) => p.name).join(', ')}
           </span>
@@ -138,7 +138,7 @@ export default function Inventory() {
           <div className="panel-head">
             <div>
               <div className="panel-title">
-                <Timer size={15} strokeWidth={1.9} />
+                <Timer size={15} strokeWidth={1.5} />
                 {lang === 'en' ? 'Months of cover' : 'Kaç aylık stok'}
               </div>
               <div className="panel-sub">
@@ -164,7 +164,7 @@ export default function Inventory() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><BarChart3 size={15} strokeWidth={1.9} />{t('inventory.topTitle')}</div>
+              <div className="panel-title"><BarChart3 size={15} strokeWidth={1.5} />{t('inventory.topTitle')}</div>
               <div className="panel-sub">{lang === 'en' ? 'By stock value' : 'Stok değerine göre'}</div>
             </div>
           </div>
@@ -187,11 +187,11 @@ export default function Inventory() {
         <motion.section className="panel dash-invoices" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.14 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title"><Boxes size={15} strokeWidth={1.9} />{t('inventory.tableTitle')}</div>
+              <div className="panel-title"><Boxes size={15} strokeWidth={1.5} />{t('inventory.tableTitle')}</div>
               <div className="panel-sub">{visible.length} / {products.length}</div>
             </div>
             <label className="search-inline">
-              <Search size={15} strokeWidth={1.9} />
+              <Search size={15} strokeWidth={1.5} />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('common.search')} />
             </label>
           </div>
@@ -201,14 +201,14 @@ export default function Inventory() {
               <table className="tbl">
               <thead>
                 <tr>
-                  <th style={{ paddingLeft: 22 }}>{t('inventory.colProduct')}</th>
+                  <th>{t('inventory.colProduct')}</th>
                   <th>{t('inventory.colSku')}</th>
                   <th className="num">{t('inventory.colStock')}</th>
                   <th className="num">{lang === 'en' ? 'Reorder at' : 'Kritik'}</th>
                   <th className="num">{t('inventory.colPrice')}</th>
                   <th className="num">{t('common.total')}</th>
                   <th>{t('inventory.colStatus')}</th>
-                  <th style={{ paddingRight: 22, textAlign: 'right' }}>{t('common.action')}</th>
+                  <th style={{ textAlign: 'right' }}>{t('common.action')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,7 +216,7 @@ export default function Inventory() {
                   const st = statusOf(p)
                   return (
                     <tr key={p.id}>
-                      <td className="strong" style={{ paddingLeft: 22 }}>{p.name}</td>
+                      <td className="strong">{p.name}</td>
                       <td className="mono" style={{ fontSize: 12.5 }}>{p.sku || '—'}</td>
                       <td className="num tnum strong">{formatNumber(p.stock, lang)}</td>
                       <td className="num tnum" style={{ color: 'var(--ink-3)' }}>{formatNumber(p.minStock, lang)}</td>
@@ -227,16 +227,16 @@ export default function Inventory() {
                           {st === 'in' ? t('inventory.stIn') : st === 'low' ? t('inventory.stLow') : t('inventory.stOut')}
                         </Badge>
                       </td>
-                      <td style={{ paddingRight: 22 }}>
+                      <td>
                         <div className="row-actions">
                           <button className="icon-btn" onClick={() => adjustStock(p, -1)} disabled={busyId === p.id} title="-1">
-                            <Minus size={14} strokeWidth={1.9} />
+                            <Minus size={14} strokeWidth={1.5} />
                           </button>
                           <button className="icon-btn" onClick={() => adjustStock(p, 1)} disabled={busyId === p.id} title="+1">
-                            <Plus size={14} strokeWidth={1.9} />
+                            <Plus size={14} strokeWidth={1.5} />
                           </button>
                           <button className="icon-btn icon-btn--danger" onClick={() => handleDelete(p)} disabled={busyId === p.id} title={t('common.delete')}>
-                            <Trash2 size={14} strokeWidth={1.9} />
+                            <Trash2 size={14} strokeWidth={1.5} />
                           </button>
                         </div>
                       </td>
@@ -304,7 +304,7 @@ function ProductModal({ product, onClose, onSave }) {
         <div className="modal__head">
           <div className="modal__title">{t('inventory.addProduct')}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={1.9} />
+            <X size={16} strokeWidth={1.5} />
           </button>
         </div>
         <form onSubmit={submit}>

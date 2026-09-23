@@ -233,7 +233,7 @@ export default function Invoices() {
       <div className="page-head page-head-row">
         <div>
           <div className="page-eyebrow">
-            <ReceiptText size={14} strokeWidth={1.9} />
+            <ReceiptText size={14} strokeWidth={1.5} />
             <span className="label">{t('nav.invoices')}</span>
           </div>
           <h1 className="page-title">{t('invoices.title')}</h1>
@@ -241,13 +241,13 @@ export default function Invoices() {
         </div>
         <div className="page-actions">
           <button className="btn btn--ghost btn--sm" onClick={exportCsv} disabled={!visible.length}>
-            <Download size={14} strokeWidth={1.9} /> {t('invoices.exportCsv')}
+            <Download size={14} strokeWidth={1.5} /> {t('invoices.exportCsv')}
           </button>
           <button className="btn btn--ghost btn--sm" onClick={() => setModal({ invoice: emptyInvoice(), mode: 'create' })}>
-            <Plus size={14} strokeWidth={1.9} /> {t('invoices.addManual')}
+            <Plus size={14} strokeWidth={1.5} /> {t('invoices.addManual')}
           </button>
           <button className="btn btn--primary btn--sm" onClick={() => fileRef.current?.click()} disabled={scanning}>
-            {scanning ? <Loader2 size={14} className="spin" /> : <Upload size={14} strokeWidth={1.9} />}
+            {scanning ? <Loader2 size={14} className="spin" /> : <Upload size={14} strokeWidth={1.5} />}
             {scanning ? t('invoices.scanning') : t('invoices.upload')}
           </button>
         </div>
@@ -266,7 +266,6 @@ export default function Invoices() {
           className={`notice notice--${flash.tone === 'error' ? 'error' : 'info'}`}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          style={{ marginBottom: 16 }}
         >
           {flash.message}
         </motion.div>
@@ -274,7 +273,7 @@ export default function Invoices() {
 
       {reviewCount > 0 && (
         <div className="review-banner">
-          <AlertTriangle size={18} strokeWidth={1.9} />
+          <AlertTriangle size={18} strokeWidth={1.5} />
           <span>
             <strong>{t('invoices.reviewTitle')}</strong> — {reviewCount} {t('invoices.reviewBody')}
           </span>
@@ -285,7 +284,7 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="mini-stats" style={{ marginBottom: 20 }}>
+      <div className="mini-stats">
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('invoices.kpiTotal')}</div>
           <div className="mini-stats__value tnum">{stats.total}</div>
@@ -319,13 +318,13 @@ export default function Invoices() {
           ))}
         </div>
         <label className="search-inline">
-          <Search size={15} strokeWidth={1.9} />
+          <Search size={15} strokeWidth={1.5} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('invoices.searchPlaceholder')} />
         </label>
         <span className="toolbar__spacer" />
         <div className="seg">
           <button className={scanMode === 'server' ? 'is-active' : ''} onClick={() => setScanMode('server')} title={t('invoices.scanServer')}>
-            <ScanLine size={13} strokeWidth={1.9} style={{ verticalAlign: -2, marginRight: 5 }} />
+            <ScanLine size={13} strokeWidth={1.5} style={{ verticalAlign: -2, marginRight: 5 }} />
             {lang === 'en' ? 'On server' : 'Sunucuda'}
           </button>
           <button className={scanMode === 'browser' ? 'is-active' : ''} onClick={() => setScanMode('browser')} title={t('invoices.scanBrowser')}>
@@ -335,15 +334,15 @@ export default function Invoices() {
       </div>
 
       {scanning && scanMode === 'browser' && (
-        <div className="notice notice--info" style={{ marginBottom: 16 }}>
+        <div className="notice notice--info">
           {t('invoices.recognizing')} — %{Math.round(progress * 100)}
         </div>
       )}
 
-      <section className="panel" style={{ paddingLeft: 0, paddingRight: 0 }}>
-        <div className="panel-head" style={{ padding: '0 22px' }}>
+      <section className="panel dash-invoices">
+        <div className="panel-head">
           <div>
-            <div className="panel-title"><FileText size={15} strokeWidth={1.9} />{t('invoices.tableTitle')}</div>
+            <div className="panel-title"><FileText size={15} strokeWidth={1.5} />{t('invoices.tableTitle')}</div>
             <div className="panel-sub">
               {visible.length} / {invoices.length}
             </div>
@@ -359,14 +358,14 @@ export default function Invoices() {
             <table className="tbl">
             <thead>
               <tr>
-                <th style={{ paddingLeft: 22 }}>{t('invoices.colVendor')}</th>
+                <th>{t('invoices.colVendor')}</th>
                 <th>{t('invoices.colNo')}</th>
                 <th>{t('invoices.colDate')}</th>
                 <th>{t('invoices.colDue')}</th>
                 <th className="num">{t('invoices.vat')}</th>
                 <th className="num">{t('invoices.colAmount')}</th>
                 <th>{t('invoices.colStatus')}</th>
-                <th style={{ paddingRight: 22, textAlign: 'right' }}>{t('common.action')}</th>
+                <th style={{ textAlign: 'right' }}>{t('common.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -374,7 +373,7 @@ export default function Invoices() {
                 const status = isOverdue(inv) ? 'overdue' : inv.status
                 return (
                   <tr key={inv.id}>
-                    <td className="strong" style={{ paddingLeft: 22 }}>
+                    <td className="strong">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {inv.vendor}
                         {inv.source?.startsWith('ocr') && (
@@ -394,7 +393,7 @@ export default function Invoices() {
                         {t(`invoices.st${status[0].toUpperCase()}${status.slice(1)}`)}
                       </Badge>
                     </td>
-                    <td style={{ paddingRight: 22 }}>
+                    <td>
                       <div className="row-actions">
                         {inv.status !== 'paid' && (
                           <button
@@ -403,11 +402,11 @@ export default function Invoices() {
                             onClick={() => handleMarkPaid(inv)}
                             disabled={busyId === inv.id}
                           >
-                            <CheckCircle2 size={15} strokeWidth={1.9} />
+                            <CheckCircle2 size={15} strokeWidth={1.5} />
                           </button>
                         )}
                         <button className="icon-btn" title={t('common.edit')} onClick={() => setModal({ invoice: inv, mode: 'edit' })}>
-                          <Pencil size={14} strokeWidth={1.9} />
+                          <Pencil size={14} strokeWidth={1.5} />
                         </button>
                         <button
                           className="icon-btn icon-btn--danger"
@@ -415,7 +414,7 @@ export default function Invoices() {
                           onClick={() => handleDelete(inv)}
                           disabled={busyId === inv.id}
                         >
-                          <Trash2 size={14} strokeWidth={1.9} />
+                          <Trash2 size={14} strokeWidth={1.5} />
                         </button>
                       </div>
                     </td>

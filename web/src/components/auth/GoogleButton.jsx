@@ -52,14 +52,14 @@ export default function GoogleButton({ onDone }) {
 
   return (
     <>
-      {error && <div className="auth-alert auth-alert--error" role="alert">{error}</div>}
+      {error && <div className="lp-alert lp-alert--error" role="alert">{error}</div>}
 
-      <button type="button" className="btn btn--google btn--block" onClick={run} disabled={busy}>
-        {busy ? <Loader2 size={16} className="spin" /> : <GoogleMark />}
+      <button type="button" className="lp-google" onClick={run} disabled={busy}>
+        {busy ? <Loader2 size={17} className="spin" /> : <GoogleMark />}
         {busy ? t('auth.googleBusy') : t('auth.google')}
       </button>
 
-      <div className="auth-or"><span>{t('auth.or')}</span></div>
+      <div className="lp-or"><span>{t('auth.or')}</span></div>
     </>
   )
 }

@@ -1,60 +1,13 @@
 /* ============================================================
-   Financial assistant — floating widget and chat surfaces
+   Financial assistant — the chat surfaces.
+
+   There is no floating launcher and no popover panel any more: the
+   assistant has a room of its own in the rail, and a bubble that
+   opened a second copy of it over whatever page you were on was a
+   third route to one screen. What is left here is the message
+   stream, the composer and the badges, which `/app/assistant`
+   renders full width.
    ============================================================ */
-
-/* -------------------------------------------------- launcher -- */
-
-/* Circular and ink-filled. The dock already names the assistant; this is
-   the shortcut that keeps the page you are on. */
-.chat-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 55;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background-color: var(--orb-well);
-  background-image:
-    radial-gradient(circle at 30% 24%, var(--orb-ember) 0%, transparent 44%),
-    radial-gradient(circle at 70% 22%, var(--orb-iris) 0%, transparent 30%),
-    radial-gradient(circle at 24% 70%, var(--orb-mauve) 0%, transparent 38%),
-    radial-gradient(circle at 66% 62%, var(--brand-red) 0%, transparent 64%),
-    radial-gradient(90% 70% at 30% 14%, rgba(255, 255, 255, 0.3), transparent 62%);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: var(--shadow-orb-wide);
-  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
-}
-
-.chat-fab:hover { transform: scale(1.06); }
-.chat-fab__label { display: none; }
-
-/* ----------------------------------------------------- panel -- */
-
-.chat-panel {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 70;
-  width: min(400px, calc(100vw - 32px));
-  height: min(600px, calc(100vh - 108px));
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 16px;
-  box-shadow: var(--shadow-3);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Below the dock's compact breakpoint the bar runs nearly the full width,
-   so both the launcher and the panel step up above it. */
-@media (max-width: 760px) {
-  .chat-fab { bottom: calc(var(--dock-clearance) - 44px); right: 16px; }
-  .chat-panel { bottom: calc(var(--dock-clearance) - 44px); right: 12px; height: min(560px, calc(100vh - 200px)); }
-}
 
 .chat-head {
   display: flex;
