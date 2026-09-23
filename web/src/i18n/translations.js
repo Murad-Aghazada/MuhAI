@@ -3,8 +3,11 @@
    Deep-keyed; accessed via t('section.key')
    ============================================================ */
 
+import { landingCopy } from './landing.js'
+
 export const translations = {
   tr: {
+    lp: landingCopy.tr,
     common: {
       appName: 'Muhai',
       tagline: 'Akıllı Muhasebe',
@@ -550,6 +553,7 @@ export const translations = {
   },
 
   en: {
+    lp: landingCopy.en,
     common: {
       appName: 'Muhai',
       tagline: 'Smart Accounting',

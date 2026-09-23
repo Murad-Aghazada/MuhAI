@@ -1,635 +1,1587 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
-  ArrowRight,
+  ArrowLeft,
   ArrowUpRight,
-  Bot,
   Boxes,
+  CalendarClock,
+  CircleCheck,
+  Factory,
+  Gauge,
+  Hammer,
   Landmark,
+  LayoutDashboard,
+  Layers,
   LineChart,
-  Lock,
+  ListChecks,
+  Menu,
+  MessagesSquare,
   Moon,
+  Percent,
   Plus,
+  Recycle,
   ReceiptText,
   ScanLine,
-  Sparkles,
+  Server,
+  Share2,
   Sun,
-  Users,
-  WifiOff,
-  Zap,
+  Tag,
+  Tags,
+  Target,
+  TriangleAlert,
+  Truck,
+  Wheat,
+  X,
 } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
-import LanguageToggle from '../components/layout/LanguageToggle.jsx'
-import Logo from '../components/ui/Logo.jsx'
-import AnimatedNumber from '../components/ui/AnimatedNumber.jsx'
-import Reveal from '../components/ui/Reveal.jsx'
-import AreaChart from '../components/charts/AreaChart.jsx'
-import SiteChat from '../components/chatbot/SiteChat.jsx'
-import { MONTHS } from '../lib/format.js'
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  show: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: [0.44, 0, 0.56, 1], delay: i * 0.05 },
-  }),
+/* ============================================================
+   Reveal.
+
+   One IntersectionObserver for the whole page, opening each
+   element once. Framer's `whileInView` is not used anywhere here
+   (N6): every revealed element starts at `opacity: 0`, so a
+   trigger that never fires renders a blank section rather than an
+   unanimated one. Everything opens immediately when the API is
+   missing.
+
+   The open state lives in React, not in a class the observer
+   writes onto the node. It used to be `el.classList.add('is-in')`,
+   and React blew it away: `Rv` renders `className`, so the next
+   render of a parent — opening an FAQ answer, switching a tab —
+   reset the attribute to the string in the JSX and dropped
+   `is-in` with it. The element faded back out and never returned,
+   because the observer had already unobserved it. Anything React
+   renders has to be owned by React.
+   ============================================================ */
+const REVEAL_MARGIN = { rootMargin: '0px 0px -12% 0px', threshold: 0.01 }
+let revealIO = null
+const revealJobs = new WeakMap()
+
+function onReveal(el, fire) {
+  if (typeof IntersectionObserver === 'undefined') {
+    fire()
+    return undefined
+  }
+  if (!revealIO) {
+    revealIO = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return
+        const job = revealJobs.get(e.target)
+        revealIO.unobserve(e.target)
+        revealJobs.delete(e.target)
+        job?.()
+      })
+    }, REVEAL_MARGIN)
+  }
+  revealJobs.set(el, fire)
+  revealIO.observe(el)
+  return () => {
+    revealIO.unobserve(el)
+    revealJobs.delete(el)
+  }
 }
 
-/* The six modules, as tabs over one feature slab. Each carries the pastel
-   bed it sits on and a small card standing in for the screen itself. */
-const MODULES = [
-  { key: 'f1', icon: ReceiptText, to: '/app/invoices', bed: 'steel' },
-  { key: 'f2', icon: Landmark, to: '/app/tax', bed: 'iris' },
-  { key: 'f3', icon: Boxes, to: '/app/inventory', bed: 'blush' },
-  { key: 'f4', icon: Users, to: '/app/payroll', bed: 'mauve' },
-  { key: 'f5', icon: Sparkles, to: '/app/assistant', bed: 'iris' },
-  { key: 'f6', icon: LineChart, to: '/app', bed: 'steel' },
-]
+/* ============================================================
+   Scroll progress.
 
-// Illustrative series for the marketing mock only. Real figures come from the
-// workspace and the compute API once you are signed in.
-const PREVIEW_CASHFLOW = [
-  { income: 183000, expense: 118000 },
-  { income: 176000, expense: 109000 },
-  { income: 198000, expense: 124000 },
-  { income: 211000, expense: 131000 },
-  { income: 205000, expense: 127000 },
-  { income: 228000, expense: 138000 },
-  { income: 241000, expense: 142000 },
-  { income: 263000, expense: 151000 },
-]
+   Writes a 0 → 1 number into a CSS custom property on the element
+   instead of into React state, so the scroll handler never causes
+   a render and the transforms stay on the compositor. Custom
+   properties inherit, so descendants can read the same `--p`.
+   ============================================================ */
+const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n)
+const smooth = (n) => n * n * (3 - 2 * n)
 
-export default function Landing() {
-  const { t, lang } = useLang()
-  const { theme, toggle } = useTheme()
-  const en = lang === 'en'
+function useScrollVar(ref, map, name = '--p') {
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof window === 'undefined') return
 
-  // The header is transparent over the hero and glass once you scroll past it.
-  const [stuck, setStuck] = useState(false)
-  const [tab, setTab] = useState(0)
-  const [openQ, setOpenQ] = useState(0)
+    // Honour the OS setting: with motion reduced the page renders
+    // in its settled state and never moves on scroll.
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      el.style.setProperty(name, '1')
+      return
+    }
+
+    let raf = 0
+    const write = () => {
+      raf = 0
+      el.style.setProperty(name, map(el.getBoundingClientRect(), window.innerHeight).toFixed(4))
+    }
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(write)
+    }
+    write()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [ref, map, name])
+}
+
+/* The hero stage settles over roughly the first two thirds of a
+   viewport of scrolling — measured against the reference, which
+   is fully flat by 700px at a 900px viewport. */
+const heroMap = (rect, vh) => smooth(clamp01((vh * 0.8 - rect.top) / (vh * 0.95)))
+
+/* The statement lights up while its section crosses the viewport. */
+const sayMap = (rect, vh) => clamp01((vh * 0.6 - rect.top) / (vh * 0.95))
+
+/* ============================================================
+   Nav tone.
+
+   The reference's nav pill is white over the light bands and
+   #35363B over the dark ones, switching at the band edge rather
+   than at a scroll offset. This reads the dark bands' live rects
+   against the pill's own centre line, so inserting or resizing a
+   section cannot desynchronise it. Three or four rects per frame
+   is cheap; the read is rAF-throttled and never touches state
+   unless the answer actually changed.
+   ============================================================ */
+function useNavTone(rootRef, setDark) {
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || typeof window === 'undefined') return
+    const bands = [...root.querySelectorAll('.lp-dark')]
+    if (!bands.length) return
+
+    let raf = 0
+    let last = null
+    const line = 40 // the pill's centre: 8px offset + 56/2, rounded up
+    const read = () => {
+      raf = 0
+      const over = bands.some((b) => {
+        const r = b.getBoundingClientRect()
+        return r.top <= line && r.bottom >= line
+      })
+      if (over !== last) {
+        last = over
+        setDark(over)
+      }
+    }
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(read)
+    }
+    read()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [rootRef, setDark])
+}
+
+/* ---------- small shared pieces ---------- */
+
+function Rv({ as: As = 'div', y, delay = 0, now = false, className = '', children, ...rest }) {
+  const ref = useRef(null)
+  const [shown, setShown] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setStuck(window.scrollY > 24)
+    if (shown) return undefined
+    if (now) {
+      setShown(true)
+      return undefined
+    }
+    const el = ref.current
+    if (!el) return undefined
+
+    /* Already on screen the moment it mounts — the hero, or a panel
+       swapped in under the reader on a tab click. Open it now rather
+       than waiting a frame for the observer to say what is already
+       true. An element that starts translated off the top (the nav,
+       at `y={-56}`) measures as off-screen and never intersects, so
+       it takes `now` instead — that is what this check cannot do. */
+    const r = el.getBoundingClientRect()
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      setShown(true)
+      return undefined
+    }
+    return onReveal(el, () => setShown(true))
+  }, [shown, now])
+
+  const style = { ...(rest.style || {}) }
+  if (delay) style['--rv-d'] = delay + 'ms'
+  if (y != null) style['--rv-y'] = y + 'px'
+
+  return (
+    <As {...rest} ref={ref} style={style} className={'lp-rv ' + className + (shown ? ' is-in' : '')}>
+      {children}
+    </As>
+  )
+}
+
+function Btn({ to, href, label, variant = '', size = '', onClick, icon: Icon = Arrow, ...rest }) {
+  const cls = ['lp-btn', variant && 'lp-btn--' + variant, size && 'lp-btn--' + size]
+    .filter(Boolean)
+    .join(' ')
+
+  /* The label is rendered twice on purpose. The copy inside the chip
+     is what the hover sweep reveals; the outer one is what fades out
+     under it. Both are the same string at the same size, so the swap
+     lands on itself rather than shifting. The duplicate is hidden
+     from assistive tech. */
+  const inner = (
+    <>
+      <span className="lp-btn__chip" aria-hidden="true">
+        <span>{label}</span>
+        <i className="lp-btn__ico">
+          <Icon />
+        </i>
+      </span>
+      <span className="lp-btn__ghost" aria-hidden="true" />
+      <span className="lp-btn__label">{label}</span>
+    </>
+  )
+
+  if (href) {
+    return (
+      <a className={cls} href={href} onClick={onClick} {...rest}>
+        {inner}
+      </a>
+    )
+  }
+  return (
+    <Link className={cls} to={to || '/register'} onClick={onClick} {...rest}>
+      {inner}
+    </Link>
+  )
+}
+
+/* ============================================================
+   Count-up.
+
+   A figure that is already at its final value when it scrolls into
+   frame is just text; the reference lets its numbers and its ring
+   arrive. Both run once, on the same observer the reveal uses, and
+   both respect `prefers-reduced-motion` — under it the value is
+   simply there, never a frozen zero.
+   ============================================================ */
+const still = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function useInOnce() {
+  const ref = useRef(null)
+  const [on, setOn] = useState(false)
+
+  useEffect(() => {
+    if (on) return undefined
+    const el = ref.current
+    if (!el) return undefined
+    const r = el.getBoundingClientRect()
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      setOn(true)
+      return undefined
+    }
+    return onReveal(el, () => setOn(true))
+  }, [on])
+
+  return [ref, on]
+}
+
+const easeOut = (t) => 1 - Math.pow(1 - t, 3)
+
+function useCount(to, on, ms = 1100) {
+  const [n, setN] = useState(0)
+
+  useEffect(() => {
+    if (!on) return undefined
+    if (still()) {
+      setN(to)
+      return undefined
+    }
+    let raf = 0
+    const t0 = performance.now()
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / ms)
+      setN(to * easeOut(t))
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [to, on, ms])
+
+  return n
+}
+
+/* Turkish grouping in both languages: these are lira figures on a
+   Turkish invoice, and ₺1,200 would be wrong on either side. */
+const tl = new Intl.NumberFormat('tr-TR')
+
+function Count({ to, on, pre = '', ms }) {
+  const n = useCount(to, on, ms)
+  /* tabular figures, or the digits change width as they climb and
+     the card twitches all the way up */
+  return (
+    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+      {pre}
+      {tl.format(Math.round(n))}
+    </span>
+  )
+}
+
+/* The reference draws its arrow across the whole 24 grid — x 3 to
+   21, 1.5 stroke, round caps — which is where its buttons get their
+   length. Lucide's ArrowRight is inset to 5 → 19 and reads stubby
+   beside it. Geometry lifted from the reference's own sprite. */
+function Arrow(props) {
+  return (
+    <svg
+      className="lucide"
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M3 12h18m0 0-7-7m7 7-7 7" />
+    </svg>
+  )
+}
+
+function Eyebrow({ icon: Icon = ReceiptText, tone = '', children }) {
+  return (
+    <span className={'lp-eyebrow' + (tone ? ' lp-eyebrow--' + tone : '')}>
+      <span className="lp-eyebrow__ico">
+        <Icon />
+      </span>
+      {children}
+    </span>
+  )
+}
+
+/* ---------- language ----------
+   Two flags, drawn rather than fetched: an emoji flag is a font
+   lottery (Windows has no flag glyphs at all and renders "TR"), and
+   an image would be two more requests for 22×15 of colour. */
+function FlagTR() {
+  return (
+    <svg viewBox="0 0 30 20" aria-hidden="true">
+      <rect width="30" height="20" fill="#e30a17" />
+      <circle cx="11.5" cy="10" r="5" fill="#fff" />
+      <circle cx="13.2" cy="10" r="4" fill="#e30a17" />
+      <path
+        d="M18.6 7.6 19.19 9.19 20.88 9.26 19.55 10.31 20.01 11.94 18.6 11 17.19 11.94 17.65 10.31 16.32 9.26 18.01 9.19Z"
+        fill="#fff"
+      />
+    </svg>
+  )
+}
+
+function FlagEN() {
+  return (
+    <svg viewBox="0 0 30 20" aria-hidden="true">
+      <rect width="30" height="20" fill="#012169" />
+      <path d="M0 0 30 20M30 0 0 20" stroke="#fff" strokeWidth="4" />
+      <path d="M0 0 30 20M30 0 0 20" stroke="#c8102e" strokeWidth="2" />
+      <path d="M15 0V20M0 10H30" stroke="#fff" strokeWidth="6" />
+      <path d="M15 0V20M0 10H30" stroke="#c8102e" strokeWidth="3.4" />
+    </svg>
+  )
+}
+
+function LangFlags({ lang, setLanguage }) {
+  return (
+    <div className="lp-flags" role="group" aria-label="Language">
+      <button
+        className={lang === 'tr' ? 'on' : ''}
+        onClick={() => setLanguage('tr')}
+        aria-pressed={lang === 'tr'}
+        aria-label="Türkçe"
+        title="Türkçe"
+      >
+        <FlagTR />
+      </button>
+      <button
+        className={lang === 'en' ? 'on' : ''}
+        onClick={() => setLanguage('en')}
+        aria-pressed={lang === 'en'}
+        aria-label="English"
+        title="English"
+      >
+        <FlagEN />
+      </button>
+    </div>
+  )
+}
+
+/* ---------- the dashboard mock ----------
+   Hand-drawn in CSS and SVG rather than screenshotted: a capture
+   goes stale the moment the console changes, and it cannot carry
+   the two languages. */
+
+const SPARK = [34, 31, 38, 36, 42, 39, 47, 44, 52, 58, 55, 64, 71, 68, 76, 84]
+
+function Spark() {
+  const w = 100
+  const h = 100
+  const max = Math.max(...SPARK)
+  const min = Math.min(...SPARK)
+  const pts = SPARK.map((v, i) => {
+    const x = (i / (SPARK.length - 1)) * w
+    const y = h - ((v - min) / (max - min)) * (h - 12) - 6
+    return [x, y]
+  })
+  const d = pts
+    .map(([x, y], i) => {
+      if (i === 0) return 'M' + x + ' ' + y
+      const [px, py] = pts[i - 1]
+      const cx = (px + x) / 2
+      return 'C' + cx + ' ' + py + ' ' + cx + ' ' + y + ' ' + x + ' ' + y
+    })
+    .join(' ')
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      {SPARK.map((_, i) => (
+        <line
+          key={i}
+          x1={(i / (SPARK.length - 1)) * w}
+          y1="0"
+          x2={(i / (SPARK.length - 1)) * w}
+          y2="100"
+          stroke="rgba(36,36,38,.1)"
+          strokeWidth="0.5"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      <path d={d} fill="none" stroke="#242426" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
+/* Start poses for the four cards that assemble into the grid.
+   Measured off the reference, then applied as CSS variables that
+   the stylesheet interpolates against `--p`. */
+const POSE = [
+  { tx: -55, ty: -55, rx: -12.1, ry: 2.2, rz: -8.4, sc: 0.9 },
+  { tx: -74, ty: -172, rx: -5.6, ry: 8.8, rz: -10.7, sc: 0.9 },
+  { tx: 122, ty: -333, rx: -0.9, ry: -9.1, rz: 10.2, sc: 1.1 },
+  { tx: 36, ty: -24, rx: 0, ry: 0, rz: 3, sc: 1.1 },
+]
+
+const poseVars = (i, live) =>
+  live
+    ? { '--tx': POSE[i].tx, '--ty': POSE[i].ty, '--rx': POSE[i].rx, '--ry': POSE[i].ry, '--rz': POSE[i].rz, '--sc': POSE[i].sc }
+    : undefined
+
+const BRK = ['#8b86c9', '#6aa5e0', '#5aa9a2', '#9db45f', '#e2c24f', '#c9764a']
+
+function AppMock({ en, live = false }) {
+  const rows = en
+    ? [
+        ['Invoices & VAT', '48%', '₺13.200'],
+        ['Services', '32%', '₺8.800'],
+        ['Product sales', '12%', '₺3.300'],
+        ['Other income', '5%', '₺1.400'],
+        ['Refunds', '3%', '₺800'],
+      ]
+    : [
+        ['Fatura & KDV', '%48', '₺13.200'],
+        ['Hizmet geliri', '%32', '₺8.800'],
+        ['Ürün satışı', '%12', '₺3.300'],
+        ['Diğer gelir', '%5', '₺1.400'],
+        ['İadeler', '%3', '₺800'],
+      ]
+  return (
+    <div className="lp-app">
+      <div className="lp-app__rail" aria-hidden="true">
+        <i className="on">
+          <Boxes />
+        </i>
+        <i>
+          <LineChart />
+        </i>
+        <i>
+          <ScanLine />
+        </i>
+        <i>
+          <TriangleAlert />
+        </i>
+        <span className="sp" />
+        <span className="lp-app__me" />
+      </div>
+
+      <div className="lp-app__main">
+        <div className="lp-app__bar">
+          <div>
+            <div className="lp-app__ttl">{en ? 'Projected cash' : 'Nakit tahmini'}</div>
+            <div className="lp-app__sub">{en ? 'No negative days expected' : 'Eksiye düşen gün beklenmiyor'}</div>
+          </div>
+          <span className="lp-app__pick">
+            {en ? 'Next 30 days' : 'Önümüzdeki 30 gün'}
+            <Plus style={{ width: 13, height: 13, opacity: 0.4 }} />
+          </span>
+          <span className="lp-app__plus" aria-hidden="true">
+            <Plus />
+          </span>
+        </div>
+
+        <div className="lp-app__grid">
+          <div className="lp-hcard lp-hcard--tall" style={poseVars(0, live)}>
+            <div className="lp-panel">
+              <div className="lp-panel__top">
+                <div>
+                  <div className="lp-panel__k">{en ? 'Income' : 'Gelir'}</div>
+                </div>
+                <span className="lp-tag lp-tag--dark" style={{ marginLeft: 'auto' }}>
+                  +18%
+                </span>
+              </div>
+              <div className="lp-panel__big">
+                <span>₺</span>27.500
+              </div>
+              <div className="lp-spark">
+                <Spark />
+                <div className="lp-spark__x">
+                  <span>1 {en ? 'Dec' : 'Ara'}</span>
+                  <span>14 {en ? 'Dec' : 'Ara'}</span>
+                  <span>28 {en ? 'Dec' : 'Ara'}</span>
+                </div>
+              </div>
+              <div className="lp-panel__foot" style={{ paddingTop: 14 }}>
+                <div className="lp-panel__cell">
+                  <b>₺7.200</b>
+                  <span>{en ? 'Safe buffer' : 'Güvenli bakiye'}</span>
+                </div>
+                <div className="lp-panel__cell">
+                  <b>₺1.380</b>
+                  <span>{en ? 'At risk' : 'Riskli'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="lp-hcard" style={poseVars(1, live)}>
+            <div className="lp-panel">
+              <div className="lp-panel__top">
+                <div>
+                  <div className="lp-panel__k">{en ? 'Liquidity' : 'Likidite'}</div>
+                  <div className="lp-panel__d">{en ? 'Safe cash buffer' : 'Güvenli nakit payı'}</div>
+                </div>
+                <span className="lp-tag lp-tag--ok" style={{ marginLeft: 'auto' }}>
+                  +12%
+                </span>
+              </div>
+              <div className="lp-panel__big" style={{ marginTop: 'auto' }}>
+                82<small>%</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="lp-hcard" style={poseVars(2, live)}>
+            <div className="lp-panel">
+              <div className="lp-panel__top">
+                <div>
+                  <div className="lp-panel__k">{en ? 'Collection' : 'Tahsilat'}</div>
+                </div>
+                <span className="lp-tag lp-tag--ok" style={{ marginLeft: 'auto' }}>
+                  +6%
+                </span>
+              </div>
+              <div className="lp-days">
+                <i className="on">
+                  <b>1</b>
+                  {en ? 'Mon' : 'Pzt'}
+                </i>
+                <i>
+                  <b>2</b>
+                  {en ? 'Tue' : 'Sal'}
+                </i>
+                <i>
+                  <b>3</b>
+                  {en ? 'Wed' : 'Çar'}
+                </i>
+              </div>
+              <div className="lp-panel__big" style={{ marginTop: 'auto' }}>
+                96<small>%</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="lp-hcard lp-hcard--wide" style={poseVars(3, live)}>
+            <div className="lp-panel">
+              <div className="lp-panel__top">
+                <div>
+                  <div className="lp-panel__k">{en ? 'Income sources' : 'Gelir kaynakları'}</div>
+                  <div className="lp-panel__d">{en ? 'Overview' : 'Genel bakış'}</div>
+                </div>
+                <span className="lp-tag" style={{ marginLeft: 'auto' }}>
+                  Q4 2026
+                </span>
+              </div>
+              <div className="lp-bars" aria-hidden="true">
+                {[48, 32, 12, 5, 3].map((n, i) => (
+                  <i key={i} style={{ flex: n, background: BRK[i] }} />
+                ))}
+              </div>
+              <div className="lp-brk">
+                {rows.map(([k, p, v]) => (
+                  <div className="lp-brk__row" key={k}>
+                    <i style={{ background: BRK[rows.findIndex((r) => r[0] === k)] }} />
+                    <span>{k}</span>
+                    <em>{p}</em>
+                    <b>{v}</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- slab visuals ----------
+   Small floating panels that sit on the mesh half of each slab. */
+
+function Float({ className = '', style, children }) {
+  return (
+    <div
+      className={'lp-panel ' + className}
+      style={{ boxShadow: '0 2px 4px rgba(36,36,38,.05), 0 16px 40px rgba(36,36,38,.12)', ...style }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function ReadMock({ en }) {
+  const f = en
+    ? [['Vendor', 'Teknopark Gayrimenkul A.Ş.'], ['Net', '₺12.350'], ['VAT', '₺2.470'], ['Total', '₺14.820']]
+    : [['Satıcı', 'Teknopark Gayrimenkul A.Ş.'], ['Matrah', '₺12.350'], ['KDV', '₺2.470'], ['Toplam', '₺14.820']]
+  return (
+    <Float>
+      <div className="lp-panel__top">
+        <div className="lp-panel__k">{en ? 'Read fields' : 'Okunan alanlar'}</div>
+        <span className="lp-tag lp-tag--ok" style={{ marginLeft: 'auto' }}>
+          0,91
+        </span>
+      </div>
+      <div className="lp-brk" style={{ paddingTop: 14 }}>
+        {f.map(([k, v]) => (
+          <div className="lp-brk__row" key={k}>
+            <span style={{ color: 'var(--ink-50)' }}>{k}</span>
+            <b style={{ marginLeft: 'auto', minWidth: 0 }}>{v}</b>
+          </div>
+        ))}
+      </div>
+    </Float>
+  )
+}
+
+function TaxMock({ en }) {
+  const r = en
+    ? [['VAT return', '26 Dec', 'ok'], ['Withholding', '26 Dec', 'ok'], ['Social security', '31 Dec', 'warn']]
+    : [['KDV beyannamesi', '26 Ara', 'ok'], ['Muhtasar', '26 Ara', 'ok'], ['SGK bildirgesi', '31 Ara', 'warn']]
+  return (
+    <Float>
+      <div className="lp-panel__top">
+        <div className="lp-panel__k">{en ? 'Filing calendar' : 'Beyan takvimi'}</div>
+        <span className="lp-tag" style={{ marginLeft: 'auto' }}>
+          2026
+        </span>
+      </div>
+      <div className="lp-brk" style={{ paddingTop: 14 }}>
+        {r.map(([k, d, tone]) => (
+          <div className="lp-brk__row" key={k}>
+            <span>{k}</span>
+            <span className={'lp-tag lp-tag--' + tone} style={{ marginLeft: 'auto' }}>
+              {d}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Float>
+  )
+}
+
+function CashMock({ en }) {
+  return (
+    <Float>
+      <div className="lp-panel__top">
+        <div className="lp-panel__k">{en ? '30-day forecast' : '30 günlük tahmin'}</div>
+        <span className="lp-tag lp-tag--lime" style={{ marginLeft: 'auto' }}>
+          Prophet
+        </span>
+      </div>
+      <div className="lp-spark" style={{ height: 130, flex: 'none' }}>
+        <Spark />
+      </div>
+      <div className="lp-panel__foot" style={{ paddingTop: 14 }}>
+        <div className="lp-panel__cell">
+          <b>₺41.900</b>
+          <span>{en ? 'Projected' : 'Beklenen'}</span>
+        </div>
+        <div className="lp-panel__cell">
+          <b>18 {en ? 'Dec' : 'Ara'}</b>
+          <span>{en ? 'Tightest day' : 'En dar gün'}</span>
+        </div>
+      </div>
+    </Float>
+  )
+}
+
+function BankMock({ en }) {
+  const r = en
+    ? [['Teknopark A.Ş.', '₺14.820', '100%', 'ok'], ['Mavi Lojistik', '₺6.400', '95%', 'ok'], ['Unmatched', '₺2.150', '—', 'warn']]
+    : [['Teknopark A.Ş.', '₺14.820', '%100', 'ok'], ['Mavi Lojistik', '₺6.400', '%95', 'ok'], ['Eşleşmeyen', '₺2.150', '—', 'warn']]
+  return (
+    <Float>
+      <div className="lp-panel__top">
+        <div className="lp-panel__k">{en ? 'Statement match' : 'Ekstre eşleşmesi'}</div>
+        <span className="lp-tag" style={{ marginLeft: 'auto' }}>
+          CSV
+        </span>
+      </div>
+      <div className="lp-brk" style={{ paddingTop: 14 }}>
+        {r.map(([k, v, p, tone]) => (
+          <div className="lp-brk__row" key={k}>
+            <span>{k}</span>
+            <b style={{ marginLeft: 'auto', minWidth: 0 }}>{v}</b>
+            <span className={'lp-tag lp-tag--' + tone}>{p}</span>
+          </div>
+        ))}
+      </div>
+    </Float>
+  )
+}
+
+const SLAB_ART = [ReadMock, TaxMock, CashMock, BankMock]
+const SLAB_ICON = [ScanLine, Percent, LineChart, Landmark]
+/* The reference sets its feature slabs on out-of-focus photographs,
+   not on flat CSS meshes — that depth is most of why its slabs read
+   as designed rather than generated. These are Unsplash gradients
+   (see public/img/README.md); they carry no claim, they are texture. */
+const SLAB_ART_BG = ['/img/art-1.jpg', '/img/art-2.jpg', '/img/art-3.jpg', '/img/art-4.jpg']
+
+/* ---------- bento visuals ---------- */
+
+function CatsMock({ en }) {
+  const c = en
+    ? ['Utilities', 'Software', 'Rent', 'Taxes & fees', 'Payroll', 'Income']
+    : ['Fatura', 'Yazılım', 'Kira', 'Vergi & harç', 'Bordro', 'Gelir']
+  /* [left offset %, rotation deg]. A straight column with random
+     left offsets read as a layout accident; the reference tilts
+     them so the scatter is legibly on purpose. */
+  const lay = [[22, -7], [2, 4], [38, -5], [8, 6], [30, -4], [14, 5]]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', paddingBottom: 22 }}>
+      {c.map((x, i) => (
+        <span
+          key={x}
+          className="lp-pill"
+          style={{ '--off': lay[i][0] + '%', transform: `rotate(${lay[i][1]}deg)` }}
+        >
+          {x}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function SyncMock({ en }) {
+  const [ref, on] = useInOnce()
+  return (
+    <div ref={ref} style={{ width: '100%', paddingBottom: 24 }}>
+      <Float style={{ borderColor: 'rgba(36,36,38,.1)' }}>
+        <div className="lp-panel__top">
+          <span className="lp-tag lp-tag--ok">{en ? 'Incoming' : 'Gelen'}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-50)' }}>
+            {en ? '1 min ago' : '1 dk önce'}
+          </span>
+        </div>
+        <div className="lp-panel__big" style={{ paddingTop: 10 }}>
+          <span>+₺</span>
+          <Count to={14820} on={on} />
+        </div>
+        <div style={{ height: 1, background: 'var(--ink-07)', marginTop: 12 }} />
+        <div style={{ fontSize: 13, color: 'var(--ink-50)', paddingTop: 10 }}>
+          {en ? 'Matched to invoice #002-12' : '#002-12 faturasıyla eşleşti'}
+        </div>
+      </Float>
+    </div>
+  )
+}
+
+function ScoreMock({ en }) {
+  const [ref, on] = useInOnce()
+  const pct = 0.74
+  const r = 56
+  const c = 2 * Math.PI * r
+  const score = useCount(74, on)
+  return (
+    <div ref={ref} style={{ display: 'grid', placeItems: 'center', paddingBottom: 26 }}>
+      <svg viewBox="0 0 140 140" style={{ width: 186, height: 186 }} aria-hidden="true">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(36,36,38,.08)" strokeWidth="8" />
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          fill="none"
+          stroke="#35363b"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          /* the arc sweeps from nothing to its share; the dash offset
+             is the animated property, so the cap keeps its round end
+             the whole way round */
+          strokeDashoffset={on ? c * (1 - pct) : c}
+          style={{ transition: 'stroke-dashoffset 1.25s cubic-bezier(0.16, 1, 0.3, 1)' }}
+          transform="rotate(-90 70 70)"
+        />
+        <text
+          x="70"
+          y="72"
+          textAnchor="middle"
+          fontSize="32"
+          fill="#242426"
+          letterSpacing="-1.2"
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {Math.round(score)}
+        </text>
+        <text x="70" y="90" textAnchor="middle" fontSize="9.5" fill="rgba(36,36,38,.5)">
+          {en ? 'of 100' : '100 üzerinden'}
+        </text>
+      </svg>
+    </div>
+  )
+}
+
+function InvMock({ en }) {
+  const r = en
+    ? [['#002-12', 'Mira Stüdyo', 1200, 'ok', 'Paid'], ['#003-12', 'Gümüş Masa', 550, 'stop', 'Overdue']]
+    : [['#002-12', 'Mira Stüdyo', 1200, 'ok', 'Ödendi'], ['#003-12', 'Gümüş Masa', 550, 'stop', 'Gecikti']]
+  const [ref, on] = useInOnce()
+  return (
+    <div ref={ref} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', paddingBottom: 24 }}>
+      {r.map(([no, who, amt, tone, label]) => (
+        <Float key={no} style={{ borderColor: 'rgba(36,36,38,.1)' }}>
+          <div className="lp-panel__top">
+            <span style={{ fontSize: 12, color: 'var(--ink-50)' }}>{no}</span>
+            <span className={'lp-tag lp-tag--' + tone} style={{ marginLeft: 'auto' }}>
+              {label}
+            </span>
+          </div>
+          <div style={{ fontSize: 20, letterSpacing: '-0.02em', paddingTop: 8 }}>{who}</div>
+          <div className="lp-brk__row" style={{ paddingTop: 8 }}>
+            <span style={{ fontSize: 13 }}>{en ? 'Services' : 'Hizmet bedeli'}</span>
+            <b style={{ marginLeft: 'auto' }}>
+              <Count to={amt} on={on} pre="₺" />
+            </b>
+          </div>
+        </Float>
+      ))}
+    </div>
+  )
+}
+
+function DueMock({ en }) {
+  /* the flanking cards carry real values rather than sitting empty:
+     blank rectangles read as unloaded placeholders, which is exactly
+     what this section must not look like */
+  const [ref, on] = useInOnce()
+  const side = (label, amount, key) => (
+    <Float key={key} style={{ flex: '0 1 86px', padding: '12px 10px', minWidth: 0, opacity: 0.55, textAlign: 'center' }}>
+      <div style={{ fontSize: 15, letterSpacing: '-0.02em' }}>
+        <Count to={amount} on={on} pre="₺" />
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--ink-50)', paddingTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+    </Float>
+  )
+  return (
+    <div ref={ref} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', width: '100%', minWidth: 0, paddingBottom: 28, justifyContent: 'center' }}>
+      {side(en ? 'Stamp tax' : 'Damga', 610, 'a')}
+      <Float style={{ flex: '1 1 150px', maxWidth: 170, padding: 16, textAlign: 'center', minWidth: 0 }}>
+        <div style={{ display: 'grid', placeItems: 'center', width: 40, height: 40, borderRadius: 12, background: 'var(--pg)', margin: '0 auto 10px' }}>
+          <Landmark style={{ width: 18, height: 18, color: 'var(--ink-50)' }} />
+        </div>
+        <div style={{ fontSize: 22, letterSpacing: '-0.02em' }}>
+          <Count to={4940} on={on} pre="₺" />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-50)', paddingTop: 2 }}>{en ? 'VAT · 26 Dec' : 'KDV · 26 Ara'}</div>
+      </Float>
+      {side(en ? 'Payroll tax' : 'SGK', 2180, 'b')}
+    </div>
+  )
+}
+
+function AlertMock({ en }) {
+  return (
+    <div style={{ width: '100%', paddingBottom: 24 }}>
+      <Float style={{ borderColor: 'rgba(36,36,38,.1)', padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 16 }}>
+          <span style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 12, background: 'rgba(190,70,60,.12)', color: '#a4433a', flex: '0 0 auto' }}>
+            <TriangleAlert style={{ width: 17, height: 17 }} />
+          </span>
+          <div style={{ minWidth: 0, textAlign: 'left' }}>
+            <div style={{ fontSize: 14 }}>{en ? 'Duplicate invoice' : 'Mükerrer fatura'}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-50)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              #002-12 · ₺14.820
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--pg)', fontSize: 13, color: 'var(--ink-75)' }}>
+          {en ? 'Fix the invoice, alert clears' : 'Fatura düzeltilince uyarı kalkar'}
+          <span style={{ marginLeft: 'auto', display: 'grid', placeItems: 'center', width: 24, height: 24, borderRadius: 8, background: 'var(--lime)', color: '#242426' }}>
+            <CircleCheck style={{ width: 13, height: 13 }} />
+          </span>
+        </div>
+      </Float>
+    </div>
+  )
+}
+
+const BENTO_ART = [CatsMock, SyncMock, ScoreMock, InvMock, DueMock, AlertMock]
+const BENTO_ICON = [Tags, Landmark, Gauge, ListChecks, CalendarClock, TriangleAlert]
+/* The reference's bento is three columns of alternating tall/short
+   cards, not a uniform grid: column 2 starts short so the seam
+   between columns never lines up. Each entry is
+   [card index, height, tone]; heights are the measured 584 / 382. */
+const BENTO_COLS = [
+  [[0, 'tall', 'a'], [4, 'short', 'c']],
+  [[1, 'short', 'b'], [3, 'tall', 'a']],
+  [[2, 'tall', 'c'], [5, 'short', 'b']],
+]
+const SECTOR_ICON = [Factory, Truck, Wheat, Recycle, Boxes, Hammer]
+const SPOT_ICON = [ScanLine, LineChart, Tags, Landmark]
+const SHOW_ICON = [LayoutDashboard, LineChart, ListChecks]
+
+/* ============================================================
+   The page
+   ============================================================ */
+
+export default function Landing() {
+  const { t, lang, setLanguage } = useLang()
+  const { theme, toggleTheme } = useTheme()
+  const en = lang === 'en'
+
+  const page = useRef(null)
+  const stage = useRef(null)
+  const sayRef = useRef(null)
+  const track = useRef(null)
+
+  useScrollVar(stage, heroMap)
+  useScrollVar(sayRef, sayMap)
+
+  const [stuck, setStuck] = useState(false)
+  const [navDark, setNavDark] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const [yearly, setYearly] = useState(true)
+  const [tab, setTab] = useState(0)
+  const [open, setOpen] = useState(0)
+  const [slide, setSlide] = useState(0)
+
+  useNavTone(page, setNavDark)
+
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 12)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const facts = [
-    { icon: ScanLine, label: en ? 'Reads the invoice' : 'Faturayı okur' },
-    { icon: LineChart, label: en ? '30-day forecast' : '30 günlük tahmin' },
-    { icon: Landmark, label: en ? '2026 rates built in' : '2026 oranları yerleşik' },
-    { icon: WifiOff, label: en ? 'Works without internet' : 'İnternetsiz de çalışır' },
+  // the drawer owns the scroll lock while it is open
+  useEffect(() => {
+    if (!menu) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menu])
+
+  const nav = t('lp.nav')
+  const hero = t('lp.hero')
+  const strip = t('lp.strip')
+  const say = t('lp.say')
+  const slabs = t('lp.slabs')
+  const bento = t('lp.bento')
+  const show = t('lp.show')
+  const price = t('lp.price')
+  const spot = t('lp.spot')
+  const faq = t('lp.faq')
+  const close = t('lp.close')
+  const foot = t('lp.foot')
+
+  const words = String(say.text).split(/\s+/)
+  const groups = faq.groups[tab] || []
+  const priceWords = String(price.title).split(/\s+/)
+
+  const onTrack = useCallback(() => {
+    const el = track.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    const i = max <= 0 ? 0 : Math.round((el.scrollLeft / max) * (spot.cards.length - 1))
+    setSlide(i)
+  }, [spot.cards.length])
+
+  const move = (dir) => {
+    const el = track.current
+    if (!el) return
+    const card = el.querySelector('.lp-rcard')
+    const step = card ? card.getBoundingClientRect().width + 20 : el.clientWidth
+    el.scrollBy({ left: dir * step, behavior: 'smooth' })
+  }
+
+  const links = [
+    ['#modules', nav.modules],
+    ['#how', nav.how],
+    ['#pricing', nav.pricing],
+    ['#faq', nav.faq],
   ]
 
-  const active = MODULES[tab]
-
-  const queue = en
-    ? [
-        ['Anadolu Textiles', 'Invoice arrived · ₺48,200'],
-        ['Marmara Logistics', 'Due in 6 days'],
-        ['Aegean Chemicals', 'VAT rate looks wrong'],
-        ['Başak Packaging', 'Duplicate of FT-0141?'],
-        ['Yıldız Food', 'Payment recorded'],
-        ['Toros Energy', 'Category corrected'],
-      ]
-    : [
-        ['Anadolu Tekstil', 'Fatura geldi · ₺48.200'],
-        ['Marmara Lojistik', 'Vadesine 6 gün'],
-        ['Ege Kimya', 'KDV oranı tutmuyor'],
-        ['Başak Ambalaj', 'FT-0141 ile mükerrer mi?'],
-        ['Yıldız Gıda', 'Ödeme kaydedildi'],
-        ['Toros Enerji', 'Kategori düzeltildi'],
-      ]
-
-  const faqs = [1, 2, 3, 4, 5, 6].map((n) => ({ q: t(`landing.faq${n}Q`), a: t(`landing.faq${n}A`) }))
-
   return (
-    <div className="lp">
-      {/* ---------------------------------------------------- nav -- */}
-      <nav className={`lp-nav${stuck ? ' lp-nav--stuck' : ''}`}>
-        <div className="lp-nav__pill">
-          <Link to="/" className="brand">
-            <span className="brand-glyph"><Logo size={15} /></span>
-            <span className="brand-name">Muhai</span>
+    <div className="lp" ref={page}>
+      {/* ---------- nav ---------- */}
+      <div className={'lp-navwrap' + (stuck ? ' is-stuck' : '') + (navDark ? ' is-dark' : '')}>
+        <Rv as="nav" y={-56} now className="lp-nav">
+          <Link className="lp-nav__brand" to="/">
+            Muhai
           </Link>
 
           <div className="lp-nav__links">
-            <a href="#modules">{t('nav.modules')}</a>
-            <a href="#how">{t('landing.howEyebrow')}</a>
-            <a href="#faq">{t('landing.faqTitle')}</a>
+            {links.map(([href, label]) => (
+              <a key={href} href={href}>
+                {label}
+              </a>
+            ))}
           </div>
 
           <div className="lp-nav__right">
-            <LanguageToggle />
+            <LangFlags lang={lang} setLanguage={setLanguage} />
             <button
-              className="topbar__icon-btn"
-              onClick={toggle}
-              aria-label={t(theme === 'dark' ? 'common.lightMode' : 'common.darkMode')}
+              className="lp-burger"
+              onClick={() => setMenu(true)}
+              aria-label={en ? 'Open menu' : 'Menüyü aç'}
             >
-              {theme === 'dark' ? <Sun size={15} strokeWidth={1.9} /> : <Moon size={15} strokeWidth={1.9} />}
+              <Menu style={{ width: 18, height: 18 }} />
             </button>
-            <Link to="/login" className="lp-nav__login">{t('nav.login')}</Link>
-            <Link to="/register" className="btn btn--primary btn--sm">
-              {t('nav.launch')}
-              <ArrowRight size={13} strokeWidth={1.9} />
+            <Link className="lp-nav__login" to="/login">
+              {t('lp.login')}
             </Link>
+            <Btn to="/register" label={t('lp.start')} size="sm" />
           </div>
+        </Rv>
+      </div>
+
+      <div className={'lp-drawer' + (menu ? ' is-open' : '')}>
+        <div className="lp-drawer__top">
+          <Link className="lp-nav__brand" to="/" onClick={() => setMenu(false)}>
+            Muhai
+          </Link>
+          <button className="lp-burger" onClick={() => setMenu(false)} aria-label={en ? 'Close menu' : 'Menüyü kapat'}>
+            <X style={{ width: 18, height: 18 }} />
+          </button>
         </div>
-      </nav>
-
-      {/* --------------------------------------------------- hero -- */}
-      <header className="lp-hero">
-        <div className="lp-hero__copy">
-          <motion.span className="label lp-hero__eyebrow" variants={fadeUp} initial="hidden" animate="show">
-            {t('landing.badge')}
-          </motion.span>
-
-          <motion.h1 className="lp-hero__title" variants={fadeUp} initial="hidden" animate="show" custom={1}>
-            {t('landing.heroLine1')}{' '}
-            <span className="lp-hero__rule">
-              {t('landing.heroLine2')}
-              <UnderStroke />
-            </span>
-          </motion.h1>
-
-          <motion.p className="lp-hero__sub" variants={fadeUp} initial="hidden" animate="show" custom={2}>
-            {t('landing.heroSub')}
-          </motion.p>
-
-          <motion.div className="lp-hero__cta" variants={fadeUp} initial="hidden" animate="show" custom={3}>
-            <Link to="/register" className="btn btn--primary btn--lg">
-              {t('landing.ctaPrimary')}
-              <ArrowRight size={15} strokeWidth={1.9} />
-            </Link>
-            <a href="#modules" className="btn btn--ghost btn--lg">{t('landing.ctaSecondary')}</a>
-          </motion.div>
-        </div>
-
-        {/* Figures in a tray — three white cards at an 8px gutter. */}
-        <motion.div className="tray lp-figures" variants={fadeUp} initial="hidden" animate="show" custom={4}>
-          <Stat value={2.4} suffix="M+" label={t('landing.statInvoices')} fmt={(v) => v.toFixed(1)} />
-          <Stat value={98.6} suffix="%" label={t('landing.statAccuracy')} fmt={(v) => v.toFixed(1)} />
-          <Stat value={1200} suffix="+" label={t('landing.statBusinesses')} fmt={(v) => Math.round(v).toString()} />
-        </motion.div>
-
-        {/* The product, shown rather than described. */}
-        <div className="lp-hero__visual lp-settle">
-          <div className="lp-hero__clip">
-            <div className="tray tray--lifted">
-              <div className="lp-mock">
-                <div className="lp-mock__head">
-                  <span className="lp-mock__glyph"><Logo size={13} /></span>
-                  <span className="lp-mock__title">Muhai · {t('nav.dashboard')}</span>
-                  <span className="pill ok lp-mock__live">{t('common.live')}</span>
-                </div>
-
-                <div className="lp-mock__kpis">
-                  {[
-                    { label: t('dashboard.kpiRevenue'), val: '₺263.400', up: '+9,1%' },
-                    { label: t('dashboard.kpiProfit'), val: '₺112.180', up: '+12,8%' },
-                  ].map((k) => (
-                    <div className="lp-mock__kpi" key={k.label}>
-                      <span className="label">{k.label}</span>
-                      <div className="lp-mock__kpi-val num">{k.val}</div>
-                      <span className="delta delta--pos">{k.up}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="lp-mock__chart">
-                  <div className="lp-mock__chart-head">
-                    <span className="label">{t('dashboard.cashflowTitle')}</span>
-                    <span className="lp-mock__legend">
-                      <i style={{ background: 'var(--d3)' }} />{t('dashboard.income')}
-                      <i style={{ background: 'var(--d2)' }} />{t('dashboard.expense')}
-                    </span>
-                  </div>
-                  <AreaChart
-                    data={PREVIEW_CASHFLOW}
-                    labels={MONTHS[lang].slice(4)}
-                    keys={['income', 'expense']}
-                    colors={['var(--d3)', 'var(--d2)']}
-                    height={148}
-                    formatValue={(v) => `₺${Math.round(v / 1000)}K`}
-                    seriesNames={[t('dashboard.income'), t('dashboard.expense')]}
-                  />
-                </div>
-
-                {/* The mock ends on a calm list rather than mid-chart: the
-                    fade over the foot smears anything busy underneath it. */}
-                <div className="lp-mock__rows">
-                  {(en
-                    ? [
-                        ['Anadolu Textiles', 'FT-2026-0148', '₺48,200', 'ok'],
-                        ['Marmara Logistics', 'FT-2026-0147', '₺12,940', 'warn'],
-                        ['Aegean Chemicals', 'FT-2026-0146', '₺31,500', 'stop'],
-                        ['Başak Packaging', 'FT-2026-0145', '₺7,310', 'ok'],
-                      ]
-                    : [
-                        ['Anadolu Tekstil', 'FT-2026-0148', '₺48.200', 'ok'],
-                        ['Marmara Lojistik', 'FT-2026-0147', '₺12.940', 'warn'],
-                        ['Ege Kimya', 'FT-2026-0146', '₺31.500', 'stop'],
-                        ['Başak Ambalaj', 'FT-2026-0145', '₺7.310', 'ok'],
-                      ]
-                  ).map(([name, no, amount, tone]) => (
-                    <div className="lp-mock__row" key={no}>
-                      <span className="lp-mock__row-av">{name.slice(0, 2).toUpperCase()}</span>
-                      <span className="lp-mock__row-body">
-                        <span className="lp-mock__row-name">{name}</span>
-                        <span className="lp-mock__row-meta">{no}</span>
-                      </span>
-                      <span className="lp-mock__row-amt num">{amount}</span>
-                      <span className={`pill ${tone}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          <span className="lp-hero__fade" aria-hidden="true"><span /><span /><span /></span>
-        </div>
-
-        <Reveal className="lp-facts" variants={fadeUp}>
-          {facts.map((f) => (
-            <span className="lp-fact" key={f.label}>
-              <f.icon size={14} strokeWidth={1.9} />
-              {f.label}
-            </span>
+        <div className="lp-drawer__body">
+          {links.map(([href, label]) => (
+            <a key={href} href={href} onClick={() => setMenu(false)}>
+              {label}
+            </a>
           ))}
-        </Reveal>
+          <a href="/login" onClick={() => setMenu(false)}>
+            {t('lp.login')}
+          </a>
+          <div className="lp-drawer__foot">
+            <LangFlags lang={lang} setLanguage={setLanguage} />
+            <Btn to="/register" label={t('lp.start')} onClick={() => setMenu(false)} />
+          </div>
+        </div>
+      </div>
+
+      {/* ---------- hero ---------- */}
+      <header className="lp-hero">
+        <div className="lp-shell">
+          <div className="lp-hero__head">
+            <Rv as="h1" y={48} delay={60} className="lp-d1 lp-hero__title">
+              {hero.title}
+            </Rv>
+            <Rv as="p" y={72} delay={120} className="lp-lead lp-hero__lead">
+              {hero.sub}
+            </Rv>
+            <Rv y={96} delay={180} className="lp-hero__cta">
+              <Btn to="/register" label={t('lp.start')} size="lg" />
+              <div className="lp-trust">
+                <div className="lp-trust__row" aria-hidden="true">
+                  {[Factory, Truck, Boxes, Landmark].map((I, i) => (
+                    <span className="lp-trust__dot" key={i}>
+                      <I style={{ width: 14, height: 14 }} />
+                    </span>
+                  ))}
+                </div>
+                <span className="lp-trust__label">{hero.trust}</span>
+              </div>
+            </Rv>
+          </div>
+        </div>
+
+        <div className="lp-shell">
+          <Rv y={128} delay={240} className="lp-rv--zoom">
+            <div className="lp-stage" ref={stage}>
+              <AppMock en={en} live />
+            </div>
+          </Rv>
+        </div>
       </header>
 
-      {/* ------------------------------------------------ modules --
-          A tab rail over one feature slab, rather than six cards. */}
-      <section className="lp-section" id="modules">
-        <div className="lp-inner lp-stack">
-          <Reveal className="lp-head" variants={fadeUp}>
-            <h2>{t('landing.featuresTitle')}</h2>
-            <p>{t('landing.featuresSub')}</p>
-          </Reveal>
-
-          <div className="tray lp-tabs" role="tablist">
-            {MODULES.map((m, i) => (
-              <button
-                key={m.key}
-                role="tab"
-                aria-selected={i === tab}
-                className={`lp-tab${i === tab ? ' is-active' : ''}`}
-                onClick={() => setTab(i)}
-              >
-                <m.icon size={15} strokeWidth={1.9} />
-                {t(`landing.${m.key}Eyebrow`)}
-              </button>
-            ))}
-          </div>
-
-          <div className="tray lp-slab">
-            <div className="lp-slab__grid">
-              <div className={`lp-slab__bed lp-slab__bed--${active.bed}`}>
-                <div className="lp-slab__card">
-                  <ModuleCard which={active.key} en={en} />
+      {/* ---------- sector strip ---------- */}
+      <section className="lp-sec lp-strip" id="modules">
+        <div className="lp-shell">
+          <Rv className="lp-strip__bar">
+            <p>{strip.head}</p>
+            <a className="lp-strip__link" href="#how">
+              <i>
+                <ArrowUpRight />
+              </i>
+              {strip.link}
+            </a>
+          </Rv>
+          <Rv delay={80} className="lp-strip__panel">
+            {strip.sectors.map((s, i) => {
+              const I = SECTOR_ICON[i % SECTOR_ICON.length]
+              return (
+                <div className="lp-strip__item" key={s}>
+                  <I />
+                  <span>{s}</span>
                 </div>
-              </div>
-
-              <div className="lp-slab__copy">
-                <p className="label">{t(`landing.${active.key}Tag`)}</p>
-                <h3>{t(`landing.${active.key}Title`)}</h3>
-                <p>{t(`landing.${active.key}Desc`)}</p>
-                <Link to={active.to} className="lp-slab__link">
-                  {t('landing.modulesPanelCta')}
-                  <ArrowUpRight size={16} strokeWidth={1.9} />
-                </Link>
-              </div>
-            </div>
-          </div>
+              )
+            })}
+          </Rv>
         </div>
       </section>
 
-      {/* -------------------------------------------------- proof -- */}
-      <section className="lp-section">
-        <div className="lp-inner lp-stack">
-          <Reveal className="lp-head" variants={fadeUp}>
-            <h2>{t('landing.proofTitle')}</h2>
-            <p>{t('landing.proofSub')}</p>
-          </Reveal>
-
-          <Reveal className="tray lp-proof" variants={fadeUp}>
-            <div className="lp-proof__figures">
-              {[1, 2, 3, 4].map((n) => (
-                <div className="lp-proof__fig" key={n}>
-                  <span className="label">{t(`landing.proofStat${n}`)}</span>
-                  <span className="lp-proof__fig-val">{t(`landing.proofStat${n}Val`)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="lp-proof__panels">
-              {/* The bar length IS the rate, so the chart carries a real number. */}
-              <div className="lp-panel">
-                <h3>{t('landing.proofRatesTitle')}</h3>
-                <ul>
-                  {[
-                    { label: t('landing.proofRate1'), pct: 20 },
-                    { label: t('landing.proofRate2'), pct: 10 },
-                    { label: t('landing.proofRate3'), pct: 1 },
-                  ].map((r) => (
-                    <li className="lp-bar-row" key={r.label}>
-                      <span className="lp-bar-row__head">
-                        <span>{r.label}</span>
-                        <b>%{r.pct}</b>
-                      </span>
-                      <span className="lp-bar">
-                        <i style={{ width: `${Math.max(r.pct * 4, 6)}%` }} />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="lp-panel">
-                <h3>{t('landing.proofFieldsTitle')}</h3>
-                <ul>
-                  {[
-                    { icon: ReceiptText, n: 1 },
-                    { icon: Landmark, n: 2 },
-                    { icon: Bot, n: 3 },
-                  ].map((f) => (
-                    <li className="lp-list-row" key={f.n}>
-                      <span className="lp-list-row__glyph"><f.icon size={15} strokeWidth={1.9} /></span>
-                      <span className="lp-list-row__body">
-                        <span className="lp-list-row__name">{t(`landing.proofField${f.n}`)}</span>
-                        <span className="lp-list-row__note">{t(`landing.proofField${f.n}Note`)}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Reveal>
-
-          <p className="lp-note">{t('landing.proofNote')}</p>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------- problem -- */}
-      <section className="lp-section">
-        <div className="lp-inner" style={{ display: 'flex', flexDirection: 'column', gap: 64 }}>
-          <div className="lp-pain__grid">
-            <Reveal className="lp-head lp-head--left" variants={fadeUp}>
-              <h2>{t('landing.painTitle')}</h2>
-              <p>{t('landing.painSub')}</p>
-            </Reveal>
-
-            {/* The queue drifts, so the section moves without anything blinking. */}
-            <div className="lp-drift" aria-hidden="true">
-              <ul>
-                {[...queue, ...queue].map(([name, meta], i) => (
-                  <li key={`${name}-${i}`}>
-                    <span className="lp-drift__av">{name.slice(0, 2).toUpperCase()}</span>
-                    <span className="lp-drift__body">
-                      <span className="lp-drift__name">{name}</span>
-                      <span className="lp-drift__meta">{meta}</span>
-                    </span>
-                  </li>
+      {/* ---------- statement + pinned slabs ---------- */}
+      <section className="lp-sec lp-stack" id="how">
+        <div className="lp-stack__pin">
+          <div className="lp-say" ref={sayRef}>
+            <div className="lp-shell">
+              <h2 className="lp-say__text" style={{ '--n': words.length }}>
+                {words.map((w, i) => (
+                  <span className="lp-say__w" key={i} style={{ '--i': i }}>
+                    {w}
+                    {i < words.length - 1 ? ' ' : ''}
+                  </span>
                 ))}
-              </ul>
-              <span className="lp-drift__veil lp-drift__veil--top" />
-              <span className="lp-drift__wash lp-drift__wash--top" />
-              <span className="lp-drift__veil lp-drift__veil--bot" />
-              <span className="lp-drift__wash lp-drift__wash--bot" />
+              </h2>
+              <div className="lp-say__trio">
+                {say.trio.map((c, i) => {
+                  const I = [ScanLine, Percent, LineChart][i]
+                  return (
+                    <div className="lp-say__cell" key={c.b}>
+                      <span className="lp-say__ico">
+                        <I />
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <b>{c.b}</b>
+                        <span>{c.s}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
-          <Reveal className="tray lp-three" variants={fadeUp}>
-            <div className="lp-three__grid">
-              {[
-                { icon: Zap, n: 1 },
-                { icon: WifiOff, n: 2 },
-                { icon: Lock, n: 3 },
-              ].map((c) => (
-                <div className="lp-three__card" key={c.n}>
-                  <span className="lp-three__glyph"><c.icon size={17} strokeWidth={1.9} /></span>
-                  <h4>{t(`landing.pain${c.n}Title`)}</h4>
-                  <p>{t(`landing.pain${c.n}Desc`)}</p>
+          <div className="lp-slabs">
+            {slabs.map((s, i) => {
+              const Art = SLAB_ART[i]
+              const I = SLAB_ICON[i]
+              return (
+                <div className={'lp-slab' + (i % 2 ? ' lp-slab--flip' : '')} key={s.badge}>
+                  <div className="lp-shell" style={{ width: '100%' }}>
+                    <div className="lp-slab__card">
+                      <div className="lp-slab__say">
+                        <Eyebrow icon={I} tone="flat">
+                          {s.badge}
+                        </Eyebrow>
+                        <h3 className="lp-d4">{s.title}</h3>
+                        <p className="lp-lead">{s.body}</p>
+                        <div className="lp-slab__foot">
+                          <CircleCheck />
+                          {s.foot}
+                        </div>
+                      </div>
+                      <div
+                        className="lp-slab__art"
+                        style={{ '--art': `url(${SLAB_ART_BG[i % SLAB_ART_BG.length]})` }}
+                      >
+                        <span className="lp-slab__ghost lp-slab__ghost--a" aria-hidden="true" />
+                        <span className="lp-slab__ghost lp-slab__ghost--b" aria-hidden="true" />
+                        <div className="lp-slab__mock">
+                          <Art en={en} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </Reveal>
-
-          <p className="lp-note">{t('landing.painNote')}</p>
+              )
+            })}
+          </div>
         </div>
       </section>
 
-      {/* ----------------------------------------------------- how -- */}
-      <section className="lp-section" id="how">
-        <div className="lp-inner lp-stack">
-          <Reveal className="lp-head" variants={fadeUp}>
-            <h2>{t('landing.howTitle')}</h2>
-          </Reveal>
-          <div className="lp-steps">
-            {['how1', 'how2', 'how3'].map((s, i) => (
-              <Reveal key={s} className="lp-step" variants={fadeUp} custom={i}>
-                <span className="lp-step__num">{String(i + 1).padStart(2, '0')}</span>
-                <h4>{t(`landing.${s}Title`)}</h4>
-                <p>{t(`landing.${s}Desc`)}</p>
-              </Reveal>
+      {/* ---------- bento ---------- */}
+      <section className="lp-sec lp-sec--pad lp-bento">
+        <div className="lp-shell">
+          <div className="lp-bento__head">
+            <Rv>
+              <Eyebrow icon={Layers} tone="flat">
+                {bento.eyebrow}
+              </Eyebrow>
+            </Rv>
+            <Rv as="h2" delay={60} className="lp-d3">
+              {bento.title}
+            </Rv>
+            <Rv as="p" delay={120} className="lp-lead">
+              {bento.sub}
+            </Rv>
+          </div>
+
+          <div className="lp-bento__grid">
+            {BENTO_COLS.map((col, ci) => (
+              <div className="lp-bento__col" key={ci}>
+                {col.map(([i, size, tone], ri) => {
+                  const c = bento.cards[i]
+                  const Art = BENTO_ART[i]
+                  const I = BENTO_ICON[i]
+                  return (
+                    <Rv
+                      key={c.title}
+                      y={32}
+                      delay={ci * 90 + ri * 60}
+                      className={'lp-bcard lp-bcard--' + size + ' lp-bcard--' + tone}
+                    >
+                      <Eyebrow icon={I}>{c.badge}</Eyebrow>
+                      <h3 className="lp-d5 lp-bcard__title">{c.title}</h3>
+                      <p className="lp-bcard__body">{c.body}</p>
+                      <div className="lp-bcard__art">
+                        <Art en={en} />
+                      </div>
+                    </Rv>
+                  )
+                })}
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ----------------------------------------------------- faq -- */}
-      <section className="lp-section" id="faq">
-        <div className="lp-inner">
-          <div className="lp-faq__grid">
-            <Reveal className="lp-head lp-head--left lp-faq__aside" variants={fadeUp}>
-              <h2>{t('landing.faqTitle')}</h2>
-              <p>{t('landing.faqSub')}</p>
-              <a href="mailto:destek@muhai.com" className="btn btn--ghost btn--lg">
-                {t('landing.faqCta')}
-                <ArrowUpRight size={15} strokeWidth={1.9} />
-              </a>
-            </Reveal>
+      {/* ---------- showcase ---------- */}
+      <section className="lp-sec lp-show">
+        <div className="lp-show__slab lp-dark">
+          <div className="lp-show__head">
+            <Rv>
+              <Eyebrow icon={LayoutDashboard} tone="dark">
+                {show.eyebrow}
+              </Eyebrow>
+            </Rv>
+            <Rv as="h2" delay={60} className="lp-d3">
+              {show.title}
+            </Rv>
+            <Rv as="p" delay={120} className="lp-lead lp-lead--dark">
+              {show.sub}
+            </Rv>
+          </div>
 
-            <div className="tray lp-faq__list">
-              {faqs.map((f, i) => (
-                <div className={`lp-faq__item${openQ === i ? ' is-open' : ''}`} key={f.q}>
-                  <h3>
-                    <button
-                      className="lp-faq__q"
-                      aria-expanded={openQ === i}
-                      onClick={() => setOpenQ(openQ === i ? -1 : i)}
-                    >
-                      <span>{f.q}</span>
-                      <span className="lp-faq__mark"><Plus size={16} strokeWidth={2.2} /></span>
-                    </button>
-                  </h3>
-                  <motion.div
-                    className="lp-faq__a"
-                    initial={false}
-                    animate={{ height: openQ === i ? 'auto' : 0, opacity: openQ === i ? 1 : 0 }}
-                    transition={{ duration: 0.3, ease: [0.44, 0, 0.56, 1] }}
-                  >
-                    <p>{f.a}</p>
-                  </motion.div>
+          <Rv delay={160} className="lp-show__frame">
+            <div className="lp-show__glass">
+              <div className="lp-show__clip">
+                <AppMock en={en} />
+              </div>
+            </div>
+          </Rv>
+
+          <div className="lp-show__list">
+            {show.list.map((c, i) => {
+              const I = SHOW_ICON[i]
+              return (
+                <Rv key={c.t} delay={i * 90} className="lp-show__cell">
+                  <b>
+                    <i>
+                      <I />
+                    </i>
+                    {c.t}
+                  </b>
+                  <span>{c.d}</span>
+                </Rv>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- pricing ---------- */}
+      <section className="lp-sec lp-sec--pad lp-price" id="pricing">
+        <div className="lp-shell">
+          <div className="lp-price__head">
+            <Rv>
+              <Eyebrow icon={Tag} tone="flat">
+                {price.eyebrow}
+              </Eyebrow>
+            </Rv>
+            <Rv as="h2" delay={60} className="lp-d3">
+              {priceWords.slice(0, -1).join(' ')}{' '}
+              <span className="lp-price__hi">{priceWords[priceWords.length - 1]}</span>
+            </Rv>
+            <Rv as="p" delay={120} className="lp-lead">
+              {price.sub}
+            </Rv>
+          </div>
+
+          <Rv delay={80} className="lp-price__tabs" role="group">
+            <button className={'lp-price__tab' + (yearly ? ' on' : '')} onClick={() => setYearly(true)} aria-pressed={yearly}>
+              {price.yearly}
+            </button>
+            <button className={'lp-price__tab' + (!yearly ? ' on' : '')} onClick={() => setYearly(false)} aria-pressed={!yearly}>
+              {price.monthly}
+            </button>
+          </Rv>
+
+          <Rv delay={120} className="lp-price__grid">
+            {price.plans.map((p, i) => (
+              <div className="lp-plan" key={p.name}>
+                <div className="lp-plan__name">{p.name}</div>
+                <p className="lp-plan__note">{p.note}</p>
+                <div className="lp-plan__price">
+                  <em>₺</em>
+                  {yearly ? p.y : p.m}
+                  <span>/{en ? 'mo' : 'ay'}</span>
                 </div>
+                <div className="lp-plan__per">{price.per}</div>
+                <Btn
+                  to="/register"
+                  label={p.cta}
+                  variant={i === 1 ? '' : 'quiet'}
+                  size="wide"
+                />
+                <ul className="lp-plan__feats">
+                  {p.feats.map((f, j) => (
+                    <li key={f}>
+                      {j === 0 ? <CircleCheck /> : <Plus />}
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </Rv>
+
+          <Rv delay={120} className="lp-ent">
+            <div className="lp-ent__text">
+              <Eyebrow icon={Server}>{price.entBadge}</Eyebrow>
+              <h3 className="lp-d4">{price.entTitle}</h3>
+              <p className="lp-lead">{price.entBody}</p>
+            </div>
+            <Btn href="mailto:info@muhai.app" label={price.entCta} />
+          </Rv>
+        </div>
+      </section>
+
+      {/* ---------- capability rail ---------- */}
+      <section className="lp-sec lp-rail">
+        <div className="lp-rail__slab lp-dark">
+          <div className="lp-rail__head">
+            <div>
+              <Rv>
+                <Eyebrow icon={Target} tone="dark">
+                  {spot.eyebrow}
+                </Eyebrow>
+              </Rv>
+              <Rv as="h2" delay={60} className="lp-d3">
+                {spot.title}
+              </Rv>
+              <Rv as="p" delay={120} className="lp-lead lp-lead--dark">
+                {spot.sub}
+              </Rv>
+            </div>
+          </div>
+
+          <div className="lp-rail__track" ref={track} onScroll={onTrack}>
+            {spot.cards.map((c, i) => {
+              const I = SPOT_ICON[i % SPOT_ICON.length]
+              return (
+                <article className={'lp-rcard lp-rcard--' + (i % 4)} key={c.title}>
+                  <div className="lp-rcard__say">
+                    <h3 className="lp-d4">{c.title}</h3>
+                    <p>{c.body}</p>
+                  </div>
+                  <div className="lp-rcard__facts">
+                    <div className="lp-rcard__art" aria-hidden="true">
+                      <I />
+                    </div>
+                    {c.facts.map((f) => (
+                      <div className="lp-rcard__fact" key={f.k}>
+                        <span>{f.k}</span>
+                        <b>{f.v}</b>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+
+          <div className="lp-rail__foot">
+            <div className="lp-rail__nav">
+              <button onClick={() => move(-1)} aria-label={en ? 'Previous' : 'Önceki'}>
+                <ArrowLeft />
+              </button>
+              <button onClick={() => move(1)} aria-label={en ? 'Next' : 'Sonraki'}>
+                <Arrow />
+              </button>
+            </div>
+            <div className="lp-rail__bar" aria-hidden="true">
+              {spot.cards.map((c, i) => (
+                <i key={c.title} className={i === slide ? 'on' : ''} />
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ----------------------------------------------------- cta -- */}
-      <section className="lp-cta">
-        <Reveal className="lp-cta__inner" variants={fadeUp}>
-          <h2>{t('landing.ctaTitle')}</h2>
-          <p>{t('landing.ctaSub')}</p>
-          <Link to="/register" className="btn btn--lg lp-cta__btn">
-            {t('landing.ctaButton')}
-            <ArrowRight size={15} strokeWidth={1.9} />
-          </Link>
-        </Reveal>
+      {/* ---------- faq ---------- */}
+      <section className="lp-sec lp-sec--pad lp-faq" id="faq">
+        <div className="lp-shell">
+          <div className="lp-faq__head">
+            <Rv>
+              <Eyebrow icon={MessagesSquare} tone="flat">
+                {faq.eyebrow}
+              </Eyebrow>
+            </Rv>
+            <Rv as="h2" delay={60} className="lp-d3">
+              {faq.titleA} <em>{faq.titleB}</em>
+            </Rv>
+            <Rv as="p" delay={120} className="lp-lead">
+              {faq.sub}
+            </Rv>
+          </div>
+
+          <div className="lp-faq__grid">
+            <Rv className="lp-faq__side">
+              {faq.tabs.map((x, i) => (
+                <button
+                  key={x}
+                  className={i === tab ? 'on' : ''}
+                  onClick={() => {
+                    setTab(i)
+                    setOpen(0)
+                  }}
+                >
+                  {x}
+                </button>
+              ))}
+            </Rv>
+
+            <div className="lp-faq__list">
+              {groups.map((q, i) => (
+                <Rv key={q.q} delay={i * 60} className={'lp-q' + (open === i ? ' on' : '')}>
+                  <button
+                    className="lp-q__btn"
+                    onClick={() => setOpen(open === i ? -1 : i)}
+                    aria-expanded={open === i}
+                  >
+                    {q.q}
+                    <i>
+                      <Plus />
+                    </i>
+                  </button>
+                  <div className="lp-q__body">
+                    <div>
+                      <p>{q.a}</p>
+                    </div>
+                  </div>
+                </Rv>
+              ))}
+
+              <Rv delay={120} className="lp-ask">
+                <div className="lp-ask__text">
+                  <Eyebrow icon={MessagesSquare}>{faq.askBadge}</Eyebrow>
+                  <h3 className="lp-d4">{faq.askTitle}</h3>
+                  <p className="lp-lead">{faq.askBody}</p>
+                </div>
+                <Btn href="mailto:info@muhai.app" label={faq.askCta} />
+              </Rv>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* -------------------------------------------------- footer -- */}
-      <footer className="lp-footer">
-        <div className="lp-footer__main">
-          <div className="lp-footer__brand">
-            <span className="brand">
-              <span className="brand-glyph"><Logo size={15} /></span>
-              <span className="brand-name">Muhai</span>
-            </span>
-            <p>{t('landing.footerTagline')}</p>
+      {/* ---------- closing ---------- */}
+      <div className="lp-closewrap">
+        <section className="lp-close lp-dark">
+          <div className="lp-close__head">
+            <Rv as="h2" className="lp-d2">
+              {close.title}
+            </Rv>
+            <Rv as="p" delay={60} className="lp-lead lp-lead--dark">
+              {close.sub}
+            </Rv>
+            <Rv delay={120}>
+              <Btn to="/register" label={close.cta} variant="lime" size="lg" />
+            </Rv>
           </div>
-          <div className="lp-footer__cols">
-            <FooterCol
-              title={t('landing.footerProduct')}
-              items={[t('nav.invoices'), t('nav.tax'), t('nav.inventory'), t('nav.payroll')]}
-            />
-            <FooterCol title={t('landing.footerCompany')} items={[t('nav.about'), 'Blog', t('nav.pricing')]} />
-            <FooterCol title={t('landing.footerLegal')} items={['KVKK', 'Gizlilik', 'Şartlar']} />
+          <Rv delay={160} className="lp-close__stage">
+            <AppMock en={en} />
+          </Rv>
+        </section>
+      </div>
+
+      {/* ---------- footer ---------- */}
+      <footer className="lp-foot">
+        <div className="lp-shell">
+          <div className="lp-foot__grid">
+            <div className="lp-foot__brand">
+              <Link className="lp-nav__brand" to="/">
+                    Muhai
+              </Link>
+              <p>{foot.tagline}</p>
+              <button
+                className="lp-burger"
+                onClick={toggleTheme}
+                aria-label={en ? 'Toggle theme' : 'Temayı değiştir'}
+              >
+                {theme === 'dark' ? <Sun style={{ width: 16, height: 16 }} /> : <Moon style={{ width: 16, height: 16 }} />}
+              </button>
+            </div>
+            {foot.cols.map((c) => (
+              <div className="lp-foot__col" key={c.h}>
+                <h4>{c.h}</h4>
+                {c.items.map((x) => (
+                  <a key={x} href="#modules">
+                    {x}
+                  </a>
+                ))}
+              </div>
+            ))}
           </div>
-        </div>
 
-        <div className="lp-footer__contact">
-          <a href="mailto:destek@muhai.com">destek@muhai.com</a>
-        </div>
+          <div className="lp-foot__mark" aria-hidden="true">
+            <span>Muhai</span>
+          </div>
 
-        <div className="lp-footer__bar">
-          <span>© 2026 Muhai. {t('landing.footerRights')}</span>
-          <span>{t('landing.madeWith')}</span>
+          <div className="lp-foot__bar">
+            <p>© {new Date().getFullYear()} Muhai. {foot.rights}</p>
+          </div>
         </div>
       </footer>
-
-      <SiteChat />
-    </div>
-  )
-}
-
-/* A hand-drawn stroke under the claim — one stroke, drawn in, never a
-   straight rule. `pathLength="1"` makes the dash animation unit-based, so it
-   works at any width. */
-function UnderStroke() {
-  return (
-    <svg className="lp-hero__stroke" viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M4 8.4C58 3.6 126 2.4 296 5.6" pathLength="1" vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
-}
-
-/* The small card standing on the pastel bed.
-
-   Three rows, and that is all: an avatar, a name, a quiet second line and
-   a tint pill. Theirs is this spare on purpose — the card stands in for a
-   screen rather than reproducing one, so a dense replica reads as clutter
-   at this size. */
-function ModuleCard({ which, en }) {
-  const rows = {
-    f1: [
-      { av: 'AT', name: 'Anadolu Tekstil', meta: 'FT-2026-0148', pill: '0,96' },
-      { av: 'ML', name: 'Marmara Lojistik', meta: 'FT-2026-0147', pill: '0,94' },
-      { av: 'EK', name: 'Ege Kimya', meta: 'FT-2026-0146', pill: '0,61', tone: 'amber' },
-    ],
-    f2: [
-      { av: 'KDV', name: en ? 'VAT return' : 'KDV Beyannamesi', meta: '26.09.2026', pill: en ? '6 days' : '6 gün', tone: 'amber' },
-      { av: 'MUH', name: en ? 'Withholding' : 'Muhtasar', meta: '26.09.2026', pill: en ? '6 days' : '6 gün', tone: 'amber' },
-      { av: 'SGK', name: en ? 'SGK premium' : 'SGK Primi', meta: '30.09.2026', pill: en ? '10 days' : '10 gün', tone: 'slate' },
-    ],
-    f3: [
-      { av: '14', name: en ? 'Cotton yarn 40/1' : 'Pamuk iplik 40/1', meta: 'SKU-014', pill: '78' },
-      { av: '21', name: en ? 'Dye — indigo' : 'Boya — indigo', meta: 'SKU-021', pill: '41' },
-      { av: '36', name: en ? 'Packing tape' : 'Koli bandı', meta: 'SKU-036', pill: '12', tone: 'red' },
-    ],
-    f4: [
-      { av: 'AD', name: 'Ayşe Demir', meta: en ? 'Accounting' : 'Muhasebe', pill: '₺38.610' },
-      { av: 'MK', name: 'Mert Kaya', meta: en ? 'Production' : 'Üretim', pill: '₺31.240' },
-      { av: 'ZA', name: 'Zeynep Arslan', meta: en ? 'Sales' : 'Satış', pill: '₺35.180' },
-    ],
-    f6: [
-      { av: '₺', name: en ? 'Net profit' : 'Net kâr', meta: en ? 'This month' : 'Bu ay', pill: '+12,8%' },
-      { av: '↑', name: en ? 'Revenue' : 'Gelir', meta: en ? 'This month' : 'Bu ay', pill: '+9,1%' },
-      { av: '↓', name: en ? 'Expense' : 'Gider', meta: en ? 'This month' : 'Bu ay', pill: '+4,2%', tone: 'slate' },
-    ],
-  }
-
-  if (which === 'f5') {
-    return (
-      <div className="lp-mini">
-        <div className="lp-mini__ask">
-          {en ? 'What are the 2026 VAT rates?' : '2026 KDV oranları nedir?'}
-        </div>
-        <div className="lp-mini__reply">
-          {en
-            ? 'Three rates apply: standard 20%, reduced 10%, super-reduced 1%.'
-            : 'Üç oran uygulanır: genel %20, indirimli %10, süper indirimli %1.'}
-        </div>
-        <span className="lp-mini__src">
-          {en ? 'Source: VAT rates (2026)' : 'Kaynak: KDV oranları (2026)'}
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="lp-mini">
-      {(rows[which] || rows.f1).map((r) => (
-        <div className="lp-mini__row" key={r.name}>
-          <span className="lp-mini__av">{r.av}</span>
-          <span className="lp-mini__body">
-            <span className="lp-mini__label">{r.name}</span>
-            <span className="lp-mini__meta">{r.meta}</span>
-          </span>
-          <span className={`lp-mini__pill${r.tone ? ` lp-mini__pill--${r.tone}` : ''}`}>{r.pill}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function Stat({ value, suffix, label, fmt }) {
-  return (
-    <div className="lp-stat">
-      <div className="lp-stat__val num">
-        <AnimatedNumber value={value} format={fmt} />
-        {suffix}
-      </div>
-      <div className="lp-stat__label label">{label}</div>
-    </div>
-  )
-}
-
-function FooterCol({ title, items }) {
-  return (
-    <div className="lp-footer__col">
-      <h5 className="label">{title}</h5>
-      {items.map((it) => (
-        <a key={it} href="#">{it}</a>
-      ))}
     </div>
   )
 }

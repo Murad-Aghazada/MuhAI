@@ -6,8 +6,8 @@
 # finished virtualenv. That keeps the shipped image free of a C toolchain,
 # which is both smaller and one less thing to patch on the VPS.
 #
-# The same image runs the API, the Celery worker and the one-shot migration
-# job — they differ only by the command compose gives them.
+# The same image runs the API and the one-shot migration job — they differ
+# only by the command compose gives them.
 # ============================================================
 
 # ── Stage 1: build the virtualenv ────────────────────────────────────

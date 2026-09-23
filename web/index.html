@@ -22,6 +22,20 @@
          landing page and the auth screens stay on Cal Sans + Manrope. -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
+    <!-- The landing page runs on its own pair: Inter Tight carries every
+         display line (it is drawn for headline sizes, so -0.04em tracking
+         at 88px holds together) and Inter the body. Scoped to `.lp` in
+         styles/landing.css; the console and the auth screens are
+         unaffected and stay on Cal Sans + Manrope. -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- The wordmark is the logo: no icon beside it, so the letterforms
+         have to do the work Inter Tight deliberately does not. Syne is
+         a display grotesque with a widened M and a flat-topped a — it
+         is recognisable at 17px in the nav and at 270px across the
+         footer, which is the whole job. OFL, so it ships with us. -->
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+
     <!-- Paint the stored theme before anything else, or a dark-mode user gets
          a white flash on every reload. -->
     <script>
