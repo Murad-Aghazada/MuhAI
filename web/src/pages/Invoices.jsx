@@ -8,6 +8,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  ReceiptText,
   ScanLine,
   Search,
   Trash2,
@@ -20,13 +21,36 @@ import { COLLECTIONS, markInvoicePaid, removeItem, saveInvoiceWithLedger, update
 import { scanInvoice } from '../lib/api.js'
 import { runOcr } from '../lib/ocr.js'
 import { isOverdue } from '../lib/analytics.js'
-import { splitVat } from '../lib/seed.js'
-import { CONFIDENCE_THRESHOLD, emptyInvoice, ocrToDraft } from '../lib/invoiceDraft.js'
+import { splitVat } from '../lib/vat.js'
 import Badge from '../components/ui/Badge.jsx'
 import InvoiceModal from '../components/invoices/InvoiceModal.jsx'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
 const STATUS_TONE = { paid: 'green', pending: 'amber', overdue: 'red' }
+const CONFIDENCE_THRESHOLD = 0.7
+
+const emptyInvoice = () => {
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    number: '',
+    vendor: '',
+    taxId: '',
+    direction: 'purchase',
+    issueDate: today,
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    paidDate: null,
+    amount: 0,
+    netAmount: 0,
+    vatAmount: 0,
+    vatRate: 0.2,
+    status: 'pending',
+    category: 'other',
+    source: 'manual',
+    ocrConfidence: null,
+    needsReview: false,
+    currency: 'TRY',
+  }
+}
 
 export default function Invoices() {
   const { t, lang } = useLang()
@@ -91,8 +115,36 @@ export default function Invoices() {
       const draft = emptyInvoice()
 
       if (scanMode === 'server') {
-        // Shared with the native app, which runs the same scan (lib/invoiceDraft.js).
-        Object.assign(draft, ocrToDraft(await scanInvoice(file)))
+        const res = await scanInvoice(file)
+        const value = (f) => res[f]?.value ?? null
+        const conf = (f) => res[f]?.confidence ?? 0
+
+        const total = Number(value('total_amount')) || 0
+        const vat = Number(value('vat_amount')) || splitVat(total).vat
+
+        Object.assign(draft, {
+          vendor: value('vendor_name') || '',
+          number: value('invoice_number') || '',
+          issueDate: value('date') || draft.issueDate,
+          amount: total,
+          vatAmount: vat,
+          netAmount: Math.max(total - vat, 0),
+          source: 'ocr',
+          ocrConfidence: Math.min(
+            conf('vendor_name'),
+            conf('invoice_number'),
+            conf('total_amount'),
+          ),
+          needsReview: res.needs_review,
+          rawText: res.raw_text || '',
+          fieldConfidence: {
+            vendor: conf('vendor_name'),
+            number: conf('invoice_number'),
+            date: conf('date'),
+            amount: conf('total_amount'),
+            vat: conf('vat_amount'),
+          },
+        })
       } else {
         const res = await runOcr(file, setProgress)
         const total = res.fields.total || 0
@@ -180,18 +232,22 @@ export default function Invoices() {
     <div className="page">
       <div className="page-head page-head-row">
         <div>
+          <div className="page-eyebrow">
+            <ReceiptText size={14} strokeWidth={1.9} />
+            <span className="label">{t('nav.invoices')}</span>
+          </div>
           <h1 className="page-title">{t('invoices.title')}</h1>
           <p className="page-sub">{t('invoices.subtitle')}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="page-actions">
           <button className="btn btn--ghost btn--sm" onClick={exportCsv} disabled={!visible.length}>
-            <Download size={14} strokeWidth={2.4} /> {t('invoices.exportCsv')}
+            <Download size={14} strokeWidth={1.9} /> {t('invoices.exportCsv')}
           </button>
           <button className="btn btn--ghost btn--sm" onClick={() => setModal({ invoice: emptyInvoice(), mode: 'create' })}>
-            <Plus size={14} strokeWidth={2.6} /> {t('invoices.addManual')}
+            <Plus size={14} strokeWidth={1.9} /> {t('invoices.addManual')}
           </button>
-          <button className="btn btn--brand btn--sm" onClick={() => fileRef.current?.click()} disabled={scanning}>
-            {scanning ? <Loader2 size={14} className="spin" /> : <Upload size={14} strokeWidth={2.4} />}
+          <button className="btn btn--primary btn--sm" onClick={() => fileRef.current?.click()} disabled={scanning}>
+            {scanning ? <Loader2 size={14} className="spin" /> : <Upload size={14} strokeWidth={1.9} />}
             {scanning ? t('invoices.scanning') : t('invoices.upload')}
           </button>
         </div>
@@ -218,7 +274,7 @@ export default function Invoices() {
 
       {reviewCount > 0 && (
         <div className="review-banner">
-          <AlertTriangle size={18} strokeWidth={2.2} />
+          <AlertTriangle size={18} strokeWidth={1.9} />
           <span>
             <strong>{t('invoices.reviewTitle')}</strong> — {reviewCount} {t('invoices.reviewBody')}
           </span>
@@ -240,7 +296,7 @@ export default function Invoices() {
         </div>
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('invoices.kpiPaid')}</div>
-          <div className="mini-stats__value tnum mini-stats__value--pos">{cur(stats.paidValue)}</div>
+          <div className="mini-stats__value tnum">{cur(stats.paidValue)}</div>
         </div>
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('invoices.kpiOcr')}</div>
@@ -263,14 +319,14 @@ export default function Invoices() {
           ))}
         </div>
         <label className="search-inline">
-          <Search size={15} strokeWidth={2.2} />
+          <Search size={15} strokeWidth={1.9} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('invoices.searchPlaceholder')} />
         </label>
         <span className="toolbar__spacer" />
         <div className="seg">
           <button className={scanMode === 'server' ? 'is-active' : ''} onClick={() => setScanMode('server')} title={t('invoices.scanServer')}>
-            <ScanLine size={13} strokeWidth={2.3} style={{ verticalAlign: -2, marginRight: 5 }} />
-            Tesseract 5
+            <ScanLine size={13} strokeWidth={1.9} style={{ verticalAlign: -2, marginRight: 5 }} />
+            {lang === 'en' ? 'On server' : 'Sunucuda'}
           </button>
           <button className={scanMode === 'browser' ? 'is-active' : ''} onClick={() => setScanMode('browser')} title={t('invoices.scanBrowser')}>
             {lang === 'en' ? 'On-device' : 'Cihaz üstü'}
@@ -287,7 +343,7 @@ export default function Invoices() {
       <section className="panel" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <div className="panel-head" style={{ padding: '0 22px' }}>
           <div>
-            <div className="panel-title">{t('invoices.tableTitle')}</div>
+            <div className="panel-title"><FileText size={15} strokeWidth={1.9} />{t('invoices.tableTitle')}</div>
             <div className="panel-sub">
               {visible.length} / {invoices.length}
             </div>
@@ -347,11 +403,11 @@ export default function Invoices() {
                             onClick={() => handleMarkPaid(inv)}
                             disabled={busyId === inv.id}
                           >
-                            <CheckCircle2 size={15} strokeWidth={2.2} />
+                            <CheckCircle2 size={15} strokeWidth={1.9} />
                           </button>
                         )}
                         <button className="icon-btn" title={t('common.edit')} onClick={() => setModal({ invoice: inv, mode: 'edit' })}>
-                          <Pencil size={14} strokeWidth={2.2} />
+                          <Pencil size={14} strokeWidth={1.9} />
                         </button>
                         <button
                           className="icon-btn icon-btn--danger"
@@ -359,7 +415,7 @@ export default function Invoices() {
                           onClick={() => handleDelete(inv)}
                           disabled={busyId === inv.id}
                         >
-                          <Trash2 size={14} strokeWidth={2.2} />
+                          <Trash2 size={14} strokeWidth={1.9} />
                         </button>
                       </div>
                     </td>

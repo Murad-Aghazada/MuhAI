@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { Building2, Loader2, LogOut } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
-import { seedCompany } from '../lib/seed.js'
 import AuthShell from '../components/auth/AuthShell.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
@@ -30,7 +29,6 @@ export default function CompanySetup() {
     city: '',
     sector: 'general',
     legalForm: 'ltd',
-    withDemoData: true,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -52,7 +50,7 @@ export default function CompanySetup() {
 
     setBusy(true)
     try {
-      const companyId = await createCompanyForAccount({
+      await createCompanyForAccount({
         name: form.companyName.trim(),
         taxId: form.taxId.trim(),
         taxOffice: form.taxOffice.trim(),
@@ -60,13 +58,6 @@ export default function CompanySetup() {
         sector: form.sector,
         legalForm: form.legalForm,
       })
-      if (form.withDemoData) {
-        try {
-          await seedCompany(companyId)
-        } catch (seedErr) {
-          console.error('[muhai] demo seeding failed', seedErr)
-        }
-      }
       await refreshCompany()
       navigate('/app', { replace: true })
       // The auth listener re-reads the profile; a reload guarantees every
@@ -93,7 +84,7 @@ export default function CompanySetup() {
         <label className="field">
           <span className="field__label">{t('auth.companyName')}</span>
           <span className="field__wrap">
-            <Building2 size={16} strokeWidth={2.1} />
+            <Building2 size={16} strokeWidth={1.9} />
             <input value={form.companyName} onChange={set('companyName')} required placeholder="Atlas Ticaret Ltd. Şti." />
           </span>
         </label>
@@ -143,17 +134,9 @@ export default function CompanySetup() {
           </span>
         </label>
 
-        <label className="checkbox-row">
-          <input type="checkbox" checked={form.withDemoData} onChange={set('withDemoData')} />
-          <span>
-            <strong>{t('auth.demoToggle')}</strong>
-            <em>{t('auth.demoToggleHint')}</em>
-          </span>
-        </label>
-
         {error && <div className="auth-alert auth-alert--error">{error}</div>}
 
-        <button className="btn btn--brand btn--block" type="submit" disabled={busy}>
+        <button className="btn btn--primary btn--block" type="submit" disabled={busy}>
           {busy && <Loader2 size={16} className="spin" />}
           {busy ? t('auth.registering') : t('auth.register')}
         </button>
@@ -167,7 +150,7 @@ export default function CompanySetup() {
             navigate('/login', { replace: true })
           }}
         >
-          <LogOut size={14} strokeWidth={2.2} /> {t('auth.logout')}
+          <LogOut size={14} strokeWidth={1.9} /> {t('auth.logout')}
         </button>
       </div>
     </AuthShell>

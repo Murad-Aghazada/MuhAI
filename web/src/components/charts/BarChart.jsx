@@ -10,7 +10,7 @@ export default function BarChart({
   data,
   labels = [],
   keys = ['value'],
-  colors = ['var(--c-emerald)'],
+  colors = ['var(--d1)'],
   height = 220,
   formatValue = (v) => v,
   seriesNames = [],

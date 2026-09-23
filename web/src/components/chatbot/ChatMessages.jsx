@@ -61,7 +61,7 @@ export default function ChatMessages({ messages, loading, welcome }) {
       {/* welcome message always first */}
       <div className="msg msg--bot">
         <span className="msg__av msg__av--bot">
-          <Sparkles size={15} strokeWidth={2.3} />
+          <Sparkles size={15} strokeWidth={1.9} />
         </span>
         <div className="msg__bubble">{welcome || t('assistant.welcome')}</div>
       </div>
@@ -75,13 +75,13 @@ export default function ChatMessages({ messages, loading, welcome }) {
           transition={{ duration: 0.3 }}
         >
           <span className={`msg__av msg__av--${m.role === 'user' ? 'user' : 'bot'}`}>
-            {m.role === 'user' ? 'EB' : <Sparkles size={15} strokeWidth={2.3} />}
+            {m.role === 'user' ? 'EB' : <Sparkles size={15} strokeWidth={1.9} />}
           </span>
           <div className="msg__bubble">
             <FormattedText text={m.text} />
             {m.source === 'offline' && (
               <div className="msg__offline">
-                <WifiOff size={10} strokeWidth={2.4} />
+                <WifiOff size={10} strokeWidth={1.9} />
                 {t('assistant.offlineBadge')}
               </div>
             )}
@@ -103,7 +103,7 @@ export default function ChatMessages({ messages, loading, welcome }) {
       {loading && (
         <div className="msg msg--bot">
           <span className="msg__av msg__av--bot">
-            <Sparkles size={15} strokeWidth={2.3} />
+            <Sparkles size={15} strokeWidth={1.9} />
           </span>
           <div className="msg__bubble" style={{ display: 'flex', alignItems: 'center' }}>
             <span className="typing">

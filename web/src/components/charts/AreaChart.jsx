@@ -23,7 +23,7 @@ export default function AreaChart({
   data = [],
   labels = [],
   height = 260,
-  colors = ['var(--c-emerald)', 'var(--c-coral)'],
+  colors = ['var(--d1)', 'var(--d2)'],
   keys = ['income', 'expense'],
   formatValue = (v) => v,
   formatAxis,

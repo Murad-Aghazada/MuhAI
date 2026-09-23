@@ -144,9 +144,16 @@ def _is_overdue(inv: InvoiceIn, as_of: dt.date) -> bool:
 
 
 def invoice_rollup(invoices: list[InvoiceIn], as_of: dt.date) -> dict:
-    """Receivables, payables and collection performance."""
+    """Receivables, payables and collection performance.
+
+    The overdue tally is split by direction as well as totalled: an overdue
+    purchase invoice is money this company owes, and telling its owner to chase
+    the customer for it would be advice about the wrong side of the ledger.
+    """
     receivables = payables = 0.0
     overdue_count = 0
+    overdue_receivables = 0
+    overdue_payables = 0
     collected_on_time = 0
     closed = 0
 
@@ -158,6 +165,10 @@ def invoice_rollup(invoices: list[InvoiceIn], as_of: dt.date) -> dict:
                 payables += float(inv.amount)
             if _is_overdue(inv, as_of):
                 overdue_count += 1
+                if inv.direction == "sales":
+                    overdue_receivables += 1
+                else:
+                    overdue_payables += 1
         else:
             closed += 1
             # No due date recorded → treat a paid invoice as collected on time
@@ -169,6 +180,8 @@ def invoice_rollup(invoices: list[InvoiceIn], as_of: dt.date) -> dict:
         "receivables": round(receivables, 2),
         "payables": round(payables, 2),
         "overdue_count": overdue_count,
+        "overdue_receivable_count": overdue_receivables,
+        "overdue_payable_count": overdue_payables,
         "invoices_total": closed,
         "invoices_collected_on_time": collected_on_time,
     }

@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     # company genuinely receives English documents.
     OCR_LANG: str = "tur"
 
+    # ── Sign in with Google ────────────────────────────────────────────
+    # The Firebase project whose ID tokens /api/auth/google will accept; it is
+    # checked as the token's `aud` and, prefixed, as its `iss`. Public — it
+    # identifies the project, it does not authorise anything.
+    #
+    # Empty switches the endpoint off: it then answers 503 rather than
+    # accepting a token nobody verified the audience of.
+    FIREBASE_PROJECT_ID: str = ""
+
     # AI (Gemini). When empty, the chatbot uses the offline rule backend.
     GEMINI_API_KEY: str = ""
     # Empty falls back to chat_service.GEMINI_MODEL_DEFAULT.

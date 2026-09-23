@@ -3,13 +3,8 @@
 
    One origin, one token. The API is Muhai's own FastAPI service: it holds the
    data, the maths and the sessions. There is no third-party SDK in the path
-   any more, and nothing but this file knows how a request is authenticated.
-
-   The two facts that differ between a browser and a phone — where the API is,
-   and where the session is kept — are injected once at boot through
-   configureClient(). That is the whole reason this file is portable: the Expo
-   app bundles it unchanged, and `web/src/main.jsx` is the only place in the
-   web app that knows about Vite's environment.
+   any more, and nothing but this file knows where the API lives or how a
+   request is authenticated.
 
    Three rules the rest of the app relies on:
      1. Every call has a timeout. A hanging fetch is worse than a failure.
@@ -20,18 +15,13 @@
         expired token lands on the login screen instead of looping.
    ============================================================ */
 
-// Where the API is. Empty means "same origin", which is the production
-// arrangement: nginx proxies /api to the backend, so no hostname is baked into
-// the bundle. The entry point supplies the value through configureClient()
-// below — this module deliberately reads no build-time environment of its own,
-// because it is also bundled by Metro for the Expo app and `import.meta` is a
-// syntax error there.
-//
-// `let` rather than `const` on purpose: an ES-module live binding means
-// lib/api.js's re-export and the one read in pages/Settings.jsx see the
-// configured value without either of them changing. The one hazard is a future
-// consumer that copies it at module scope, before boot.
-export let apiBaseUrl = ''
+// Empty in a production build: the app and the API share an origin and nginx
+// proxies /api to the backend, so no hostname is baked into the bundle. In
+// development the Vite server is on :5173 and the API on :8000.
+const RAW_BASE =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '')
+
+export const apiBaseUrl = RAW_BASE.replace(/\/$/, '')
 
 const TOKEN_KEY = 'muhai.token'
 const DEFAULT_TIMEOUT_MS = 20000
@@ -52,65 +42,31 @@ export class ApiError extends Error {
 }
 
 // ── Session token ─────────────────────────────────────────────────────
-// Storage rather than a cookie: the API is stateless and CSRF-free because
-// nothing is sent ambiently — every authenticated request carries the token in
-// a header this file adds.
-//
-// The store is injectable because React Native has no localStorage and its
-// replacements are asynchronous, while getToken() is called synchronously
-// inside every request. So a native app reads the token once at boot and hands
-// it to configureClient(); the synchronous read below is only ever a browser's.
+// localStorage rather than a cookie: the API is stateless and CSRF-free
+// because nothing is sent ambiently — every authenticated request carries the
+// token in a header this file adds.
 
-const browserStore = {
-  read() {
-    try {
-      return localStorage.getItem(TOKEN_KEY)
-    } catch {
-      // Private mode, or storage blocked. The session is then tab-only.
-      return null
-    }
-  },
-  write(token) {
-    try {
-      if (token) localStorage.setItem(TOKEN_KEY, token)
-      else localStorage.removeItem(TOKEN_KEY)
-    } catch {
-      /* in-memory session only */
-    }
-  },
-}
-
-const memoryStore = { read: () => null, write() {} }
-
-let store = typeof localStorage !== 'undefined' ? browserStore : memoryStore
 let memoryToken = null
-
-/**
- * Point the client at an API and tell it where the session lives.
- *
- * Called once from the entry point before anything renders — `main.jsx` on the
- * web, the Expo root layout on a phone. Those two are the only places that
- * know which platform this is; everything below here does not.
- *
- * `token` is the boot hydration: a native app has already read it out of
- * asynchronous storage and passes it in, which is what keeps getToken()
- * synchronous for every caller.
- */
-export function configureClient({ baseUrl, tokenStore, token } = {}) {
-  if (baseUrl !== undefined) apiBaseUrl = String(baseUrl || '').replace(/\/$/, '')
-  if (tokenStore) store = tokenStore
-  if (token !== undefined) memoryToken = token || null
-}
 
 export function getToken() {
   if (memoryToken) return memoryToken
-  memoryToken = store.read()
+  try {
+    memoryToken = localStorage.getItem(TOKEN_KEY)
+  } catch {
+    // Private mode, or storage blocked. The session is then tab-only.
+    memoryToken = null
+  }
   return memoryToken
 }
 
 export function setToken(token) {
   memoryToken = token || null
-  store.write(memoryToken)
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* in-memory session only */
+  }
 }
 
 export function clearToken() {
@@ -146,12 +102,7 @@ export async function request(
       signal: controller.signal,
     })
 
-    // A 401 only means "your session expired" when there *was* a session. On
-    // an unauthenticated call — sign-in, registration — it is the API saying
-    // the credentials are wrong, and it says so in Turkish in the body.
-    // Swallowing that detail told a user with a mistyped password to log in
-    // again, which is the one thing that could not help them.
-    if (res.status === 401 && token) {
+    if (res.status === 401) {
       clearToken()
       onUnauthenticated?.()
       throw new ApiError('Oturumunuzun süresi doldu. Tekrar giriş yapın.', { status: 401 })

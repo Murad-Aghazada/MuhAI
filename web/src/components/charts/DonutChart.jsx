@@ -16,10 +16,14 @@ export default function DonutChart({ data, size = 200, thickness = 26, centerLab
   const cy = size / 2
   const C = 2 * Math.PI * r
 
+  // A hairline of surface between neighbouring arcs, so two similar hues
+  // still read as two slices rather than one long one.
+  const GAP = 3
+
   let acc = 0
   const segments = data.map((d) => {
     const frac = d.value / total
-    const seg = { ...d, frac, offset: acc, dash: frac * C }
+    const seg = { ...d, frac, offset: acc, dash: Math.max(frac * C - GAP, 1) }
     acc += frac
     return seg
   })

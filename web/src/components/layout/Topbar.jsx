@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, LogOut, Menu, Search, Settings as SettingsIcon, WifiOff } from 'lucide-react'
+import {
+  Bell,
+  Gauge,
+  LogOut,
+  Search,
+  Settings as SettingsIcon,
+  WifiOff,
+} from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
 import { formatCurrency, formatDate } from '../../lib/format.js'
 import { isOverdue } from '../../lib/analytics.js'
 import LanguageToggle from './LanguageToggle.jsx'
+import Logo from '../ui/Logo.jsx'
 
 function initials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -15,11 +23,17 @@ function initials(name = '') {
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
 }
 
-export default function Topbar({ onMenu }) {
+/**
+ * Identity on the left, the facts that must stay visible on the right.
+ *
+ * There is no navigation here on purpose — it all lives in the dock, which is
+ * what hands the full width of the window back to the work.
+ */
+export default function Topbar() {
   const { t, lang } = useLang()
   const navigate = useNavigate()
   const { profile, company, user, logout } = useAuth()
-  const { invoices, products, apiOnline } = useData()
+  const { invoices, products, score, apiOnline } = useData()
 
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -69,14 +83,14 @@ export default function Topbar({ onMenu }) {
     return [
       ...overdue.map((i) => ({
         key: `o-${i.id}`,
-        tone: 'red',
+        tone: 'stop',
         title: lang === 'en' ? 'Invoice overdue' : 'Vadesi geçen fatura',
         body: `${i.vendor} · ${formatCurrency(i.amount, lang)} · ${formatDate(i.dueDate, lang)}`,
         to: '/app/invoices',
       })),
       ...low.map((p) => ({
         key: `l-${p.id}`,
-        tone: 'amber',
+        tone: 'warn',
         title: lang === 'en' ? 'Low stock' : 'Kritik stok',
         body: `${p.name} · ${p.stock}/${p.minStock}`,
         to: '/app/inventory',
@@ -95,13 +109,19 @@ export default function Topbar({ onMenu }) {
 
   return (
     <header className="topbar" ref={rootRef}>
-      <button className="mobile-menu-btn topbar__icon-btn" onClick={onMenu} aria-label="Menu" style={{ width: 40, height: 40 }}>
-        <Menu size={19} />
-      </button>
+      <Link to="/app" className="brand">
+        <span className="brand-glyph">
+          <Logo size={15} />
+        </span>
+        <span>
+          <span className="brand-name">Muhai</span>
+          <span className="brand-tag">{t('common.tagline')}</span>
+        </span>
+      </Link>
 
       <div className="topbar__search-wrap">
         <label className="topbar__search">
-          <Search size={17} strokeWidth={2.2} />
+          <Search size={15} strokeWidth={1.9} />
           <input
             placeholder={t('common.search')}
             aria-label={t('common.search')}
@@ -111,11 +131,19 @@ export default function Topbar({ onMenu }) {
         </label>
         <AnimatePresence>
           {results.length > 0 && (
-            <motion.div className="popover popover--search" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+            <motion.div
+              className="popover popover--search"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: [0.22, 0.8, 0.3, 1] }}
+            >
               {results.map((r) => (
                 <button key={r.key} className="popover__row" onClick={() => go(r.to)}>
-                  <span className="popover__title">{r.label}</span>
-                  <span className="popover__meta tnum">{r.meta}</span>
+                  <span className="grow">
+                    <span className="popover__title">{r.label}</span>
+                    <span className="popover__meta num">{r.meta}</span>
+                  </span>
                 </button>
               ))}
             </motion.div>
@@ -123,84 +151,103 @@ export default function Topbar({ onMenu }) {
         </AnimatePresence>
       </div>
 
-      <div className="topbar__spacer" />
-
-      {!apiOnline && (
-        <span className="conn-badge conn-badge--off" title={t('common.offlineHint')}>
-          <WifiOff size={13} strokeWidth={2.4} />
-          {t('common.offline')}
-        </span>
-      )}
-
-      <LanguageToggle />
-
-      <div className="topbar__pop-anchor">
-        <button
-          className="topbar__icon-btn"
-          aria-label="Notifications"
-          onClick={() => {
-            setNotifOpen((v) => !v)
-            setMenuOpen(false)
-          }}
-        >
-          <Bell size={18} strokeWidth={2.1} />
-          {alerts.length > 0 && <span className="topbar__notif-dot" />}
-        </button>
-        <AnimatePresence>
-          {notifOpen && (
-            <motion.div className="popover popover--right" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-              {alerts.length === 0 ? (
-                <div className="popover__empty">{t('common.none')}</div>
-              ) : (
-                alerts.slice(0, 6).map((a) => (
-                  <button key={a.key} className="popover__row" onClick={() => go(a.to)}>
-                    <span className={`popover__dot popover__dot--${a.tone}`} />
-                    <span>
-                      <span className="popover__title">{a.title}</span>
-                      <span className="popover__meta">{a.body}</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="topbar__pop-anchor">
-        <button
-          className="topbar__avatar"
-          onClick={() => {
-            setMenuOpen((v) => !v)
-            setNotifOpen(false)
-          }}
-        >
-          <span className="topbar__avatar-img">{initials(displayName)}</span>
-          <span>
-            <div className="topbar__avatar-name">{displayName}</div>
-            <div className="topbar__avatar-role">{company?.name || '—'}</div>
+      <div className="topbar-meta">
+        {!apiOnline && (
+          <span className="pill warn pill--icon" title={`${t('common.offline')} — ${t('common.offlineHint')}`}>
+            <WifiOff size={12} strokeWidth={1.9} />
+            <span className="pill__text">{t('common.offline')}</span>
           </span>
-        </button>
-        <AnimatePresence>
-          {menuOpen && (
-            <motion.div className="popover popover--right" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-              <button className="popover__row" onClick={() => go('/app/settings')}>
-                <SettingsIcon size={15} strokeWidth={2.2} />
-                <span className="popover__title">{t('nav.settings')}</span>
-              </button>
-              <button
-                className="popover__row popover__row--danger"
-                onClick={async () => {
-                  await logout()
-                  navigate('/login', { replace: true })
-                }}
+        )}
+
+        {score && (
+          <span className="chip optional" title="Muhai Score">
+            <Gauge size={13} strokeWidth={1.9} />
+            Muhai Score <b>{score.total_score}</b>
+          </span>
+        )}
+
+        <LanguageToggle />
+
+        <div className="topbar__pop-anchor">
+          <button
+            className="topbar__icon-btn"
+            aria-label="Notifications"
+            onClick={() => {
+              setNotifOpen((v) => !v)
+              setMenuOpen(false)
+            }}
+          >
+            <Bell size={15} strokeWidth={1.9} />
+            {alerts.length > 0 && <span className="topbar__notif-dot" />}
+          </button>
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                className="popover popover--right"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: [0.22, 0.8, 0.3, 1] }}
               >
-                <LogOut size={15} strokeWidth={2.2} />
-                <span className="popover__title">{t('auth.logout')}</span>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {alerts.length === 0 ? (
+                  <div className="popover__empty">{t('common.none')}</div>
+                ) : (
+                  alerts.slice(0, 6).map((a) => (
+                    <button key={a.key} className="popover__row" onClick={() => go(a.to)}>
+                      <span className={`popover__dot popover__dot--${a.tone}`} />
+                      <span className="grow">
+                        <span className="popover__title">{a.title}</span>
+                        <span className="popover__meta">{a.body}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="topbar__pop-anchor">
+          <button
+            className="topbar__avatar"
+            onClick={() => {
+              setMenuOpen((v) => !v)
+              setNotifOpen(false)
+            }}
+          >
+            <span className="topbar__avatar-img">{initials(displayName)}</span>
+            <span>
+              <span className="topbar__avatar-name">{displayName}</span>
+              <span className="topbar__avatar-role">{company?.name || '—'}</span>
+            </span>
+          </button>
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                className="popover popover--right"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.16, ease: [0.22, 0.8, 0.3, 1] }}
+              >
+                <button className="popover__row" onClick={() => go('/app/settings')}>
+                  <SettingsIcon size={14} strokeWidth={1.9} />
+                  <span className="popover__title">{t('nav.settings')}</span>
+                </button>
+                <button
+                  className="popover__row popover__row--danger"
+                  onClick={async () => {
+                    await logout()
+                    navigate('/login', { replace: true })
+                  }}
+                >
+                  <LogOut size={14} strokeWidth={1.9} />
+                  <span className="popover__title">{t('auth.logout')}</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </header>
   )

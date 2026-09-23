@@ -5,6 +5,7 @@ import { ArrowRight, Loader2, Lock, Mail } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
+import GoogleButton from '../components/auth/GoogleButton.jsx'
 
 export default function Login() {
   const { t, lang } = useLang()
@@ -35,11 +36,13 @@ export default function Login() {
 
   return (
     <AuthShell title={t('auth.loginTitle')} subtitle={t('auth.loginSub')}>
+      <GoogleButton onDone={() => navigate(from, { replace: true })} />
+
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <label className="field">
           <span className="field__label">{t('auth.email')}</span>
           <span className="field__wrap">
-            <Mail size={16} strokeWidth={2.1} />
+            <Mail size={16} strokeWidth={1.9} />
             <input
               type="email"
               autoComplete="email"
@@ -54,7 +57,7 @@ export default function Login() {
         <label className="field">
           <span className="field__label">{t('auth.password')}</span>
           <span className="field__wrap">
-            <Lock size={16} strokeWidth={2.1} />
+            <Lock size={16} strokeWidth={1.9} />
             <input
               type="password"
               autoComplete="current-password"
@@ -72,10 +75,10 @@ export default function Login() {
           </motion.div>
         )}
 
-        <button className="btn btn--brand btn--block" type="submit" disabled={busy}>
+        <button className="btn btn--primary btn--block" type="submit" disabled={busy}>
           {busy ? <Loader2 size={16} className="spin" /> : null}
           {busy ? t('auth.loggingIn') : t('auth.login')}
-          {!busy && <ArrowRight size={16} strokeWidth={2.4} />}
+          {!busy && <ArrowRight size={16} strokeWidth={1.9} />}
         </button>
 
       </form>

@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Building2, Loader2, Lock, Mail, User } from 'luc
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
+import GoogleButton from '../components/auth/GoogleButton.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
 const LEGAL_FORMS = ['ltd', 'as', 'sahis', 'koop']
@@ -25,7 +26,6 @@ export default function Register() {
     city: '',
     sector: 'general',
     legalForm: 'ltd',
-    withDemoData: true,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -64,7 +64,6 @@ export default function Register() {
         email: form.email.trim(),
         password: form.password,
         displayName: form.displayName.trim(),
-        withDemoData: form.withDemoData,
         company: {
           name: form.companyName.trim(),
           taxId: form.taxId.trim(),
@@ -96,11 +95,16 @@ export default function Register() {
       </div>
 
       {step === 1 ? (
+        <>
+        {/* Step one only. Past it an account is half-made, and Google would
+            start a second one beside it. */}
+        <GoogleButton onDone={() => navigate('/app', { replace: true })} />
+
         <form className="auth-form" onSubmit={goToStep2} noValidate>
           <label className="field">
             <span className="field__label">{t('auth.fullName')}</span>
             <span className="field__wrap">
-              <User size={16} strokeWidth={2.1} />
+              <User size={16} strokeWidth={1.9} />
               <input value={form.displayName} onChange={set('displayName')} autoComplete="name" required placeholder="Emin Baytar" />
             </span>
           </label>
@@ -108,7 +112,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.email')}</span>
             <span className="field__wrap">
-              <Mail size={16} strokeWidth={2.1} />
+              <Mail size={16} strokeWidth={1.9} />
               <input type="email" value={form.email} onChange={set('email')} autoComplete="email" required placeholder="ornek@sirket.com" />
             </span>
           </label>
@@ -116,7 +120,7 @@ export default function Register() {
           <label className="field">
             <span className="field__label">{t('auth.password')}</span>
             <span className="field__wrap">
-              <Lock size={16} strokeWidth={2.1} />
+              <Lock size={16} strokeWidth={1.9} />
               <input
                 type="password"
                 value={form.password}
@@ -136,16 +140,17 @@ export default function Register() {
             </motion.div>
           )}
 
-          <button className="btn btn--brand btn--block" type="submit">
-            {t('auth.next')} <ArrowRight size={16} strokeWidth={2.4} />
+          <button className="btn btn--primary btn--block" type="submit">
+            {t('auth.next')} <ArrowRight size={16} strokeWidth={1.9} />
           </button>
         </form>
+        </>
       ) : (
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <label className="field">
             <span className="field__label">{t('auth.companyName')}</span>
             <span className="field__wrap">
-              <Building2 size={16} strokeWidth={2.1} />
+              <Building2 size={16} strokeWidth={1.9} />
               <input value={form.companyName} onChange={set('companyName')} required placeholder="Atlas Ticaret Ltd. Şti." />
             </span>
           </label>
@@ -199,14 +204,6 @@ export default function Register() {
             </span>
           </label>
 
-          <label className="checkbox-row">
-            <input type="checkbox" checked={form.withDemoData} onChange={set('withDemoData')} />
-            <span>
-              <strong>{t('auth.demoToggle')}</strong>
-              <em>{t('auth.demoToggleHint')}</em>
-            </span>
-          </label>
-
           {error && (
             <motion.div className="auth-alert auth-alert--error" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
               {error}
@@ -215,9 +212,9 @@ export default function Register() {
 
           <div className="auth-actions">
             <button className="btn btn--ghost" type="button" onClick={() => setStep(1)} disabled={busy}>
-              <ArrowLeft size={16} strokeWidth={2.4} /> {t('auth.back')}
+              <ArrowLeft size={16} strokeWidth={1.9} /> {t('auth.back')}
             </button>
-            <button className="btn btn--brand" type="submit" disabled={busy}>
+            <button className="btn btn--primary" type="submit" disabled={busy}>
               {busy && <Loader2 size={16} className="spin" />}
               {busy ? t('auth.registering') : t('auth.register')}
             </button>

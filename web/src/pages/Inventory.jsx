@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Boxes, Loader2, Minus, Plus, Search, Trash2, X } from 'lucide-react'
+import { BarChart3, Boxes, Loader2, Minus, Plus, Search, Timer, Trash2, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { formatCurrency, formatNumber } from '../lib/format.js'
@@ -89,11 +89,15 @@ export default function Inventory() {
     <div className="page">
       <div className="page-head page-head-row">
         <div>
+          <div className="page-eyebrow">
+            <Boxes size={14} strokeWidth={1.9} />
+            <span className="label">{t('nav.inventory')}</span>
+          </div>
           <h1 className="page-title">{t('inventory.title')}</h1>
           <p className="page-sub">{t('inventory.subtitle')}</p>
         </div>
-        <button className="btn btn--brand btn--sm" onClick={() => setModal(emptyProduct())}>
-          <Plus size={14} strokeWidth={2.6} /> {t('inventory.addProduct')}
+        <button className="btn btn--primary btn--sm" onClick={() => setModal(emptyProduct())}>
+          <Plus size={14} strokeWidth={1.9} /> {t('inventory.addProduct')}
         </button>
       </div>
 
@@ -122,7 +126,7 @@ export default function Inventory() {
 
       {critical.length > 0 && (
         <div className="review-banner">
-          <Boxes size={18} strokeWidth={2.2} />
+          <Boxes size={18} strokeWidth={1.9} />
           <span>
             <strong>{t('inventory.kpiLow')}</strong> — {critical.map((p) => p.name).join(', ')}
           </span>
@@ -133,7 +137,10 @@ export default function Inventory() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{lang === 'en' ? 'Months of cover' : 'Kaç aylık stok'}</div>
+              <div className="panel-title">
+                <Timer size={15} strokeWidth={1.9} />
+                {lang === 'en' ? 'Months of cover' : 'Kaç aylık stok'}
+              </div>
               <div className="panel-sub">
                 {lang === 'en' ? 'Stock ÷ recorded monthly usage' : 'Stok ÷ aylık kullanım'}
               </div>
@@ -144,7 +151,7 @@ export default function Inventory() {
               data={coverChart}
               labels={coverChart.map((d) => d.label.split(' ')[0])}
               keys={['value']}
-              colors={['var(--c-sky)']}
+              colors={['var(--d1)']}
               seriesNames={[lang === 'en' ? 'Months' : 'Ay']}
               formatValue={(v) => `${v} ${lang === 'en' ? 'mo' : 'ay'}`}
               height={220}
@@ -157,7 +164,7 @@ export default function Inventory() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('inventory.topTitle')}</div>
+              <div className="panel-title"><BarChart3 size={15} strokeWidth={1.9} />{t('inventory.topTitle')}</div>
               <div className="panel-sub">{lang === 'en' ? 'By stock value' : 'Stok değerine göre'}</div>
             </div>
           </div>
@@ -168,7 +175,7 @@ export default function Inventory() {
               .map((p) => (
                 <div className="legend__row" key={p.id}>
                   <span className="legend__left">
-                    <span className="legend__swatch" style={{ background: statusOf(p) === 'in' ? 'var(--c-emerald)' : 'var(--c-amber)' }} />
+                    <span className="legend__swatch" style={{ background: statusOf(p) === 'in' ? 'var(--ok)' : 'var(--warn)' }} />
                     {p.name}
                   </span>
                   <span className="legend__val">{cur((Number(p.stock) || 0) * (Number(p.unitPrice) || 0))}</span>
@@ -180,11 +187,11 @@ export default function Inventory() {
         <motion.section className="panel dash-invoices" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.14 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('inventory.tableTitle')}</div>
+              <div className="panel-title"><Boxes size={15} strokeWidth={1.9} />{t('inventory.tableTitle')}</div>
               <div className="panel-sub">{visible.length} / {products.length}</div>
             </div>
             <label className="search-inline">
-              <Search size={15} strokeWidth={2.2} />
+              <Search size={15} strokeWidth={1.9} />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('common.search')} />
             </label>
           </div>
@@ -223,13 +230,13 @@ export default function Inventory() {
                       <td style={{ paddingRight: 22 }}>
                         <div className="row-actions">
                           <button className="icon-btn" onClick={() => adjustStock(p, -1)} disabled={busyId === p.id} title="-1">
-                            <Minus size={14} strokeWidth={2.4} />
+                            <Minus size={14} strokeWidth={1.9} />
                           </button>
                           <button className="icon-btn" onClick={() => adjustStock(p, 1)} disabled={busyId === p.id} title="+1">
-                            <Plus size={14} strokeWidth={2.4} />
+                            <Plus size={14} strokeWidth={1.9} />
                           </button>
                           <button className="icon-btn icon-btn--danger" onClick={() => handleDelete(p)} disabled={busyId === p.id} title={t('common.delete')}>
-                            <Trash2 size={14} strokeWidth={2.2} />
+                            <Trash2 size={14} strokeWidth={1.9} />
                           </button>
                         </div>
                       </td>
@@ -293,11 +300,11 @@ function ProductModal({ product, onClose, onSave }) {
 
   return (
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <motion.div className="modal" initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25 }}>
+      <motion.div className="modal" initial={{ x: 28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}>
         <div className="modal__head">
           <div className="modal__title">{t('inventory.addProduct')}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={2.2} />
+            <X size={16} strokeWidth={1.9} />
           </button>
         </div>
         <form onSubmit={submit}>
@@ -356,7 +363,7 @@ function ProductModal({ product, onClose, onSave }) {
             <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn--brand" disabled={busy}>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy && <Loader2 size={15} className="spin" />}
               {t('common.save')}
             </button>

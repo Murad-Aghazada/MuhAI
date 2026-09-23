@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, Loader2, Sparkles, X } from 'lucide-react'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
-import { splitVat } from '../../lib/seed.js'
+import { splitVat } from '../../lib/vat.js'
 import { classifyExpenses } from '../../lib/api.js'
 import { rememberVendorCategory, vendorKey } from '../../lib/db.js'
 
@@ -127,9 +127,9 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <motion.div
         className="modal modal--wide"
-        initial={{ opacity: 0, scale: 0.97, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ x: 28, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
       >
         <div className="modal__head">
           <div>
@@ -139,7 +139,9 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
             {invoice.ocrConfidence != null && (
               <div className="modal__sub">
                 OCR {lang === 'en' ? 'confidence' : 'güveni'} %{Math.round(invoice.ocrConfidence * 100)}
-                {invoice.source === 'ocr' ? ' · Tesseract 5 (server)' : ' · tesseract.js'}
+                {invoice.source === 'ocr'
+                  ? lang === 'en' ? ' · on the server' : ' · sunucuda'
+                  : lang === 'en' ? ' · on this device' : ' · cihaz üstünde'}
               </div>
             )}
           </div>
@@ -147,7 +149,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
               to type="submit", which made this X the form's default button —
               so Enter anywhere in the form activated *close*, not save. */}
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={2.2} />
+            <X size={16} strokeWidth={1.9} />
           </button>
         </div>
 
@@ -155,7 +157,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
           <div className="modal__body">
             {lowFields.length > 0 && (
               <div className="review-banner" style={{ margin: 0 }}>
-                <AlertTriangle size={17} strokeWidth={2.2} />
+                <AlertTriangle size={17} strokeWidth={1.9} />
                 <span>
                   {lowFields.length} {t('invoices.reviewBody')}
                 </span>
@@ -241,7 +243,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
                 </span>
                 {suggestion && (
                   <span className="field__hint field__hint--learn">
-                    <Sparkles size={12} strokeWidth={2.4} />
+                    <Sparkles size={12} strokeWidth={1.9} />
                     {suggestion.source === 'learned'
                       ? t('invoices.catLearned')
                       : t('invoices.catSuggested')}
@@ -285,7 +287,7 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
             <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn--brand" disabled={busy}>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy && <Loader2 size={15} className="spin" />}
               {busy ? t('invoices.saving') : t('invoices.saveInvoice')}
             </button>

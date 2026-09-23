@@ -88,11 +88,20 @@ def _insight(series: list[dict], rollup: dict, runway_days: float) -> str:
 
     current, previous = series[-1], (series[-2] if len(series) > 1 else series[-1])
 
-    if rollup["overdue_count"] > 0:
+    # Collection advice belongs to the sales side. An overdue *purchase*
+    # invoice is a debt this company owes, so it gets its own sentence rather
+    # than being counted into a receivables figure it has nothing to do with.
+    if rollup["overdue_receivable_count"] > 0:
         return (
-            f"{rollup['overdue_count']} fatura vadesini geçti; toplam "
-            f"{rollup['receivables']:,.0f} ₺ tahsilat bekliyor. Tahsilat "
+            f"{rollup['overdue_receivable_count']} satış faturası vadesini geçti; "
+            f"toplam {rollup['receivables']:,.0f} ₺ tahsilat bekliyor. Tahsilat "
             "hatırlatması göndermek nakit akışınızı doğrudan iyileştirir."
+        )
+    if rollup["overdue_payable_count"] > 0:
+        return (
+            f"{rollup['overdue_payable_count']} alış faturasının vadesi geçti; "
+            f"toplam {rollup['payables']:,.0f} ₺ borcunuz var. Gecikme faizi "
+            "işlemeden ödeme planı yapın."
         )
     if current["expense"] > previous["expense"] * 1.15 and previous["expense"] > 0:
         jump = (current["expense"] / previous["expense"] - 1) * 100

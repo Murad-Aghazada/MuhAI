@@ -7,7 +7,7 @@ import { useChat } from './useChat.js'
 import ChatMessages from './ChatMessages.jsx'
 import ChatComposer from './ChatComposer.jsx'
 
-export default function ChatWidget({ compact = false }) {
+export default function ChatWidget() {
   const { t } = useLang()
   const { messages, loading, send } = useChat()
   const [open, setOpen] = useState(false)
@@ -23,7 +23,7 @@ export default function ChatWidget({ compact = false }) {
       <AnimatePresence>
         {!open && (
           <motion.button
-            className={`chat-fab ${compact ? 'chat-fab--compact' : ''}`}
+            className="chat-fab"
             onClick={() => setOpen(true)}
             aria-label={t('chatbot.open')}
             initial={{ opacity: 0, scale: 0.8, y: 10 }}
@@ -31,13 +31,7 @@ export default function ChatWidget({ compact = false }) {
             exit={{ opacity: 0, scale: 0.8, y: 10 }}
             transition={{ type: 'spring', stiffness: 380, damping: 28 }}
           >
-            <span className="chat-fab__spark">
-              <Sparkles size={16} strokeWidth={2.4} />
-            </span>
-            {/* Kept in the DOM and hidden in CSS rather than removed: the
-                compact state is only meaningful under the drawer breakpoint,
-                and a stale `compact` must not strip the label on desktop. */}
-            <span className="chat-fab__label">{t('chatbot.open')}</span>
+            <Sparkles size={18} strokeWidth={1.75} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -53,7 +47,7 @@ export default function ChatWidget({ compact = false }) {
           >
             <div className="chat-head">
               <span className="chat-head__av">
-                <Sparkles size={19} strokeWidth={2.3} />
+                <Sparkles size={16} strokeWidth={1.9} />
               </span>
               <div style={{ flex: 1 }}>
                 <div className="chat-head__name">{t('chatbot.title')}</div>
@@ -62,8 +56,8 @@ export default function ChatWidget({ compact = false }) {
                   {t('chatbot.online')}
                 </div>
               </div>
-              <button className="topbar__icon-btn" onClick={() => setOpen(false)} aria-label="Close" style={{ width: 34, height: 34 }}>
-                <X size={17} />
+              <button className="topbar__icon-btn" onClick={() => setOpen(false)} aria-label="Close" >
+                <X size={15} strokeWidth={1.9} />
               </button>
             </div>
 
@@ -73,7 +67,7 @@ export default function ChatWidget({ compact = false }) {
                 <div className="chat-suggests">
                   {suggestions.map((s) => (
                     <button key={s} className="chat-suggest" onClick={() => send(t(s))}>
-                      <ArrowRight size={14} strokeWidth={2.4} />
+                      <ArrowRight size={13} strokeWidth={1.9} />
                       {t(s)}
                     </button>
                   ))}

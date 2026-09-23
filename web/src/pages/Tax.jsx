@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CalendarClock, Calculator, CheckCircle2, Landmark } from 'lucide-react'
+import { CalendarClock, Calculator, CheckCircle2, FileText, Landmark, PieChart } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { formatCurrency, formatDate, MONTHS } from '../lib/format.js'
@@ -63,6 +63,10 @@ export default function Tax() {
   return (
     <div className="page">
       <div className="page-head">
+        <div className="page-eyebrow">
+          <Landmark size={14} strokeWidth={1.9} />
+          <span className="label">{t('nav.tax')}</span>
+        </div>
         <h1 className="page-title">{t('tax.title')}</h1>
         <p className="page-sub">{t('tax.subtitle')}</p>
       </div>
@@ -100,6 +104,7 @@ export default function Tax() {
           <div className="panel-head">
             <div>
               <div className="panel-title">
+                <Landmark size={15} strokeWidth={1.9} />
                 {lang === 'en' ? 'VAT position' : 'KDV pozisyonu'} · {taxSummary?.period ?? '—'}
               </div>
               <div className="panel-sub">
@@ -108,7 +113,6 @@ export default function Tax() {
                   : 'Hesaplanan KDV eksi indirilecek KDV'}
               </div>
             </div>
-            <Landmark size={20} color="var(--ink-4)" />
           </div>
 
           {taxSummary ? (
@@ -120,7 +124,7 @@ export default function Tax() {
                 </div>
                 <div className="kdv-row">
                   <span>{lang === 'en' ? 'Input VAT (purchases)' : 'İndirilecek KDV (alış)'}</span>
-                  <strong className="tnum" style={{ color: 'var(--neg)' }}>
+                  <strong className="tnum" style={{ color: 'var(--stop)' }}>
                     −{cur(taxSummary.kdv_paid)}
                   </strong>
                 </div>
@@ -132,7 +136,7 @@ export default function Tax() {
 
               <div className="panel-head" style={{ marginTop: 26 }}>
                 <div>
-                  <div className="panel-title">{t('tax.breakdownTitle')}</div>
+                  <div className="panel-title"><PieChart size={15} strokeWidth={1.9} />{t('tax.breakdownTitle')}</div>
                   <div className="panel-sub">
                     {lang === 'en' ? 'Total due this period' : 'Bu dönem toplam yük'} · {cur(taxSummary.total_due)}
                   </div>
@@ -143,7 +147,7 @@ export default function Tax() {
                   data={burden}
                   labels={burden.map((b) => b.label)}
                   keys={['value']}
-                  colors={['var(--c-amber)']}
+                  colors={['var(--d1)']}
                   seriesNames={[lang === 'en' ? 'Amount' : 'Tutar']}
                   formatValue={cur}
                   height={180}
@@ -161,7 +165,7 @@ export default function Tax() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('tax.calcTitle')}</div>
+              <div className="panel-title"><Calculator size={15} strokeWidth={1.9} />{t('tax.calcTitle')}</div>
               <div className="panel-sub">{t('tax.calcSub')}</div>
             </div>
             <Calculator size={20} color="var(--ink-4)" />
@@ -193,7 +197,7 @@ export default function Tax() {
             </div>
             <div className="kdv-row">
               <span>{t('tax.calcVat')}</span>
-              <strong className="tnum" style={{ color: 'var(--c-amber)' }}>{cur(calc.vat)}</strong>
+              <strong className="tnum" style={{ color: 'var(--ink)' }}>{cur(calc.vat)}</strong>
             </div>
             <div className="kdv-row kdv-row--total">
               <span>{t('tax.calcGross')}</span>
@@ -203,8 +207,8 @@ export default function Tax() {
 
           <p className="score-reco" style={{ marginTop: 20 }}>
             {lang === 'en'
-              ? 'Rates are the official 2026 values from the backend tax engine (VAT 20/10/1%, corporate 25%, rent withholding 20%).'
-              : 'Oranlar backend vergi motorundaki resmi 2026 değerleridir (KDV %20/%10/%1, kurumlar %25, kira stopajı %20).'}
+              ? 'Official 2026 rates: VAT 20/10/1%, corporate 25%, rent withholding 20%.'
+              : 'Resmi 2026 oranları: KDV %20/%10/%1, kurumlar %25, kira stopajı %20.'}
           </p>
         </motion.section>
 
@@ -212,7 +216,7 @@ export default function Tax() {
         <motion.section className="panel dash-invoices" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.14 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('tax.filingsTitle')}</div>
+              <div className="panel-title"><FileText size={15} strokeWidth={1.9} />{t('tax.filingsTitle')}</div>
               <div className="panel-sub">{t('tax.timelineSub')}</div>
             </div>
             <CalendarClock size={20} color="var(--ink-4)" />
@@ -249,7 +253,7 @@ export default function Tax() {
                         <div className="row-actions">
                           {o.status !== 'filed' && (
                             <button className="icon-btn" onClick={() => markFiled(o)} disabled={busyId === o.id} title={t('tax.stFiled')}>
-                              <CheckCircle2 size={15} strokeWidth={2.2} />
+                              <CheckCircle2 size={15} strokeWidth={1.9} />
                             </button>
                           )}
                         </div>
@@ -269,7 +273,7 @@ export default function Tax() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.2 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('tax.timelineTitle')}</div>
+              <div className="panel-title"><CalendarClock size={15} strokeWidth={1.9} />{t('tax.timelineTitle')}</div>
               <div className="panel-sub">
                 {lang === 'en' ? 'Statutory deadlines (2026 calendar)' : 'Yasal son tarihler (2026 takvimi)'}
               </div>

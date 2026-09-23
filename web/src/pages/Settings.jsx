@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Building2, CheckCircle2, Database, Loader2, Plug, Sparkles, Trash2, X } from 'lucide-react'
+import { Building2, Database, Loader2, Plug, Settings as SettingsIcon, Sparkles, Trash2, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -11,7 +11,6 @@ import {
   forgetVendorCategory,
   updateCompany,
 } from '../lib/db.js'
-import { seedCompany } from '../lib/seed.js'
 import { apiBaseUrl, ping } from '../lib/api.js'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 
@@ -23,12 +22,11 @@ export default function Settings() {
   const { company, companyId, refreshCompany } = useAuth()
   const {
     invoices, transactions, products, employees, taxObligations,
-    vendorCategories, loading, refresh,
+    vendorCategories, loading,
   } = useData()
 
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [seeding, setSeeding] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [forgetting, setForgetting] = useState(null)
   const [flash, setFlash] = useState(null)
@@ -69,26 +67,6 @@ export default function Settings() {
       notify(err.message, 'error')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSeed() {
-    setSeeding(true)
-    try {
-      // Clear first so re-seeding replaces the dataset instead of stacking a
-      // second year of movements on top of the first.
-      for (const name of Object.values(COLLECTIONS)) {
-        await clearCollection(name)
-      }
-      const counts = await seedCompany(companyId)
-      await refreshCompany()
-      await refresh()
-      notify(`${t('settings.seeded')} (${counts.invoices} ${t('nav.invoices').toLowerCase()}, ${counts.transactions} ${'hareket'})`)
-    } catch (err) {
-      console.error('[muhai] seeding failed', err)
-      notify(err.message, 'error')
-    } finally {
-      setSeeding(false)
     }
   }
 
@@ -147,6 +125,10 @@ export default function Settings() {
   return (
     <div className="page">
       <div className="page-head">
+        <div className="page-eyebrow">
+          <SettingsIcon size={14} strokeWidth={1.9} />
+          <span className="label">{t('nav.settings')}</span>
+        </div>
         <h1 className="page-title">{t('settings.title')}</h1>
         <p className="page-sub">{t('settings.subtitle')}</p>
       </div>
@@ -166,7 +148,7 @@ export default function Settings() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('settings.companySection')}</div>
+              <div className="panel-title"><Building2 size={15} strokeWidth={1.9} />{t('settings.companySection')}</div>
               <div className="panel-sub">PostgreSQL · companies/{companyId?.slice(0, 8)}…</div>
             </div>
             <Building2 size={20} color="var(--ink-4)" />
@@ -221,7 +203,7 @@ export default function Settings() {
                 </select>
               </span>
             </label>
-            <button className="btn btn--brand" type="submit" disabled={saving} style={{ alignSelf: 'flex-start' }}>
+            <button className="btn btn--primary" type="submit" disabled={saving} style={{ alignSelf: 'flex-start' }}>
               {saving && <Loader2 size={15} className="spin" />}
               {t('common.save')}
             </button>
@@ -231,7 +213,7 @@ export default function Settings() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.08 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('settings.connSection')}</div>
+              <div className="panel-title"><Plug size={15} strokeWidth={1.9} />{t('settings.connSection')}</div>
               <div className="panel-sub">{t('settings.counts')}</div>
             </div>
             <Plug size={20} color="var(--ink-4)" />
@@ -250,7 +232,7 @@ export default function Settings() {
             </div>
             <div className="kdv-row">
               <span>{t('common.status')}</span>
-              <strong style={{ color: apiUp ? 'var(--pos)' : 'var(--neg)' }}>
+              <strong style={{ color: apiUp ? 'var(--ok)' : 'var(--stop)' }}>
                 {apiUp == null ? '…' : apiUp ? t('common.online') : t('common.offline')}
               </strong>
             </div>
@@ -258,7 +240,7 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title">{t('settings.counts')}</div>
+              <div className="panel-title"><Database size={15} strokeWidth={1.9} />{t('settings.counts')}</div>
             </div>
             <Database size={20} color="var(--ink-4)" />
           </div>
@@ -273,7 +255,7 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title">{t('settings.vendorSection')}</div>
+              <div className="panel-title"><Sparkles size={15} strokeWidth={1.9} />{t('settings.vendorSection')}</div>
               <div className="panel-sub">{t('settings.vendorSectionSub')}</div>
             </div>
             <Sparkles size={20} color="var(--ink-4)" />
@@ -293,7 +275,7 @@ export default function Settings() {
                       aria-label={t('settings.vendorForget')}
                       title={t('settings.vendorForget')}
                     >
-                      {forgetting === v.id ? <Loader2 size={13} className="spin" /> : <X size={13} strokeWidth={2.6} />}
+                      {forgetting === v.id ? <Loader2 size={13} className="spin" /> : <X size={13} strokeWidth={1.9} />}
                     </button>
                   </li>
                 ))}
@@ -304,7 +286,7 @@ export default function Settings() {
                 onClick={handleForgetAll}
                 disabled={forgetting !== null}
               >
-                {forgetting === 'all' ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={2.3} />}
+                {forgetting === 'all' ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.9} />}
                 {t('settings.vendorForgetAll')}
               </button>
             </>
@@ -314,17 +296,13 @@ export default function Settings() {
 
           <div className="panel-head" style={{ marginTop: 26 }}>
             <div>
-              <div className="panel-title">{t('settings.dataSection')}</div>
-              <div className="panel-sub">{t('auth.demoToggleHint')}</div>
+              <div className="panel-title"><Trash2 size={15} strokeWidth={1.9} />{t('settings.dataSection')}</div>
+              <div className="panel-sub">{t('settings.dataSectionHint')}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn btn--brand btn--sm" onClick={handleSeed} disabled={seeding || clearing}>
-              {seeding ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={14} strokeWidth={2.3} />}
-              {seeding ? t('common.loadingDemo') : company?.seeded ? t('settings.reseedBtn') : t('settings.seedBtn')}
-            </button>
-            <button className="btn btn--ghost btn--sm" onClick={handleClear} disabled={seeding || clearing}>
-              {clearing ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={2.3} />}
+            <button className="btn btn--ghost btn--sm" onClick={handleClear} disabled={clearing}>
+              {clearing ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} strokeWidth={1.9} />}
               {t('settings.clearBtn')}
             </button>
           </div>

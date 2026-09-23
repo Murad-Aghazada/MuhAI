@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Loader2, Plus, Trash2, Users, X } from 'lucide-react'
+import { Loader2, PieChart, PiggyBank, Plus, Trash2, Users, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { formatCurrency, formatDate } from '../lib/format.js'
@@ -41,11 +41,11 @@ export default function Payroll() {
     const incomeTax = payroll.payslips.reduce((s, p) => s + p.income_tax, 0)
     const stamp = payroll.payslips.reduce((s, p) => s + p.stamp_tax, 0)
     return [
-      { key: 'net', label: t('payroll.net'), value: Math.round(net), color: 'var(--c-emerald)' },
-      { key: 'sgkE', label: t('payroll.sgkEmployee'), value: Math.round(sgkEmployee), color: 'var(--c-sky)' },
-      { key: 'sgkR', label: t('payroll.sgkEmployer'), value: Math.round(sgkEmployer), color: 'var(--c-violet)' },
-      { key: 'tax', label: t('payroll.incomeTax'), value: Math.round(incomeTax), color: 'var(--c-amber)' },
-      { key: 'stamp', label: t('payroll.stampTax'), value: Math.round(stamp), color: 'var(--c-coral)' },
+      { key: 'net', label: t('payroll.net'), value: Math.round(net), color: 'var(--d1)' },
+      { key: 'sgkE', label: t('payroll.sgkEmployee'), value: Math.round(sgkEmployee), color: 'var(--d2)' },
+      { key: 'sgkR', label: t('payroll.sgkEmployer'), value: Math.round(sgkEmployer), color: 'var(--d3)' },
+      { key: 'tax', label: t('payroll.incomeTax'), value: Math.round(incomeTax), color: 'var(--d4)' },
+      { key: 'stamp', label: t('payroll.stampTax'), value: Math.round(stamp), color: 'var(--d5)' },
     ].filter((d) => d.value > 0)
   }, [payroll, t])
 
@@ -66,11 +66,15 @@ export default function Payroll() {
     <div className="page">
       <div className="page-head page-head-row">
         <div>
+          <div className="page-eyebrow">
+            <Users size={14} strokeWidth={1.9} />
+            <span className="label">{t('nav.payroll')}</span>
+          </div>
           <h1 className="page-title">{t('payroll.title')}</h1>
           <p className="page-sub">{t('payroll.subtitle')}</p>
         </div>
-        <button className="btn btn--brand btn--sm" onClick={() => setModal(emptyEmployee())}>
-          <Plus size={14} strokeWidth={2.6} /> {lang === 'en' ? 'Add employee' : 'Çalışan ekle'}
+        <button className="btn btn--primary btn--sm" onClick={() => setModal(emptyEmployee())}>
+          <Plus size={14} strokeWidth={1.9} /> {lang === 'en' ? 'Add employee' : 'Çalışan ekle'}
         </button>
       </div>
 
@@ -91,7 +95,7 @@ export default function Payroll() {
         </div>
         <div className="mini-stats__item">
           <div className="mini-stats__label">{t('payroll.kpiNet')}</div>
-          <div className="mini-stats__value tnum mini-stats__value--pos">{payroll ? cur(payroll.total_net) : '—'}</div>
+          <div className="mini-stats__value tnum">{payroll ? cur(payroll.total_net) : '—'}</div>
         </div>
         <div className="mini-stats__item">
           <div className="mini-stats__label">{lang === 'en' ? 'Employer cost' : 'İşveren maliyeti'}</div>
@@ -103,11 +107,11 @@ export default function Payroll() {
         <motion.section className="panel dash-cashflow" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('payroll.tableTitle')}</div>
+              <div className="panel-title"><Users size={15} strokeWidth={1.9} />{t('payroll.tableTitle')}</div>
               <div className="panel-sub">
                 {lang === 'en'
-                  ? 'Computed by the backend payroll engine (2026 SGK, income tax, stamp duty)'
-                  : 'Backend bordro motoruyla hesaplandı (2026 SGK, gelir vergisi, damga)'}
+                  ? '2026 rates: SGK, income tax and stamp duty'
+                  : '2026 oranlarıyla: SGK, gelir vergisi ve damga'}
               </div>
             </div>
             <Users size={20} color="var(--ink-4)" />
@@ -138,7 +142,7 @@ export default function Payroll() {
                     </td>
                     <td>{employee.role || '—'}</td>
                     <td className="num tnum">{cur(employee.grossSalary)}</td>
-                    <td className="num tnum" style={{ color: 'var(--neg)' }}>
+                    <td className="num tnum" style={{ color: 'var(--stop)' }}>
                       {slip ? `−${cur(slip.total_deductions)}` : '—'}
                     </td>
                     <td className="num tnum strong">{slip ? cur(slip.net_salary) : '—'}</td>
@@ -151,7 +155,7 @@ export default function Payroll() {
                           disabled={busyId === employee.id}
                           title={t('common.delete')}
                         >
-                          <Trash2 size={14} strokeWidth={2.2} />
+                          <Trash2 size={14} strokeWidth={1.9} />
                         </button>
                       </div>
                     </td>
@@ -168,7 +172,7 @@ export default function Payroll() {
         <motion.section className="panel" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.1 }}>
           <div className="panel-head">
             <div>
-              <div className="panel-title">{t('payroll.breakdownTitle')}</div>
+              <div className="panel-title"><PieChart size={15} strokeWidth={1.9} />{t('payroll.breakdownTitle')}</div>
               <div className="panel-sub">{t('payroll.breakdownSub')}</div>
             </div>
           </div>
@@ -200,7 +204,10 @@ export default function Payroll() {
           <motion.section className="panel dash-forecast" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.16 }}>
             <div className="panel-head">
               <div>
-                <div className="panel-title">{lang === 'en' ? 'Severance provision' : 'Kıdem tazminatı karşılığı'}</div>
+                <div className="panel-title">
+                  <PiggyBank size={15} strokeWidth={1.9} />
+                  {lang === 'en' ? 'Severance provision' : 'Kıdem tazminatı karşılığı'}
+                </div>
                 <div className="panel-sub">
                   {lang === 'en'
                     ? 'Accrued liability if every contract ended today'
@@ -273,11 +280,11 @@ function EmployeeModal({ employee, onClose, onSave }) {
 
   return (
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <motion.div className="modal" initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.25 }}>
+      <motion.div className="modal" initial={{ x: 28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}>
         <div className="modal__head">
           <div className="modal__title">{lang === 'en' ? 'Add employee' : 'Çalışan ekle'}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
-            <X size={16} strokeWidth={2.2} />
+            <X size={16} strokeWidth={1.9} />
           </button>
         </div>
         <form onSubmit={submit}>
@@ -323,7 +330,7 @@ function EmployeeModal({ employee, onClose, onSave }) {
             <button type="button" className="btn btn--ghost" onClick={onClose} disabled={busy}>
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn--brand" disabled={busy}>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy && <Loader2 size={15} className="spin" />}
               {t('common.save')}
             </button>

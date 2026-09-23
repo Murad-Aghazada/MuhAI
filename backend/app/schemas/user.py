@@ -30,6 +30,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuth(BaseModel):
+    """The Firebase ID token the browser got from "sign in with Google"."""
+
+    id_token: str = Field(min_length=1)
+
+
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6, max_length=128)

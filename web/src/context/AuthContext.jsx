@@ -2,8 +2,8 @@
    Authentication + company identity.
 
    One account owns one company. Registration creates both in a single server
-   transaction, then optionally seeds a demo dataset so the dashboard is never
-   an empty shell.
+   transaction and leaves the workspace empty — the only seeded dataset is the
+   demo account the backend's scripts/seed_demo.py writes.
 
    The session is a JWT issued by Muhai's own API and kept in localStorage. On
    load the app asks /api/auth/me whether that token is still good — one round
@@ -20,7 +20,13 @@ import {
   setUnauthenticatedHandler,
 } from '../lib/client.js'
 import { getCompany, updateCompany } from '../lib/db.js'
-import { seedCompany } from '../lib/seed.js'
+import {
+  CANCELLED,
+  completeRedirectSignIn,
+  getGoogleIdToken,
+  hasPendingRedirect,
+  signOutOfGoogle,
+} from '../lib/firebase.js'
 
 const AuthContext = createContext(null)
 
@@ -115,8 +121,16 @@ export function AuthProvider({ children }) {
     }
   }, [applySession])
 
+  /**
+   * Create the account and its company in one call.
+   *
+   * The new workspace is empty, and stays that way until its owner puts
+   * something in it. Registration used to generate a year of demo trading in
+   * the browser and write it here; the only seeded dataset now is the demo
+   * account the backend creates.
+   */
   const register = useCallback(
-    async ({ email, password, displayName, company: companyInput, withDemoData = true }) => {
+    async ({ email, password, displayName, company: companyInput }) => {
       const session = await post(
         '/api/auth/register',
         {
@@ -139,17 +153,6 @@ export function AuthProvider({ children }) {
       setToken(session.access_token)
       applySession(session)
 
-      if (withDemoData) {
-        // A seeding failure must not strand a real, created account — the user
-        // lands in the app with an empty state they can seed from Settings.
-        try {
-          await seedCompany(session.company.id)
-          setCompany(await getCompany())
-        } catch (e) {
-          console.error('[muhai] demo seeding failed', e)
-        }
-      }
-
       return session.company?.id ?? null
     },
     [applySession],
@@ -165,8 +168,58 @@ export function AuthProvider({ children }) {
     [applySession],
   )
 
+  /**
+   * Turn a Firebase ID token into a Muhai session.
+   *
+   * The exchange is the whole point: Google proves who the person is, the
+   * API decides what they may see. Firebase is never the session, so every
+   * later request is authenticated exactly the way a password login is.
+   */
+  const exchangeGoogleToken = useCallback(
+    async (idToken) => {
+      const session = await post('/api/auth/google', { id_token: idToken }, { auth: false })
+      setToken(session.access_token)
+      applySession(session)
+      return toUser(session.user)
+    },
+    [applySession],
+  )
+
+  /**
+   * Returns the signed-in user, or null when the browser had to fall back to
+   * a redirect — in that case the page navigates away and comes back through
+   * the effect below, so the caller should simply stop.
+   */
+  const loginWithGoogle = useCallback(async () => {
+    const idToken = await getGoogleIdToken()
+    if (!idToken) return null
+    return exchangeGoogleToken(idToken)
+  }, [exchangeGoogleToken])
+
+  // The return leg of the redirect fallback. Gated on the flag the redirect
+  // set, so an ordinary page load never pulls the Firebase SDK in just to be
+  // told that nothing happened.
+  useEffect(() => {
+    if (!hasPendingRedirect()) return undefined
+    let cancelled = false
+    completeRedirectSignIn()
+      .then((idToken) => {
+        if (idToken && !cancelled) return exchangeGoogleToken(idToken)
+        return null
+      })
+      .catch((err) => {
+        if (!cancelled && !CANCELLED.has(err?.code)) setError(err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [exchangeGoogleToken])
+
   const logout = useCallback(async () => {
-    // Nothing to revoke: the token is stateless and short-lived by policy.
+    // Nothing to revoke on our side: the token is stateless and short-lived
+    // by policy. Google's session is separate and has to be dropped too, or
+    // the next "sign in with Google" silently resumes the account just left.
+    await signOutOfGoogle()
     endSession()
   }, [endSession])
 
@@ -222,13 +275,14 @@ export function AuthProvider({ children }) {
       error,
       register,
       login,
+      loginWithGoogle,
       logout,
       refreshCompany,
       saveCompany,
       createCompanyForAccount,
     }),
     [
-      user, profile, company, loading, error, register, login, logout,
+      user, profile, company, loading, error, register, login, loginWithGoogle, logout,
       refreshCompany, saveCompany, createCompanyForAccount,
     ],
   )

@@ -4,15 +4,30 @@ import { useInView } from 'framer-motion'
 /**
  * Counts up to `value`, ideally when scrolled into view.
  *
- * The count-up is decoration; the number is the point. IntersectionObserver
- * is unreliable in embedded/iframed contexts (it can simply never fire), and
- * a KPI frozen at zero is far worse than one that animates a beat early — so
- * a fallback timer starts the animation regardless, and the value is always
- * settled exactly rather than left at the last interpolated frame.
+ * The count-up is decoration; the number is the point. Both halves of it are
+ * unreliable in an embedded or occluded tab, so both have a timer behind them:
+ *
+ *   - IntersectionObserver can simply never fire, so the animation starts on a
+ *     timer whether or not the element is reported in view.
+ *   - requestAnimationFrame can never fire either — a tab that reports
+ *     `visibilityState === 'visible'` is still not painting when it is
+ *     occluded or backgrounded, and rAF callbacks then queue forever. That
+ *     left the count-up stranded at its starting zero, which on a dashboard is
+ *     the one failure that matters: every other figure on the page reads
+ *     correctly while the headline says ₺0.
+ *
+ * So a settle timer writes the exact target once the animation's own duration
+ * has passed, whether a single frame was painted or none. When frames do run
+ * it lands on the same value the last frame already set, and React drops the
+ * no-op render.
  *
  * `prefers-reduced-motion` skips the animation entirely.
  */
 const START_FALLBACK_MS = 400
+
+// A little past the animation's own duration, so the settle only ever lands
+// after the frames would have.
+const SETTLE_GRACE_MS = 80
 
 export default function AnimatedNumber({ value, format = (n) => Math.round(n).toString(), duration = 1.2, className }) {
   const ref = useRef(null)
@@ -55,7 +70,12 @@ export default function AnimatedNumber({ value, format = (n) => Math.round(n).to
     }
     rafRef.current = requestAnimationFrame(tick)
 
-    return () => cancelAnimationFrame(rafRef.current)
+    const settle = setTimeout(() => setDisplay(target), duration * 1000 + SETTLE_GRACE_MS)
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      clearTimeout(settle)
+    }
   }, [started, value, duration])
 
   return (

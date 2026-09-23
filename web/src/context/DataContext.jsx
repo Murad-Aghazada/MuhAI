@@ -119,9 +119,15 @@ export function DataProvider({ children }) {
         invoices: raw.invoices,
         products: raw.products,
         employees: raw.employees,
+        // Filing history: the score's two compliance categories are 25% of the
+        // total and had nothing to read until this was carried across.
+        taxObligations: raw.taxObligations,
         asOf: todayIso(),
       }),
-    [company, raw.transactions, raw.invoices, raw.products, raw.employees],
+    [
+      company, raw.transactions, raw.invoices, raw.products, raw.employees,
+      raw.taxObligations,
+    ],
   )
 
   // Compare by content: every reload hands back new array identities, and

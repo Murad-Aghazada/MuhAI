@@ -2,9 +2,9 @@ import { motion } from 'framer-motion'
 import { useReveal } from '../../lib/useReveal.js'
 
 const RATING_COLOR = {
-  green: 'var(--c-emerald)',
-  yellow: 'var(--c-amber)',
-  red: 'var(--c-coral)',
+  green: 'var(--ok)',
+  yellow: 'var(--warn)',
+  red: 'var(--stop)',
 }
 
 /** 0–100 Muhai Score as a 240° arc gauge. */

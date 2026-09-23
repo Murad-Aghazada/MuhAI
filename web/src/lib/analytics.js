@@ -74,13 +74,10 @@ export function kpiBlock(series) {
 
 /** Expense totals per category for the trailing `months` window. */
 export function expenseBreakdown(transactions = [], date = new Date(), months = 1) {
-  // Not named `window`: this file is bundled for the Expo app too, and
-  // shadowing a browser global is exactly what the shared-layer check looks
-  // for (N20).
-  const span = new Set(monthSpan(date, months))
+  const window = new Set(monthSpan(date, months))
   const totals = new Map()
   for (const t of transactions) {
-    if (t.type !== 'expense' || !span.has(monthKey(t.date))) continue
+    if (t.type !== 'expense' || !window.has(monthKey(t.date))) continue
     const key = t.category || 'other'
     totals.set(key, (totals.get(key) || 0) + (Number(t.amount) || 0))
   }
@@ -122,29 +119,75 @@ export function invoiceRollup(invoices = [], asOf = todayIso()) {
   }
 }
 
+/**
+ * Cash on hand: the company's opening balance plus everything the ledger has
+ * moved since.
+ *
+ * `cashBalance` on the company is *opening* cash, as the column says. It is a
+ * non-nullable 0 for every account that never typed one in, so a reading of
+ * "an explicit balance, or else the ledger" could never tell the two apart and
+ * reported a flat zero for every real company — which then zeroed the runway,
+ * the cash-flow score and the forecast's closing balance.
+ */
 export function cashBalance(company, transactions = []) {
-  if (company?.cashBalance != null) return round2(Number(company.cashBalance))
-  return round2(
-    transactions.reduce(
-      (sum, t) => sum + (t.type === 'income' ? 1 : -1) * (Number(t.amount) || 0),
-      0,
-    ),
+  const opening = Number(company?.cashBalance) || 0
+  const movement = transactions.reduce(
+    (sum, t) => sum + (t.type === 'income' ? 1 : -1) * (Number(t.amount) || 0),
+    0,
   )
+  return round2(opening + movement)
+}
+
+/**
+ * How many statutory obligations came due, and how many were filed on time.
+ *
+ * Only obligations whose due date has passed count: a draft for next month is
+ * not late yet, and counting it would read as a missed deadline. Without this
+ * the score engine saw no history at all and scored both compliance
+ * categories — a quarter of the total — at a flat 100%.
+ */
+function complianceCounts(obligations = [], matches, asOf) {
+  let total = 0
+  let onTime = 0
+  for (const o of obligations) {
+    if (!matches(o) || !o.dueDate || o.dueDate > asOf) continue
+    total++
+    if (o.status !== 'filed') continue
+    // Filed with no recorded date: credit it rather than penalise missing
+    // metadata, the same way the backend treats a paid invoice.
+    if (!o.paidDate || o.paidDate <= o.dueDate) onTime++
+  }
+  return { total, onTime }
 }
 
 /**
  * The payload posted to /api/compute/*. Trimmed to what the engines read,
  * so a company with thousands of movements still sends a compact body.
  */
-export function buildSnapshot({ company, transactions = [], invoices = [], products = [], employees = [], asOf }) {
+export function buildSnapshot({
+  company,
+  transactions = [],
+  invoices = [],
+  products = [],
+  employees = [],
+  taxObligations = [],
+  asOf,
+}) {
   const date = asOf || todayIso()
   const horizonStart = new Date(new Date(date).getTime() - 400 * 86400000)
     .toISOString()
     .slice(0, 10)
 
+  const tax = complianceCounts(taxObligations, (o) => o.type !== 'sgk', date)
+  const sgk = complianceCounts(taxObligations, (o) => o.type === 'sgk', date)
+
   return {
     as_of: date,
     cash_balance: cashBalance(company, transactions),
+    tax_deadlines_total: tax.total,
+    tax_deadlines_on_time: tax.onTime,
+    sgk_payments_total: sgk.total,
+    sgk_payments_on_time: sgk.onTime,
     transactions: transactions
       .filter((t) => t.date && t.date >= horizonStart && t.date <= date)
       .map((t) => ({
