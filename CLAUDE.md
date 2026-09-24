@@ -144,7 +144,7 @@ All four are git-ignored.
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 296 tests.**
+through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 319 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -199,7 +199,9 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 296 tests.**
   reconciliation gets built on the workspace
 
 **Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
-**553 kB (171 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**543 kB (168 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**Nothing in the repo depends on Firebase any more** (2026-09-24) — see
+"sign-in" below.
 
 **One design language, everywhere (2026-09-24).** The marketing page and
 the product used to be two products: `.lp` on the landing page (Inter
@@ -253,6 +255,17 @@ the landing language.
   sign-up, protected `/app`. **There is no password reset** — Firebase used to
   send that mail and self-hosting would need an SMTP sender. Removed on
   purpose (2026-09-08); do not re-add it as a dead button
+- **Sign-in is email + password, and nothing else (2026-09-24).** "Continue
+  with Google" is gone and so is Firebase, which was in the tree for that one
+  button: `lib/firebase.js`, `components/auth/GoogleButton.jsx`, the
+  `firebase` dependency, `AuthContext`'s `loginWithGoogle` / redirect leg /
+  `signOutOfGoogle`, the `auth.google*` strings, `.lp-google` and `.lp-or`,
+  and on the server `/api/auth/google`, `services/google_identity.py`,
+  `schemas.GoogleAuth`, `FIREBASE_PROJECT_ID` and
+  `tests/test_google_identity.py`. That removes the last third party from the
+  auth path and the last thing in `.env` naming a Firebase project. Recover it
+  all from commit `4f1d785` if a federated sign-in is ever wanted — but
+  re-adding it means re-adding a dependency on someone else's console
 - `lib/client.js` is the only place that knows where the API is or how a
   request is authenticated. `lib/db.js` is the workspace client, `lib/api.js`
   the compute client
@@ -347,7 +360,7 @@ other signed-in screens are still unverified — see open item 1.
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 296 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 296 test" — a small, defensible surface beats a big one you cannot explain |
+| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 319 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 319 test" — a small, defensible surface beats a big one you cannot explain |
 | S14 **Expo / React Native shipped** | A native Expo app runs on a real Android phone as of 2026-09-20 (`mobile/`, SDK 57, 5 screens, camera→OCR verified end to end over the LAN). Still **Expo Go only** — no EAS build, no store listing, and it has not run on iOS. | say "Expo ile native mobil uygulama" — it is now true. Do **not** say "yayında"/"mağazada": it runs through Expo Go on a development machine, not as an installable build |
 | S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
 
@@ -570,11 +583,11 @@ demoed that number before today, they demoed a literal.
 
 - **N26 — `.lp button` out-specifies every `.lp-*` class.** landing.css
   strips buttons to `background: none; border: 0` at (0,1,1) — one class
-  and one element — which beats a plain `.lp-btn` or `.lp-google` at
+  and one element — which beats a plain `.lp-btn` at
   (0,1,0). Nothing noticed for as long as the chip button was only ever a
   `<Link>`; the first real `<button type="submit">` on /login came out
   white and borderless. Any button rule written for a `.lp` surface needs
-  the extra class (`.lp button.lp-btn`, `.lp .lp-google`). The same trap
+  the extra class (`.lp button.lp-btn`). The same trap
   caught a media query in auth.css: `@media { .lp-auth__pitch {
   display: none } }` sat *above* the block that sets `display: flex`, same
   specificity, so the later rule won and the dark panel stayed on phones.

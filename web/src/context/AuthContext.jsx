@@ -20,13 +20,6 @@ import {
   setUnauthenticatedHandler,
 } from '../lib/client.js'
 import { getCompany, updateCompany } from '../lib/db.js'
-import {
-  CANCELLED,
-  completeRedirectSignIn,
-  getGoogleIdToken,
-  hasPendingRedirect,
-  signOutOfGoogle,
-} from '../lib/firebase.js'
 
 const AuthContext = createContext(null)
 
@@ -168,58 +161,9 @@ export function AuthProvider({ children }) {
     [applySession],
   )
 
-  /**
-   * Turn a Firebase ID token into a Muhai session.
-   *
-   * The exchange is the whole point: Google proves who the person is, the
-   * API decides what they may see. Firebase is never the session, so every
-   * later request is authenticated exactly the way a password login is.
-   */
-  const exchangeGoogleToken = useCallback(
-    async (idToken) => {
-      const session = await post('/api/auth/google', { id_token: idToken }, { auth: false })
-      setToken(session.access_token)
-      applySession(session)
-      return toUser(session.user)
-    },
-    [applySession],
-  )
-
-  /**
-   * Returns the signed-in user, or null when the browser had to fall back to
-   * a redirect — in that case the page navigates away and comes back through
-   * the effect below, so the caller should simply stop.
-   */
-  const loginWithGoogle = useCallback(async () => {
-    const idToken = await getGoogleIdToken()
-    if (!idToken) return null
-    return exchangeGoogleToken(idToken)
-  }, [exchangeGoogleToken])
-
-  // The return leg of the redirect fallback. Gated on the flag the redirect
-  // set, so an ordinary page load never pulls the Firebase SDK in just to be
-  // told that nothing happened.
-  useEffect(() => {
-    if (!hasPendingRedirect()) return undefined
-    let cancelled = false
-    completeRedirectSignIn()
-      .then((idToken) => {
-        if (idToken && !cancelled) return exchangeGoogleToken(idToken)
-        return null
-      })
-      .catch((err) => {
-        if (!cancelled && !CANCELLED.has(err?.code)) setError(err)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [exchangeGoogleToken])
-
   const logout = useCallback(async () => {
     // Nothing to revoke on our side: the token is stateless and short-lived
-    // by policy. Google's session is separate and has to be dropped too, or
-    // the next "sign in with Google" silently resumes the account just left.
-    await signOutOfGoogle()
+    // by policy, so dropping it is the whole of signing out.
     endSession()
   }, [endSession])
 
@@ -275,14 +219,13 @@ export function AuthProvider({ children }) {
       error,
       register,
       login,
-      loginWithGoogle,
       logout,
       refreshCompany,
       saveCompany,
       createCompanyForAccount,
     }),
     [
-      user, profile, company, loading, error, register, login, loginWithGoogle, logout,
+      user, profile, company, loading, error, register, login, logout,
       refreshCompany, saveCompany, createCompanyForAccount,
     ],
   )

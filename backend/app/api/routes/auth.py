@@ -8,23 +8,20 @@ Registration creates the account and its company in one transaction. A
 half-registered account — one that can sign in but has nothing to sign in to —
 was a real failure mode under the old two-system setup and is now impossible.
 
-``/google`` is the one exception, and not a return to Firebase Auth: it takes
-an ID token, verifies it against Google's published certificates, and issues
-Muhai's own JWT. Firebase authenticates a person and is then out of the path.
+An email and a password are the only way in. ``/google`` — which exchanged a
+Firebase ID token for a Muhai session — was deleted on 2026-09-24 along with
+the Firebase SDK it needed in the browser; recover it from commit 4f1d785 if
+a federated sign-in is ever wanted again.
 """
-import secrets
-
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
-from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.models.company import Company
 from app.db.models.user import User
 from app.schemas.user import (
     CompanyInput,
-    GoogleAuth,
     PasswordChange,
     Session,
     Token,
@@ -32,7 +29,6 @@ from app.schemas.user import (
     UserOut,
     UserRegister,
 )
-from app.services.google_identity import GoogleIdentityError, verify_id_token_async
 from app.services.workspace import company_document
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -99,71 +95,6 @@ async def login(payload: UserLogin, db: DbSession) -> Token:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-posta veya şifre hatalı.",
         )
-
-    user_out, company_out = await _session(db, user)
-    return Token(
-        access_token=create_access_token(user.id),
-        user=user_out,
-        company=company_out,
-    )
-
-
-@router.post("/google", response_model=Token)
-async def google(payload: GoogleAuth, db: DbSession) -> Token:
-    """Exchange a Firebase ID token for a Muhai session.
-
-    Google proves who the person is; Muhai still decides what they may see.
-    The token it hands back is the same one a password login issues, so every
-    later request is authenticated identically and Firebase never becomes the
-    session.
-
-    Accounts match on lowercased email, so signing in with Google and signing
-    in with a password land in the same account rather than forking it. A
-    Google profile carries no tax id or legal form, so an account created here
-    arrives with **no company** — ``ProtectedRoute`` routes it to the setup
-    screen, the path a company-less session already had.
-    """
-    if not settings.FIREBASE_PROJECT_ID:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Google ile giriş bu sunucuda yapılandırılmamış.",
-        )
-
-    try:
-        claims = await verify_id_token_async(
-            payload.id_token, settings.FIREBASE_PROJECT_ID
-        )
-    except GoogleIdentityError as exc:
-        # The message is already the one to show: google_identity raises in
-        # Turkish and says which check the token failed.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
-
-    email = claims["email"]
-    user = await db.scalar(select(User).where(User.email == email))
-
-    if user is None:
-        display_name = (claims.get("name") or "").strip()
-        user = User(
-            email=email,
-            # No password was set and none can be guessed into: bcrypt over a
-            # value nothing will ever submit. The account reaches a password
-            # by way of the reset flow, not by having a blank one.
-            hashed_password=hash_password(secrets.token_urlsafe(32)),
-            business_name=display_name or email,
-            display_name=display_name,
-            role="owner",
-            # Deliberately no company — see the docstring.
-            company_id=None,
-        )
-        db.add(user)
-        await db.flush()
-        await db.refresh(user)
-    elif not user.display_name and claims.get("name"):
-        user.display_name = str(claims["name"]).strip()
-        db.add(user)
-        await db.flush()
 
     user_out, company_out = await _session(db, user)
     return Token(

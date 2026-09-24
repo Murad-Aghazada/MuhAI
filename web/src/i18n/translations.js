@@ -83,10 +83,6 @@ export const translations = {
       groupAi: 'Akıllı Araçlar',
     },
     auth: {
-      google: 'Google ile devam et',
-      googleBusy: 'Google’a bağlanılıyor…',
-      or: 'ya da',
-      googleFailed: 'Google ile giriş tamamlanamadı. Tekrar deneyin.',
       loginTitle: 'Tekrar hoş geldiniz',
       loginSub: 'İşletme hesabınıza giriş yapın.',
       registerTitle: 'İşletme hesabı açın',
@@ -629,10 +625,6 @@ export const translations = {
       groupAi: 'Smart Tools',
     },
     auth: {
-      google: 'Continue with Google',
-      googleBusy: 'Connecting to Google…',
-      or: 'or',
-      googleFailed: 'Could not finish signing in with Google. Try again.',
       loginTitle: 'Welcome back',
       loginSub: 'Sign in to your business account.',
       registerTitle: 'Create a business account',

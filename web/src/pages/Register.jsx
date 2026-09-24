@@ -5,7 +5,6 @@ import { ArrowLeft, Building2, Loader2, Lock, Mail, User } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
-import GoogleButton from '../components/auth/GoogleButton.jsx'
 import { Btn } from '../components/ui/lp.jsx'
 
 const SECTORS = ['general', 'retail', 'manufacturing', 'services', 'logistics', 'food', 'tech', 'construction']
@@ -101,10 +100,6 @@ export default function Register() {
 
       {step === 1 ? (
         <>
-        {/* Step one only. Past it an account is half-made, and Google would
-            start a second one beside it. */}
-        <GoogleButton onDone={() => navigate('/app', { replace: true })} />
-
         <form className="auth-form" onSubmit={goToStep2} noValidate>
           <label className="field">
             <span className="field__label">{t('auth.fullName')}</span>

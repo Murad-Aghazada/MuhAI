@@ -5,7 +5,6 @@ import { Loader2, Lock, Mail } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { authErrorMessage, useAuth } from '../context/AuthContext.jsx'
 import AuthShell from '../components/auth/AuthShell.jsx'
-import GoogleButton from '../components/auth/GoogleButton.jsx'
 import { Btn } from '../components/ui/lp.jsx'
 
 export default function Login() {
@@ -41,8 +40,6 @@ export default function Login() {
       subtitle={t('auth.loginSub')}
       alt={{ to: '/register', quiet: t('auth.noAccount'), cta: t('lp.start') }}
     >
-      <GoogleButton onDone={() => navigate(from, { replace: true })} />
-
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <label className="field">
           <span className="field__label">{t('auth.email')}</span>
