@@ -5,11 +5,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, bank, compute, workspace
+from app.api.routes import agent, auth, bank, compute, workspace
 from app.core.config import settings
 from app.db.migrate import run_upgrade_to_head
 
 logger = logging.getLogger(__name__)
+
+# Uvicorn configures its own three loggers and leaves the root alone, so every
+# `logging.getLogger(__name__)` in this codebase was writing into a logger with
+# no handler — the messages went nowhere. That is fine until something needs
+# diagnosing in a container, at which point the one line that would have
+# explained it was never printed. One handler on the root, at INFO.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s %(name)s: %(message)s",
+)
 
 
 @asynccontextmanager
@@ -57,9 +67,11 @@ async def health() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-# Mount all routers under /api. Four of them: the workspace holds the data,
+# Mount all routers under /api. Five of them: the workspace holds the data,
 # compute does the maths over a posted snapshot, auth issues the token that
-# scopes the first to a company, and bank is the only surface that talks to
-# anything outside this stack — optional, and stateless like compute.
-for router in (auth, workspace, compute, bank):
+# scopes the first to a company, bank is the only surface that talks to
+# anything outside this stack — optional, and stateless like compute — and
+# agent is the second company-scoped surface, reading the workspace tables
+# read-only on the model's behalf.
+for router in (auth, workspace, compute, bank, agent):
     app.include_router(router.router, prefix=settings.API_PREFIX)

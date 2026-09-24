@@ -49,6 +49,13 @@ def test_all_expected_routers_are_mounted(client):
         "/api/bank/import",
         "/api/bank/reconcile",
         "/api/bank/sync",
+        "/api/agent/capabilities",
+        "/api/agent/conversations",
+        "/api/agent/conversations/{conversation_id}",
+        "/api/agent/conversations/{conversation_id}/ask",
+        "/api/agent/artifacts",
+        "/api/agent/artifacts/{artifact_id}",
+        "/api/agent/artifacts/{artifact_id}/pdf",
     ):
         assert expected in paths, f"missing route: {expected}"
 
@@ -80,13 +87,20 @@ def test_the_legacy_user_scoped_routes_are_gone(client):
 
 
 def test_every_mounted_api_path_belongs_to_a_live_router(client):
-    """Four surfaces and nothing else."""
+    """Five surfaces and nothing else."""
     paths = [p for p in client.get("/openapi.json").json()["paths"] if p.startswith("/api/")]
     assert paths, "no API paths mounted at all"
     for path in paths:
         assert path.startswith(
-            ("/api/auth", "/api/workspace", "/api/compute", "/api/bank")
+            ("/api/auth", "/api/workspace", "/api/compute", "/api/bank", "/api/agent")
         ), path
+
+
+def test_agent_rejects_anonymous_request(client):
+    """The agent reads the whole workspace on the caller's behalf; the token
+    is what scopes it to one company, so it is never open."""
+    assert client.get("/api/agent/conversations").status_code in (401, 403)
+    assert client.get("/api/agent/capabilities").status_code in (401, 403)
 
 
 def test_protected_endpoint_rejects_anonymous_request(client):

@@ -7,6 +7,7 @@ the account that signs in to one. The older user-scoped tables (``Invoice``,
 ``Transaction``, …) and the ``/api/invoices``-style routes above them were
 deleted on 2026-09-13 -- nothing had called them since the workspace landed.
 """
+from app.db.models.agent import AgentArtifact, AgentConversation, AgentMessage
 from app.db.models.company import (
     Company,
     CompanyEmployee,
@@ -26,5 +27,8 @@ __all__ = [
     "CompanyEmployee",
     "CompanyTaxObligation",
     "CompanyVendorCategory",
+    "AgentConversation",
+    "AgentMessage",
+    "AgentArtifact",
     "User",
 ]

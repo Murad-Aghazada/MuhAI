@@ -581,7 +581,7 @@
    supplies the rest. */
 .app-shell .page-head { padding-bottom: 20px; margin-bottom: 0; }
 
-.app-shell :is(.dash-grid, .dash-cols, .tax-grid, .inv-grid, .pay-grid, .settings-grid, .assistant-shell, .figures, .today-strip, .ocr-grid) {
+.app-shell :is(.dash-grid, .dash-cols, .tax-grid, .inv-grid, .pay-grid, .settings-grid, .figures, .today-strip, .ocr-grid) {
   gap: 16px;
 }
 
@@ -1242,56 +1242,6 @@
 .app-shell .alert-row--high .alert-row__mark { background: var(--stop-bg); color: var(--stop); }
 .app-shell .alert-row--medium .alert-row__mark { background: var(--warn-bg); color: var(--warn); }
 .app-shell .alert-row--low .alert-row__mark { background: var(--ink-07); color: var(--ink-50); }
-
-/* ============================================================
-   FLOATING ACTION BUTTON  ·  ASSISTANT
-   ============================================================ */
-
-
-
-.app-shell .assistant-main {
-  border: 1px solid var(--ink-07);
-  border-radius: var(--r-panel);
-  box-shadow: none;
-  background: var(--card);
-  height: calc(100vh - 240px);
-}
-
-.app-shell .chat-input-row {
-  border-radius: var(--r-md);
-  border-color: var(--ink-12);
-  background: var(--card);
-}
-
-.app-shell .chat-input-row:hover { border-color: var(--ink-25); }
-.app-shell .chat-input-row:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--ink-07); }
-
-.app-shell .chat-send { border-radius: var(--r-control); background: var(--dark); color: var(--lime); }
-.app-shell .chat-send:hover:not(:disabled) { background: var(--ink); }
-
-.app-shell .msg__bubble { border-radius: var(--r-md); font-size: 14px; }
-.app-shell .msg--bot .msg__bubble { border-top-left-radius: 4px; background: var(--pg); color: var(--ink); }
-.app-shell .msg--user .msg__bubble { border-top-right-radius: 4px; background: var(--dark); color: var(--on-dark); }
-.app-shell .msg__av { border-radius: var(--r-xs); }
-.app-shell .msg__av--bot { background: var(--lime); color: #242426; }
-.app-shell .msg__av--user { background: linear-gradient(140deg, var(--clay), var(--mist)); color: #242426; }
-
-.app-shell .chat-suggest {
-  border-radius: var(--pill);
-  border-color: var(--ink-12);
-  color: var(--ink-75);
-  font-size: 13px;
-}
-
-.app-shell .chat-suggest:hover { border-color: var(--ink-25); background: var(--pg); color: var(--ink); }
-.app-shell .chat-suggest:hover svg { color: var(--ink); }
-
-.app-shell .rag-badge {
-  border-radius: var(--pill);
-  border-color: var(--ink-07);
-  background: var(--pg);
-  color: var(--ink-50);
-}
 
 /* ============================================================
    EMPTY STATE  ·  SKELETON

@@ -1,7 +1,7 @@
 """Offline assistant: BM25 retrieval, pre-answered questions, and composition.
 
 The point of this backend is that it works with the network gone, so every
-test here runs without touching Gemini or any other service.
+test here runs without touching OpenAI, Gemini or any other service.
 """
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from app.services import tax_service as tax
 from app.services.chat_service import (
     PRE_ANSWERS,
     BusinessContext,
-    GeminiChatBackend,
     OfflineRagBackend,
+    RemoteChatBackend,
 )
 from app.services.rag import Bm25Index, tokenize
 
@@ -202,11 +202,17 @@ def test_every_pre_answer_renders_for_an_empty_context():
         assert entry.answer(empty), f"{entry.id} produced no text"
 
 
-# ── Gemini degrades to offline rather than to nothing ──────────────────
-def test_gemini_failure_falls_back_to_retrieval(monkeypatch, ctx):
-    backend = GeminiChatBackend()
+# ── A remote model degrades to offline rather than to nothing ──────────
+def test_remote_failure_falls_back_to_retrieval(monkeypatch, ctx):
+    """Whichever vendor is configured, a dead network still answers.
+
+    Patched at ``llm.complete`` rather than at urlopen: the provider seam is
+    what the backend depends on, and a test that reaches past it into the
+    transport would pass for Gemini and quietly stop covering OpenAI.
+    """
+    backend = RemoteChatBackend()
     monkeypatch.setattr(
-        "urllib.request.urlopen",
+        "app.services.llm.complete",
         lambda *a, **k: (_ for _ in ()).throw(OSError("network down")),
     )
     reply = backend.reply("Amortisman nedir?", ctx)

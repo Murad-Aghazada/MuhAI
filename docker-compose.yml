@@ -47,6 +47,13 @@ x-backend-env: &backend-env
   ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}"
   BACKEND_CORS_ORIGINS: "${BACKEND_CORS_ORIGINS:-http://localhost,http://localhost:5173}"
   COMPUTE_AUTH_REQUIRED: ${COMPUTE_AUTH_REQUIRED:-true}
+  # AI provider. All optional: with no key the assistant and the agent answer
+  # from the local knowledge base. AI_PROVIDER names the vendor explicitly.
+  AI_PROVIDER: ${AI_PROVIDER:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  OPENAI_REASONING_EFFORT: ${OPENAI_REASONING_EFFORT:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   GEMINI_MODEL: ${GEMINI_MODEL:-}
   OCR_LANG: ${OCR_LANG:-tur}

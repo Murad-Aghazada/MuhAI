@@ -35,11 +35,24 @@ FROM python:3.11-slim AS runtime
 
 # tesseract-ocr-tur is what makes the OCR read Turkish invoices; libpq5 is the
 # runtime half of libpq-dev; curl backs the healthcheck below.
+#
+# The pango/cairo/gdk-pixbuf trio and fonts-dejavu-core are WeasyPrint's, and
+# they belong in *this* stage rather than the builder: weasyprint is pure
+# Python but binds them through cffi at import time, so the wheel installs fine
+# without them and then fails at the first PDF. DejaVu is what carries the
+# Turkish glyphs and the ₺ sign — without a font that has them, a report prints
+# tofu boxes where the money should be.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-tur \
     libpq5 \
     curl \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
+    libffi8 \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv

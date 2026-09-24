@@ -57,8 +57,18 @@ Edit `.env`. Two values matter before the first start:
 | `SECRET_KEY` | `openssl rand -hex 32`. Compose refuses to start without it. Changing it later signs every user out. |
 | `POSTGRES_PASSWORD` | Anything long. **Set it now** — after the volume is created, editing this no longer changes the password inside the database. |
 
-`GEMINI_API_KEY` is optional: leave it empty and the assistant answers from its
-local knowledge base and says so in the UI.
+The AI block is optional: leave every key empty and the assistant and the agent
+answer from the local knowledge base and say so in the UI. To turn them on, set
+one key — `OPENAI_API_KEY` or `GEMINI_API_KEY` — and, if both are present, name
+the one you want in `AI_PROVIDER` (`openai` | `gemini` | `offline`). Switching
+vendors is that line plus the key; nothing is rebuilt and nothing is redeployed
+beyond restarting the API container. `OPENAI_BASE_URL` points the OpenAI path
+at any compatible gateway (Azure OpenAI, OpenRouter, LiteLLM, a local Ollama),
+which is also the way to run a model on your own hardware with no key at all.
+A reasoning model needs nothing extra: it rejects function tools unless
+`reasoning_effort` is `none`, and the API repairs that itself on the first 400.
+`OPENAI_REASONING_EFFORT` is there to set the level deliberately, not to make
+tool calls work.
 
 The `BANK_*` block is optional too. Leave `BANK_PROVIDER` empty and the Bank
 screen offers CSV statement import, which needs no contract and no internet;

@@ -37,9 +37,31 @@ class Settings(BaseSettings):
     # company genuinely receives English documents.
     OCR_LANG: str = "tur"
 
-    # AI (Gemini). When empty, the chatbot uses the offline rule backend.
+    # ── AI provider ────────────────────────────────────────────────────
+    # Which vendor answers the assistant and the agent. Empty auto-selects:
+    # OpenAI when OPENAI_API_KEY is set, else Gemini, else nothing — and with
+    # nothing configured both surfaces answer offline from the local BM25
+    # knowledge base, which is a supported configuration, not a failure.
+    # Set "offline" to force that path even with a key present.
+    # See services/llm.py; switching vendors is an .env edit, not a code change.
+    AI_PROVIDER: str = ""  # "" (auto) | openai | gemini | offline
+
+    OPENAI_API_KEY: str = ""
+    # Empty falls back to llm.OPENAI_MODEL_DEFAULT.
+    OPENAI_MODEL: str = ""
+    # Reasoning models only: none | low | medium | high. Empty sends nothing and
+    # lets the model default. The agent's own tool loop is its reasoning, and a
+    # reasoning model refuses function tools unless this is "none" — llm.py
+    # repairs that on the fly, so this exists to set it deliberately rather than
+    # to make tool calls work.
+    OPENAI_REASONING_EFFORT: str = ""
+    # Any OpenAI-compatible gateway (Azure OpenAI, OpenRouter, LiteLLM, Ollama).
+    # Empty means api.openai.com. Setting this alone is enough to go online when
+    # AI_PROVIDER=openai — a local gateway needs no key.
+    OPENAI_BASE_URL: str = ""
+
     GEMINI_API_KEY: str = ""
-    # Empty falls back to chat_service.GEMINI_MODEL_DEFAULT.
+    # Empty falls back to llm.GEMINI_MODEL_DEFAULT.
     GEMINI_MODEL: str = ""
 
     # ── Bank integration ───────────────────────────────────────────────

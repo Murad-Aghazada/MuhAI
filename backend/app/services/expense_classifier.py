@@ -103,23 +103,21 @@ def classify_expense(description: str | None, vendor: str | None = None) -> str:
 
 
 def classify_with_ai(description: str, vendor: str, amount: float) -> str:
-    """Gemini-backed classification, falling back to rules on any failure."""
+    """Model-backed classification, falling back to rules on any failure.
+
+    Whichever provider ``llm`` selected answers; it used to import
+    google-generativeai, which was never in requirements.txt, so this path
+    raised ImportError on every call and quietly returned the rule answer.
+    """
     try:
-        import google.generativeai as genai
+        from app.services import llm
 
-        from app.core.config import settings
-
-        if not settings.GEMINI_API_KEY:
-            raise RuntimeError("no key")
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = (
+        key = llm.complete(
             "Classify this Turkish business expense into one category. Return only "
-            f"the category key from {list(CATEGORIES)}. "
-            f"Expense: {description} from {vendor} for {amount} TL"
-        )
-        resp = model.generate_content(prompt)
-        key = (getattr(resp, "text", "") or "").strip().lower()
+            f"the category key from {list(CATEGORIES)}, nothing else.",
+            f"Expense: {description} from {vendor} for {amount} TL",
+            temperature=0,
+        ).strip().lower()
         if key in CATEGORIES:
             return key
         raise ValueError("unexpected category")

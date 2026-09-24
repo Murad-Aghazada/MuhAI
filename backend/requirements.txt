@@ -23,3 +23,16 @@ cmdstanpy==1.2.4
 pandas==2.2.1
 numpy==1.26.4
 email-validator==2.1.1
+# PDF for the agent's reports. HTML/CSS in, PDF out, which is what lets the
+# split-view pane and the download be the same document instead of two
+# renderers that drift. Needs Pango, Cairo and GDK-PixBuf present at *import*
+# time — see the runtime stage of the Dockerfile; report_pdf.py imports it
+# inside the function so a host without them loses the download, not the API.
+weasyprint==61.2
+# Pinned deliberately, like cmdstanpy above. weasyprint 61.2 declares
+# `pydyf>=0.8.0`, so a fresh install resolves 0.11 — whose PDF() constructor
+# took the version and identifier arguments away. Every render then dies with
+# "PDF.__init__() takes 1 positional argument but 3 were given", at write time
+# rather than at import, so the API starts happily and only the download
+# fails. Re-test a PDF before bumping either of these two.
+pydyf==0.8.0

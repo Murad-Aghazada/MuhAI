@@ -41,7 +41,10 @@ on it is the whole deployment target.
   FastAPI  ──▶  PostgreSQL 15 (the only stateful service)
      │
      ├── 2026 tax engine · Muhai Score · Prophet forecast · payroll
-     │   Tesseract OCR · assistant (Gemini online, local BM25 offline)
+     │   Tesseract OCR · assistant + agent (a model online, BM25 offline)
+     │
+     ├── agent tool loop ──▶ reads the company's own tables, read-only
+     │   renders typed blocks → report artifact → WeasyPrint PDF
      │
      └── bank API (optional, config-driven) ──▶ the company's bank
          no credentials → CSV statement import, same matcher
@@ -54,7 +57,8 @@ answers in ~0.3 s measured against `web/public/sample-invoice.png`. Redis
 existed solely as that worker's broker. Recover both from commit `5c91e18` if
 background work ever earns its keep.
 
-Three surfaces to the API — two that own the product, one that is optional:
+Four surfaces to the API — two that own the product, one that reasons over it,
+one that is optional:
 
 * **`/api/workspace`** — the data layer. Company profile plus five
   collections. The signed-in token *is* the company scope: every query is
@@ -64,6 +68,12 @@ Three surfaces to the API — two that own the product, one that is optional:
 * **`/api/compute`** — stateless. Reads no table; a pure function of the
   snapshot posted to it plus today's date. Authenticates the caller but never
   resolves a company.
+* **`/api/agent`** — company-scoped like the workspace, and the *only* other
+  surface that reads those tables. It exists rather than living inside
+  `/api/compute` because the agent has to decide what to read and then read
+  it, which a stateless layer cannot do. Its access is **read-only by
+  construction**: `agent_tools.py` contains no create, update or delete, so
+  there is no write for a model to reach (N29).
 * **`/api/bank`** — the only surface that talks to anything outside this
   stack, and the only optional one. Stateless like compute: the browser posts
   the invoices it already holds and gets matches back, and a movement becomes
@@ -92,7 +102,17 @@ company_transactions      date, amount, type, category, description, vendor
 company_products          name, sku, stock, minStock, unitPrice, monthlyUsage
 company_employees         name, role, grossSalary, startDate, sgkNo
 company_tax_obligations   type, name, period, dueDate, amount, status
+
+agent_conversations       title, pinned, messageCount, lastMessageAt
+agent_messages            role, content, source, blocks, toolCalls, artifactIds
+agent_artifacts           kind, title, subtitle, period, blocks
 ```
+
+The three `agent_*` tables (migration `0012`) hang off `company_id` exactly
+like the rest, so deleting a company takes its chat history with it. They are
+**not** workspace collections: they are the agent's own memory, they carry no
+`extra` round-trip contract, and `db.js`'s `COLLECTIONS` does not list them —
+"clear all data" must not wipe a conversation.
 
 The client still speaks **documents** — camelCase keys, ISO `YYYY-MM-DD` date
 strings. `app/services/workspace.py` is the only place that maps documents to
@@ -144,7 +164,8 @@ All four are git-ignored.
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 319 tests.**
+through `0012_agent_conversations`. **5 routers, 34 paths / 42 operations,
+396 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -165,11 +186,51 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 319 tests.**
   `expense_classifier.vendor_key()` — folded, punctuation **deleted** so
   "A.Ş." and "AŞ" are one vendor — and `web/src/lib/db.js` must keep applying
   the identical transform
-- Assistant has two modes. **Online** it calls `gemini-2.5-flash` over the REST
-  endpoint with stdlib `urllib` (override with `GEMINI_MODEL`). **Offline** —
-  on any network, quota or key failure — it answers from a local BM25 knowledge
-  base plus pre-answered questions and returns `source="offline"`, which the
-  chat UI badges. Neither mode needs anything downloaded at runtime (N14)
+- **The model vendor is configuration (2026-09-24).** `services/llm.py` is the
+  only file that knows a provider exists: `AI_PROVIDER` picks `openai` /
+  `gemini` / `offline`, empty auto-selects whichever key is set (OpenAI first),
+  and the assistant, the agent loop and the expense classifier all go through
+  it. Defaults `gpt-4o-mini` and `gemini-2.5-flash`, overridable per provider.
+  **This machine's `.env` runs `AI_PROVIDER=openai` on `gpt-6-luna`** as of
+  2026-09-24, verified live: a plain answer and a full tool round trip. It is
+  a *reasoning* model, which is the whole reason N30's second repair exists.
+  `OPENAI_BASE_URL` points the OpenAI path at any compatible gateway — Azure,
+  OpenRouter, LiteLLM, a local Ollama — and a base URL alone is enough to go
+  online, since a gateway on your own network authenticates nothing. Both
+  transports are **stdlib urllib**: no `openai` package, no
+  `google-generativeai`, so a model change never rebuilds the image. See N30
+- Assistant has two modes. **Online** it calls the configured provider.
+  **Offline** — on any network, quota or key failure, or with no key at all —
+  it answers from a local BM25 knowledge base plus pre-answered questions and
+  returns `source="offline"`, which the chat UI badges. Neither mode needs
+  anything downloaded at runtime (N14)
+- **`/api/agent/*` — the agent (2026-09-24).** Conversations, grounded answers
+  and report artifacts. Seven paths: `capabilities`, conversation list /
+  create / read / rename+pin / delete, `conversations/{id}/ask`, and
+  `artifacts`, `artifacts/{id}`, `artifacts/{id}/pdf`. One turn loads the
+  whole workspace once, runs the model's tool calls against that one copy
+  (so two tools in an answer cannot disagree about the data) and stores both
+  messages. `ask` runs the model in `asyncio.to_thread` — blocking urllib plus
+  a Prophet fit on the event loop would stall every other request behind it
+- **16 read tools + 7 render tools** (`agent_tools.py`). Reads: company
+  profile, invoices, transactions, products, employees, tax obligations,
+  financial summary, expense breakdown, top counterparties, Prophet forecast,
+  Muhai Score, tax summary, payroll, compliance, tax calendar, learned
+  categories. Renders: heading, text, KPI row, chart, table, callout and
+  `create_report`. **There is no write tool** — that, not the prompt, is the
+  read-only guarantee, and `test_agent_tools.py` asserts it
+- Answers carry **typed blocks** beside the prose, never markdown that each
+  end has to re-parse. `agent_blocks.py` is the schema and three renderers
+  read it: React in the thread, React again in the report pane, and
+  `report_pdf.py` into a PDF. `normalise()` is the boundary — a malformed
+  block is dropped, because the React side has no error boundary and one bad
+  chart would cost the whole answer
+- **Reports are WeasyPrint PDFs**: A4, running footer with the company and the
+  page number, charts drawn as plain SVG in Python. `weasyprint` and `pydyf`
+  are both pinned — see the comment in `requirements.txt`, they break in a way
+  that only shows at render time. The runtime image carries Pango, Cairo,
+  GDK-PixBuf and DejaVu (the font that has `₺`). Missing those gives a **503
+  with an explanation**, not a 500: the report is still readable on screen
 - `/api/bank/*` — statement import, live fetch and reconciliation. Built
   2026-09-20 on the workspace; the deleted `bank_service.py` was recovered and
   extended. `bank_providers.py` holds a preset per Turkish bank (auth style,
@@ -199,7 +260,8 @@ through `0011_drop_legacy_tables`. **4 routers, 27 endpoints, 319 tests.**
   reconciliation gets built on the workspace
 
 **Web frontend** — Vite + React 18, TR/EN, custom SVG charts. Bundle
-**543 kB (168 kB gzipped)**, down from 973 kB when the Firebase SDK went.
+**567 kB (175 kB gzipped)** — 543/168 before the agent screen, and 973 kB
+when the Firebase SDK was still in it.
 **Nothing in the repo depends on Firebase any more** (2026-09-24) — see
 "sign-in" below.
 
@@ -251,6 +313,34 @@ the landing language.
   rail's "Oluştur" tile only went to `/app/invoices`, which is the tile
   directly beneath it
 
+- **The agent screen is a room, not a page (2026-09-24).** `/app/assistant`
+  renders `pages/Agent.jsx`: a full-height three-column grid — previous chats,
+  the conversation, and the open report — under the topbar, each column
+  scrolling on its own. It is the one signed-in screen that does **not** use
+  `.page`, `--measure` or the 16px rhythm, because a conversation with a
+  document beside it is a workspace and a workspace that paginates is
+  unusable. It still speaks the console's language: same ink, same lime for
+  what is live, same Inter Tight, same categorical ramp on the charts
+  (`styles/agent.css`, which introduces no colour of its own)
+  - a thread is created **lazily**, on the first question. Landing on the
+    screen and immediately owning an empty "Yeni sohbet" is how a chat list
+    fills with noise
+  - `components/agent/AgentBlocks.jsx` renders the block schema and
+    `AgentChart.jsx` draws bar / line / area / donut with the *same*
+    arithmetic `report_pdf.py` uses — same viewBox, same padding, same tick
+    rule. Change a constant in one and change it in the other
+  - the tool trace under each answer is collapsed by default and lists what
+    the agent read. An answer about money has to be able to show its work
+  - a report opens in the right pane automatically when a turn writes one,
+    and "PDF indir" fetches the bytes **with the auth header** and hands over
+    a blob — never `?token=` in a URL, which would put the session token in
+    the browser history, the Referer and every proxy log in between
+  - "Yazdır" prints the report and nothing else; the `@media print` block in
+    `agent.css` hides the rail, the topbar and the conversation
+- The old one-shot chat is **gone**: `pages/Assistant.jsx`,
+  `components/chatbot/*` and `styles/chat.css` were deleted with it, along
+  with their skin in `console.css` and `pages.css`. The native app still
+  calls `/api/compute/chat`, which is untouched
 - Own JWT auth against `/api/auth`, token in localStorage, two-step company
   sign-up, protected `/app`. **There is no password reset** — Firebase used to
   send that mail and self-hosting would need an SMTP sender. Removed on
@@ -360,13 +450,15 @@ other signed-in screens are still unverified — see open item 1.
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 4 routers, 27 endpoints, 319 tests. 17 routers existed until the legacy half was deleted | say "27 uç nokta, 319 test" — a small, defensible surface beats a big one you cannot explain |
+| S18 **"13 servis geliştirildi"** | 5 routers, 34 paths / 42 operations, 396 tests. 17 routers existed until the legacy half was deleted | say "42 uç nokta, 396 test" — a small, defensible surface beats a big one you cannot explain |
+| Anything claiming the assistant **"acts on"** your books | The agent reads 16 data sources and writes nothing: there is no create/update/delete tool for it to call (N29) | say "salt okunur" and mean it — it is a stronger claim than autonomy, and it is true |
 | S14 **Expo / React Native shipped** | A native Expo app runs on a real Android phone as of 2026-09-20 (`mobile/`, SDK 57, 5 screens, camera→OCR verified end to end over the LAN). Still **Expo Go only** — no EAS build, no store listing, and it has not run on iOS. | say "Expo ile native mobil uygulama" — it is now true. Do **not** say "yayında"/"mağazada": it runs through Expo Go on a development machine, not as an installable build |
 | S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
 
 True as written and needing no change: S1 (Python 3.11 / FastAPI / SQLAlchemy 2
 / Pydantic v2 — drop Celery if the slide names it), S5 (Tesseract 5 + Turkish pack, swappable `OcrEngine`),
-S6 (Prophet), S7 (Gemini 2.5 Flash + RAG), S9 (per-field confidence, 0.7
+S6 (Prophet), S7 (RAG over a swappable model — OpenAI or Gemini, `AI_PROVIDER`;
+name whichever one the demo machine is configured for rather than the slide), S9 (per-field confidence, 0.7
 threshold with a working review queue) — S9 became true on 2026-09-20; until
 then the "confidence" was a table of constants (see N23), so if anyone has
 demoed that number before today, they demoed a literal.
@@ -614,6 +706,84 @@ demoed that number before today, they demoed a literal.
   `height` beside an 880-unit `viewBox`, so a wide card letterboxed the
   drawing *and* mis-mapped the crosshair, which reads the pointer through
   `rect.width` — the whole element, letterbox included.
+
+- **N29 — The agent: what makes it safe, and the two shapes it produces.**
+  Four things about `/api/agent` that are not obvious from reading it.
+  **Read-only is structural, not prompted.** `agent_tools.py` has no create,
+  update or delete function in it, so there is nothing for a jailbroken
+  prompt to reach — and no tool takes a company id, so scope comes from the
+  resolved token and a hallucinated id has nowhere to go. Both are asserted
+  in `test_agent_tools.py`; keep them asserted if you add a tool.
+  **A report is bound when the turn ends, never when `create_report` is
+  called.** The first design bound eagerly and told the model to call the
+  render tools first and `create_report` last. It cannot do that reliably:
+  it emits a whole batch of calls in one response and orders that array
+  itself. Measured on a five-section report — `create_report` came *fourth
+  of thirteen*, bound nothing, and the nine blocks after it fell loose into
+  the chat. Asking for a report is a flag on `ToolContext` now, and the
+  ordering problem is gone.
+  **Blocks are a contract between three renderers**, not markdown. React
+  draws them in the thread, React draws them again in the report pane and
+  `report_pdf.py` draws them into a PDF; `agent_blocks.normalise()` is the
+  only thing between a malformed function call and a blank answer, because
+  none of the three has an error boundary worth the name. A short series is
+  padded rather than shifted — a hole in a chart is honest, a series slid
+  one category left is not.
+  **The round budget is measured.** Six was the first number and a full
+  quarterly report blew through it: the model batches its *reads* but not
+  its render calls — heading, look, chart, heading, one round each. That
+  report took 14, so the budget is 16 and hitting it answers with what was
+  gathered rather than erroring.
+
+- **N29b — WeasyPrint: the two pins and the one CSS property it drops.**
+  `weasyprint==61.2` declares `pydyf>=0.8.0`, so a fresh install resolves
+  0.11 — whose `PDF()` constructor no longer takes the version and
+  identifier. Every render then dies with "PDF.__init__() takes 1 positional
+  argument but 3 were given", **at render time, not import time**, so the API
+  starts perfectly and only the download fails. Both are pinned; re-render a
+  PDF before bumping either. Second trap: WeasyPrint 61 lays out flex
+  containers but drops `gap` as an unknown property, so every gap in
+  `report_pdf.STYLESHEET` is a margin — the masthead read
+  "2026 3. ÇeyrekOluşturulma: 2026-09-24VKN: …" before that was found. Third:
+  the charts are hand-built SVG with no filters, no `foreignObject` and no
+  embedded CSS, because a chart that renders in a browser preview and
+  silently vanishes in the PDF is the worst possible failure for a document
+  someone is about to send their accountant.
+
+- **N30 — One model seam, two vendors, and they are not symmetric.**
+  `services/llm.py` is the only file allowed to know a provider exists.
+  Everything above it — `chat_service`, `agent_service`,
+  `expense_classifier` — sees `complete()`, `tool_session()` and a
+  provider-neutral `Step`/`ToolCall`, never a `functionCall` or a
+  `tool_calls`. Four things to know before touching it:
+  **Tool schemas have one source.** They are written in `agent_tools` in
+  Gemini's uppercase OpenAPI dialect and lower-cased for OpenAI by
+  `llm._json_schema`. Do not add a second copy: that is how a tool gains an
+  argument on one vendor and not the other.
+  **The empty-schema rule differs.** Gemini rejects an `OBJECT` with no
+  `properties` with a 400 that names no field, so `_gemini_declarations`
+  omits `parameters` entirely; OpenAI wants the empty object. Tested both
+  ways in `test_llm_provider.py`.
+  **Results correlate differently.** OpenAI matches a result to its call by
+  `tool_call_id` and needs the assistant message echoed back before the
+  `role: "tool"` messages; Gemini matches by tool *name*. `ToolCall` carries
+  an `id` for exactly this and the loop never branches on provider.
+  **Reasoning models 400 on knobs everything else accepts, and only at
+  request time** — there is no capability flag to read first. `_openai_post`
+  reads the body (the default `HTTPError` message is "Bad Request" and
+  nothing else) and repairs up to twice, since each 400 names only the first
+  thing it tripped over: drop `temperature`, then set
+  `reasoning_effort: "none"`. The second one is not a guess — `gpt-6-luna`
+  answers a plain completion happily and rejects the identical request with
+  tools attached: *"Function tools with reasoning_effort are not supported
+  for gpt-6-luna in /v1/chat/completions ... set reasoning_effort to
+  'none'"*. Thinking and tool use are exclusive there, and this agent's
+  reasoning **is** the tool loop, so turning the internal one off is the
+  right trade rather than a workaround. `OPENAI_REASONING_EFFORT` sets it
+  deliberately; you do not need it for tool calls to work.
+  Tests patch at `llm.complete` / `llm._openai_post` / `llm._gemini_post`,
+  not at `urlopen` — a test that reaches past the seam into the transport
+  passes for one vendor and quietly stops covering the other.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

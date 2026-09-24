@@ -1,9 +1,10 @@
 """AI Business Advisor chatbot service (Module 9).
 
-A Turkish-language CFO assistant. When a Gemini API key is configured it answers
-with the live business context injected into the prompt; otherwise it falls back
-to a deterministic keyword matcher (also context-aware) so the app works fully
-offline and in tests.
+A Turkish-language CFO assistant. When a model provider is configured (OpenAI
+or Gemini — see ``services/llm.py``) it answers with the live business context
+injected into the prompt; otherwise it falls back to BM25 retrieval over the
+local knowledge base (also context-aware) so the app works fully offline and in
+tests.
 
 The ``ChatBackend`` interface keeps the API contract stable across backends.
 """
@@ -308,27 +309,13 @@ class OfflineRagBackend(ChatBackend):
             reply += "\n\nKaynak: " + ", ".join(sources)
         return ChatResponse(reply=reply, source="offline")
 
-# Stable, generally-available Flash model. Overridable via GEMINI_MODEL so the
-# model can be changed without touching code. The previously hardcoded
-# "gemini-1.5-flash" has been retired and 404s on the v1beta endpoint.
-GEMINI_MODEL_DEFAULT = "gemini-2.5-flash"
-_GEMINI_ENDPOINT = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-)
-_GEMINI_TIMEOUT = 20
+class RemoteChatBackend(ChatBackend):
+    """Calls whichever provider ``llm`` selected, context injected into the prompt.
 
-
-class GeminiChatBackend(ChatBackend):
-    """Calls Gemini with the system prompt + business context injected.
-
-    Talks to the REST endpoint with the standard library rather than the
-    google-generativeai SDK: that package was never in requirements.txt, so the
-    old ``import google.generativeai`` raised ImportError on every call and this
-    backend silently degraded to the rule matcher. Stdlib only — no new
-    dependency, no image rebuild.
-
-    Falls back to OfflineRagBackend on any error (network, quota, bad key),
-    so a network failure degrades to real retrieval rather than to nothing.
+    It does not know or care which vendor that is — OpenAI and Gemini differ
+    only behind ``llm.complete``. Falls back to OfflineRagBackend on any error
+    (network, quota, bad key), so a failure degrades to real retrieval rather
+    than to nothing.
     """
 
     def __init__(self) -> None:
@@ -336,53 +323,26 @@ class GeminiChatBackend(ChatBackend):
 
     def reply(self, message: str, ctx: BusinessContext) -> ChatResponse:
         try:
-            import json
-            import urllib.request
+            from app.services import llm
 
-            from app.core.config import settings
-
-            model = getattr(settings, "GEMINI_MODEL", "") or GEMINI_MODEL_DEFAULT
             instruction = f"{SYSTEM_PROMPT}\nMevcut veriler: {ctx.as_prompt_block()}"
-            payload = {
-                "system_instruction": {"parts": [{"text": instruction}]},
-                "contents": [{"role": "user", "parts": [{"text": message}]}],
-            }
-            req = urllib.request.Request(
-                _GEMINI_ENDPOINT.format(model=model),
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    # Key travels in a header, not the query string, so it does
-                    # not end up in proxy or access logs.
-                    "x-goog-api-key": settings.GEMINI_API_KEY,
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=_GEMINI_TIMEOUT) as resp:
-                body = json.load(resp)
-
-            parts = body["candidates"][0]["content"]["parts"]
-            text = "".join(p.get("text", "") for p in parts).strip()
-            if not text:
-                raise ValueError("empty response")
-            return ChatResponse(reply=text, source="ai")
+            return ChatResponse(reply=llm.complete(instruction, message), source="ai")
         except Exception:
             return self._fallback.reply(message, ctx)
 
 
 def _select_backend() -> ChatBackend:
+    """Picked per call, not once at import: a provider is configuration, and
+    configuration must be readable without restarting the reasoning about it."""
     try:
-        from app.core.config import settings
+        from app.services import llm
 
-        if getattr(settings, "GEMINI_API_KEY", ""):
-            return GeminiChatBackend()
+        if llm.is_online():
+            return RemoteChatBackend()
     except Exception:
         pass
     return OfflineRagBackend()
 
 
-_backend: ChatBackend = _select_backend()
-
-
 def get_chat_reply(message: str, ctx: BusinessContext | None = None) -> ChatResponse:
-    return _backend.reply(message, ctx or BusinessContext())
+    return _select_backend().reply(message, ctx or BusinessContext())

@@ -9,15 +9,17 @@ import Invoices from './pages/Invoices.jsx'
 import Tax from './pages/Tax.jsx'
 import Inventory from './pages/Inventory.jsx'
 import Payroll from './pages/Payroll.jsx'
-import Assistant from './pages/Assistant.jsx'
+import Agent from './pages/Agent.jsx'
 import Settings from './pages/Settings.jsx'
 
 import './styles/components.css'
 import './styles/layout.css'
-import './styles/chat.css'
 import './styles/landing.css'
 import './styles/pages.css'
 import './styles/auth.css'
+// The agent screen. After the page styles it shares tokens with, before the
+// console skin — it defines its own shape but borrows every colour.
+import './styles/agent.css'
 // Last, so the console skin wins over the component defaults it overrides.
 // Scoped to `.app-shell`; the landing page and auth screens are unaffected.
 import './styles/console.css'
@@ -37,7 +39,7 @@ export default function App() {
             <Route path="tax" element={<Tax />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="payroll" element={<Payroll />} />
-            <Route path="assistant" element={<Assistant />} />
+            <Route path="assistant" element={<Agent />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Route>
