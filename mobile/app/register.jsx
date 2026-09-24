@@ -1,11 +1,11 @@
 /* Two steps, like the web sign-up: the account, then the company. The API
    creates both in one transaction, so a half-registered account is not a
-   state that can exist. */
+   state that can exist. The new workspace starts empty; the only seeded
+   dataset is the demo account the backend's scripts/seed_demo.py writes. */
 import { useState } from 'react'
 import { Link, router } from 'expo-router'
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch,
-  Text, View,
+  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 
 import { useAuth, authErrorMessage } from '../src/shared/AuthContext.js'
@@ -22,7 +22,6 @@ export default function Register() {
     email: '', password: '', displayName: '',
     name: '', taxId: '', taxOffice: '', city: '',
   })
-  const [withDemoData, setWithDemoData] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -46,7 +45,6 @@ export default function Register() {
           taxOffice: form.taxOffice.trim(),
           city: form.city.trim(),
         },
-        withDemoData,
       })
       router.replace('/')
     } catch (err) {
@@ -111,18 +109,6 @@ export default function Register() {
             <Field label={t('auth.taxOffice')} value={form.taxOffice} onChangeText={set('taxOffice')} />
             <Field label={t('auth.city')} value={form.city} onChangeText={set('city')} />
 
-            <Pressable style={styles.demoRow} onPress={() => setWithDemoData((v) => !v)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.demoLabel}>{t('auth.demoToggle')}</Text>
-                <Text style={styles.demoHint}>{t('auth.demoToggleHint')}</Text>
-              </View>
-              <Switch
-                value={withDemoData}
-                onValueChange={setWithDemoData}
-                trackColor={{ true: color.brand }}
-              />
-            </Pressable>
-
             <ErrorNote>{error}</ErrorNote>
 
             <Button
@@ -156,9 +142,6 @@ const styles = StyleSheet.create({
   step: { ...text.label, color: color.ink4 },
   stepOn: { color: color.brandDeep },
   form: { gap: space(4) },
-  demoRow: { flexDirection: 'row', alignItems: 'center', gap: space(3) },
-  demoLabel: { ...text.body, fontWeight: '600', color: color.ink },
-  demoHint: { fontSize: 12, color: color.ink4, lineHeight: 17 },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   link: { color: color.brandDeep, fontWeight: '700', fontSize: 13 },
 })

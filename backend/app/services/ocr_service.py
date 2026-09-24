@@ -13,6 +13,7 @@ import io
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
+from pathlib import Path
 
 from dataclasses import asdict
 
@@ -96,6 +97,42 @@ class OcrEngine(ABC):
 # simulated capture conditions: 28/32 fields against 26/32 for PSM 3.
 _TESSERACT_CONFIG = "--psm 6"
 
+# tessdata_best's Turkish model ships in the repo (backend/tessdata), because
+# the one apt installs is tessdata_fast. Measured 2026-09-24 on Turkish
+# invoices in twelve fonts, four capture conditions each, half of them held
+# out: best read 107/136 fields against 101/136 on the held-out half, and
+# 98.6% of ç ğ ı İ ö ş ü against 97.0% on the other. It costs about twice
+# the time — 1.2 s a page instead of 0.6. PaddleOCR's Latin model and
+# EasyOCR were measured too and were worse on Turkish letters (58% and 86%).
+_VENDORED_TESSDATA = Path(__file__).resolve().parents[2] / "tessdata"
+
+
+def tessdata_dir() -> Path | None:
+    """The folder to hand Tesseract, or None to use the system's own.
+
+    Only a folder that holds *every* language in OCR_LANG qualifies:
+    Tesseract takes one directory, so a partial one would fail the languages
+    it lacks rather than falling back per language.
+    """
+    folder = (
+        Path(settings.OCR_TESSDATA_DIR)
+        if settings.OCR_TESSDATA_DIR
+        else _VENDORED_TESSDATA
+    )
+    langs = [lang for lang in settings.OCR_LANG.split("+") if lang]
+    if langs and all((folder / f"{lang}.traineddata").is_file() for lang in langs):
+        return folder
+    return None
+
+
+def tesseract_config() -> str:
+    folder = tessdata_dir()
+    if folder is None:
+        return _TESSERACT_CONFIG
+    # Forward slashes and quotes: pytesseract shlex-splits this string, which
+    # would eat Windows backslashes and split a path with a space in it.
+    return f'{_TESSERACT_CONFIG} --tessdata-dir "{folder.as_posix()}"'
+
 # Tesseract's LSTM wants roughly 30 px of x-height. Below that its accuracy
 # collapses regardless of which model is loaded, and a photo taken from across
 # a desk lands well under it — upscaling is what rescues those, not a bigger
@@ -108,12 +145,28 @@ class TesseractEngine(OcrEngine):
     def _prepare(image):
         """Normalise a photographed document into something Tesseract reads.
 
-        Grayscale, upscale if small, stretch contrast, and sharpen. On a clean
-        scan this changes nothing; on an under-exposed or distant photo it is
-        the difference between four fields and one.
-        """
-        from PIL import Image, ImageFilter, ImageOps
+        Upright, grayscale, upscale if small, stretch contrast. On a clean scan
+        this changes nothing; on a distant photo the upscale is what rescues
+        it.
 
+        Two things this deliberately does not do any more, both measured on
+        `sample-invoice.png` against the browser path (2026-09-24):
+
+        * **Trust the pixel order.** A phone stores a portrait shot as
+          landscape pixels plus an EXIF Orientation tag. tesseract.js honours
+          the tag; Pillow does not unless asked, so every portrait photo was
+          read sideways here — 0/4 fields against 4/4 in the browser.
+        * **Sharpen.** An unsharp mask turns sensor noise into speckle that
+          Tesseract's binarisation keeps as ink. On a dim photo it took the
+          read from 3/4 fields to 0/4 by itself; on a clean one it only ever
+          cost a few points of confidence.
+        """
+        from PIL import Image, ImageOps
+
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:  # malformed EXIF — read the pixels as stored
+            pass
         image = image.convert("L")
         width, height = image.size
         if width < _MIN_WIDTH_PX:
@@ -123,10 +176,7 @@ class TesseractEngine(OcrEngine):
             )
         # cutoff=1 discards the top and bottom percentile before stretching, so
         # a single dark speck cannot define the black point.
-        image = ImageOps.autocontrast(image, cutoff=1)
-        return image.filter(
-            ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=3)
-        )
+        return ImageOps.autocontrast(image, cutoff=1)
 
     def image_to_text(self, image_bytes: bytes) -> str:
         return "\n".join(line for line, _ in self.image_to_lines(image_bytes))
@@ -149,7 +199,7 @@ class TesseractEngine(OcrEngine):
         data = pytesseract.image_to_data(
             image,
             lang=settings.OCR_LANG,
-            config=_TESSERACT_CONFIG,
+            config=tesseract_config(),
             output_type=pytesseract.Output.DICT,
         )
 
@@ -355,10 +405,48 @@ def _extract_fields(
 _engine: OcrEngine = TesseractEngine()
 
 
-def scan_invoice(image_bytes: bytes) -> OcrExtractResult:
-    """OCR an invoice image and return structured, confidence-scored fields."""
+def _page_confidence(lines: list[tuple[str, float]]) -> float | None:
+    """Mean word confidence over the whole page, in [0, 1].
+
+    The same figure tesseract.js reports as `data.confidence`, so a scan on the
+    server and a scan in the browser show a number that means the same thing.
+    The per-field scores cannot serve here: each is the rule's certainty
+    (0.75–0.9) times its line's read quality, so a flawless read topped out
+    near 0.75 — barely over the review threshold — while the browser showed
+    0.94 for the identical fields. Lines are weighted by their word count,
+    which is what makes this the page's mean rather than a mean of lines.
+    """
+    weighted = [(len(text.split()), conf) for text, conf in lines]
+    words = sum(n for n, _ in weighted)
+    if not words:
+        return None
+    return round(sum(n * conf for n, conf in weighted) / words, 4)
+
+
+def read_image(image_bytes: bytes) -> tuple[str, dict[str, float], float | None]:
+    """OCR one image: its text, each line's confidence, the page's confidence.
+
+    The two confidences are empty/None for an engine that reports none.
+    """
     lines = _engine.image_to_lines(image_bytes)
     if lines:
         text = "\n".join(line for line, _ in lines)
-        return _extract_fields(text, {line: conf for line, conf in lines})
-    return _extract_fields(_engine.image_to_text(image_bytes))
+        return text, {line: conf for line, conf in lines}, _page_confidence(lines)
+    return _engine.image_to_text(image_bytes), {}, None
+
+
+def extract_invoice(
+    text: str,
+    line_conf: dict[str, float] | None = None,
+    confidence: float | None = None,
+) -> OcrExtractResult:
+    """Invoice fields from text, whatever read it: OCR or a PDF's text layer."""
+    result = _extract_fields(text, line_conf)
+    if confidence is None:
+        return result
+    return result.model_copy(update={"confidence": confidence})
+
+
+def scan_invoice(image_bytes: bytes) -> OcrExtractResult:
+    """OCR an invoice image and return structured, confidence-scored fields."""
+    return extract_invoice(*read_image(image_bytes))

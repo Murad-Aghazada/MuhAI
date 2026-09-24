@@ -435,3 +435,65 @@ def test_unparseable_arguments_do_not_end_the_turn(monkeypatch):
     step = session.step()
     assert step.calls[0].name == "list_invoices"
     assert step.calls[0].args == {}
+
+
+# ── Files ─────────────────────────────────────────────────────────────
+def _capture_session(monkeypatch, name):
+    seen = {}
+
+    def fake(payload, *args, **kwargs):
+        seen["payload"] = payload
+        if name == "_openai_post":
+            return {"choices": [{"message": {"content": "tamam"}}]}
+        return {"candidates": [{"content": {"parts": [{"text": "tamam"}]}}]}
+
+    monkeypatch.setattr(llm, name, fake)
+    return seen
+
+
+PHOTO_PART = llm.FilePart(name="fis.jpg", mime="image/jpeg", data=b"\xff\xd8\xffJPEG")
+PDF_PART = llm.FilePart(name="fatura.pdf", mime="application/pdf", data=b"%PDF-1.7")
+
+
+def test_openai_receives_images_and_pdfs_as_content_parts(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-test")
+    seen = _capture_session(monkeypatch, "_openai_post")
+    session = llm.tool_session(["sys"], [], "Bu ne?", [], files=[PHOTO_PART, PDF_PART])
+    session.step()
+
+    content = seen["payload"]["messages"][-1]["content"]
+    assert content[0] == {"type": "text", "text": "Bu ne?"}
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert content[1]["image_url"]["detail"] == "high"
+    assert content[2]["type"] == "file"
+    assert content[2]["file"]["filename"] == "fatura.pdf"
+    assert content[2]["file"]["file_data"].startswith("data:application/pdf;base64,")
+
+
+def test_gemini_receives_images_and_pdfs_as_inline_data(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "g-test")
+    seen = _capture_session(monkeypatch, "_gemini_post")
+    session = llm.tool_session(["sys"], [], "Bu ne?", [], files=[PHOTO_PART, PDF_PART])
+    session.step()
+
+    parts = seen["payload"]["contents"][-1]["parts"]
+    assert parts[0] == {"text": "Bu ne?"}
+    assert parts[1]["inline_data"]["mime_type"] == "image/jpeg"
+    assert parts[2]["inline_data"]["mime_type"] == "application/pdf"
+
+
+def test_files_on_an_earlier_turn_ride_in_the_history(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "sk-test")
+    seen = _capture_session(monkeypatch, "_openai_post")
+    history = [
+        {"role": "user", "content": "Bunu incele", "files": [PDF_PART]},
+        {"role": "assistant", "content": "Bir fatura."},
+    ]
+    llm.tool_session(["sys"], history, "KDV ne?", []).step()
+
+    messages = seen["payload"]["messages"]
+    assert messages[1]["content"][1]["type"] == "file"
+    assert messages[2] == {"role": "assistant", "content": "Bir fatura."}
+    # No files on this turn: a plain string, exactly as before.
+    assert messages[3] == {"role": "user", "content": "KDV ne?"}

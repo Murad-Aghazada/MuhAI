@@ -11,6 +11,10 @@ bcrypt==4.0.1
 python-multipart==0.0.9
 pytesseract==0.3.10
 Pillow==10.3.0
+# Reading attached PDFs: the text layer of a generated e-Fatura / e-Arşiv PDF
+# (exact, no OCR), and rendering a scanned one to images for Tesseract. The
+# wheel bundles PDFium itself, so the image needs no poppler or ghostscript.
+pypdfium2==5.13.0
 prophet==1.1.5
 # Pinned deliberately. prophet 1.1.5 ships a precompiled prophet_model.bin and a
 # stripped stan_model/cmdstan-2.33.1 (bin/ + stan/ only, no makefile), then calls

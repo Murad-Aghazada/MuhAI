@@ -24,7 +24,17 @@ something to render.
 import datetime as dt
 from typing import Any, List
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -98,8 +108,53 @@ class AgentMessage(Base, TimestampMixin):
     tool_calls: Mapped[list[Any]] = _json_list()
     # Ids of any report written during this turn.
     artifact_ids: Mapped[list[Any]] = _json_list()
+    # Files the user sent with this question. Their extracted text is replayed
+    # with the message on later turns, so "and the VAT on it?" still works.
+    attachment_ids: Mapped[list[Any]] = _json_list()
 
     conversation: Mapped["AgentConversation"] = relationship(back_populates="messages")
+
+
+class AgentAttachment(Base, TimestampMixin):
+    """A photo or PDF someone sent the agent, and what was read out of it.
+
+    Read once, on upload: the text, how it was read (a PDF's own text layer,
+    or OCR), and the invoice fields found in it. The question that follows
+    only ever reads those columns, so asking about a 20-page PDF costs no more
+    than asking about a photo.
+
+    The file itself is kept in ``data``: Postgres is the only stateful service
+    this stack has, and a volume just for uploads would be a second thing to
+    back up. Files are capped at 10 MB, and an upload that never made it into
+    a sent message is deleted after a day.
+    """
+
+    __tablename__ = "agent_attachments"
+
+    id: Mapped[str] = uuid_pk()
+    company_id: Mapped[str] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    # Both empty until the message is sent.
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_conversations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
+    message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    filename: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # pdf | image
+    method: Mapped[str] = mapped_column(String(16), nullable=False)  # text | ocr | mixed
+    pages: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    pages_read: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    fields: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    notes: Mapped[list[Any]] = _json_list()
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
 
 class AgentArtifact(Base, TimestampMixin):

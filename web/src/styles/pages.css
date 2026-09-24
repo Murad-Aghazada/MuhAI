@@ -812,6 +812,13 @@
 
 @keyframes sheet-fade { from { opacity: 0; } }
 
+/* Sheets rendered through <AnimatePresence> (see ui/sheetMotion.js) are
+   moved by Framer in both directions. The keyframes above have to stand
+   down for them: sheet-in fills forwards, and a filled animation outranks
+   the inline transform, so the exit slide would never show. */
+.modal-scrim.is-presence,
+.modal-scrim.is-presence > .modal { animation: none; }
+
 @media (max-width: 560px) {
   .modal__head { padding: 20px 18px 16px; }
   .modal__body { padding: 18px; }

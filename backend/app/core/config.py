@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # measured 27/32 against 28/32 for "tur" alone. Set OCR_LANG="tur+eng" if a
     # company genuinely receives English documents.
     OCR_LANG: str = "tur"
+    # Where the language models live. Empty means backend/tessdata, which
+    # carries tessdata_best's Turkish model: Debian's tesseract-ocr-tur is the
+    # small "fast" one, and on held-out Turkish invoices best read 107/136
+    # fields against 101/136. Any language in OCR_LANG that is not in this
+    # folder falls back to the system's tessdata.
+    OCR_TESSDATA_DIR: str = ""
 
     # ── AI provider ────────────────────────────────────────────────────
     # Which vendor answers the assistant and the agent. Empty auto-selects:

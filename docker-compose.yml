@@ -57,6 +57,7 @@ x-backend-env: &backend-env
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   GEMINI_MODEL: ${GEMINI_MODEL:-}
   OCR_LANG: ${OCR_LANG:-tur}
+  OCR_TESSDATA_DIR: ${OCR_TESSDATA_DIR:-}
   # Bank API. Every one of these is optional: with BANK_PROVIDER unset the
   # Bank screen falls back to CSV statement import, which needs no contract
   # and no internet.

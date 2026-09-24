@@ -48,6 +48,29 @@ class ToolCallOut(BaseModel):
     ok: bool = True
 
 
+class AttachmentOut(BaseModel):
+    """A file sent to the agent, and what was read out of it.
+
+    ``method`` says how the text was obtained: "text" is a PDF's own text
+    layer (exact), "ocr" is Tesseract, "mixed" a PDF with both kinds of page.
+    ``confidence`` is OCR's mean word confidence, 1.0 for a text layer.
+    """
+
+    id: str
+    filename: str
+    contentType: str
+    size: int = 0
+    kind: Literal["pdf", "image"]
+    method: Literal["text", "ocr", "mixed", "none"]
+    pages: int = 1
+    pagesRead: int = 1
+    confidence: float | None = None
+    fields: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    preview: str = ""
+    createdAt: dt.datetime | None = None
+
+
 class MessageOut(BaseModel):
     id: str
     role: Literal["user", "assistant"]
@@ -56,6 +79,7 @@ class MessageOut(BaseModel):
     blocks: list[dict[str, Any]] = Field(default_factory=list)
     toolCalls: list[ToolCallOut] = Field(default_factory=list)
     artifacts: list[ArtifactSummary] = Field(default_factory=list)
+    attachments: list[AttachmentOut] = Field(default_factory=list)
     createdAt: dt.datetime | None = None
 
 
@@ -63,8 +87,19 @@ class ConversationDetail(ConversationOut):
     messages: list[MessageOut] = Field(default_factory=list)
 
 
+# A turn carries at most this many files. Each can be a 20-page PDF, and the
+# text of all of them rides in one prompt.
+MAX_ATTACHMENTS_PER_MESSAGE = 5
+
+
 class AskRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=4000)
+    # Empty is allowed when files are attached: sending an invoice on its own
+    # is a complete question ("what is this?"). The route rejects a turn
+    # with neither.
+    message: str = Field(default="", max_length=4000)
+    attachmentIds: list[str] = Field(
+        default_factory=list, max_length=MAX_ATTACHMENTS_PER_MESSAGE
+    )
 
 
 class AskResponse(BaseModel):

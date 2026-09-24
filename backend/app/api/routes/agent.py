@@ -14,6 +14,9 @@ loop's control flow in a bundle anyone can read.
     PATCH  /api/agent/conversations/{id}
     DELETE /api/agent/conversations/{id}
     POST   /api/agent/conversations/{id}/ask
+    POST   /api/agent/attachments
+    GET    /api/agent/attachments/{id}/file
+    DELETE /api/agent/attachments/{id}
     GET    /api/agent/artifacts/{id}
     GET    /api/agent/artifacts/{id}/pdf
 
@@ -29,16 +32,35 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
+import re
+import urllib.parse
+import uuid
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Path, Response, status
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from fastapi import (
+    APIRouter,
+    Body,
+    File,
+    HTTPException,
+    Path,
+    Response,
+    UploadFile,
+    status,
+)
+from sqlalchemy import delete, select
+from sqlalchemy.orm import defer, selectinload
 
 from app.api.deps import CurrentCompany, CurrentUser, DbSession
-from app.db.models.agent import AgentArtifact, AgentConversation, AgentMessage
+from app.db.models.agent import (
+    AgentArtifact,
+    AgentAttachment,
+    AgentConversation,
+    AgentMessage,
+)
 from app.schemas.agent import (
     ArtifactOut,
+    AttachmentOut,
     ArtifactSummary,
     AskRequest,
     AskResponse,
@@ -49,12 +71,26 @@ from app.schemas.agent import (
     MessageOut,
     ToolInfo,
 )
-from app.services import agent_service, agent_tools, llm, report_pdf
+from app.services import agent_service, agent_tools, document_reader, llm, report_pdf
 from app.services.agent_context import load_workspace
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 MAX_CONVERSATIONS = 200
+
+logger = logging.getLogger(__name__)
+
+# Attachments. Same ceiling as the OCR upload on /api/compute.
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+# What is kept of a file's text. A 20-page PDF is well under this; the prompt
+# takes a slice of it (agent_service.ATTACHMENT_CHARS), the rest is for the
+# preview and for anything that reads the row later.
+MAX_STORED_TEXT = 200_000
+PREVIEW_CHARS = 280
+# An upload that never made it into a sent message is swept after this long,
+# on the company's next upload. A day covers someone who attaches a file,
+# goes to find the right question and comes back.
+ORPHAN_TTL = dt.timedelta(days=1)
 
 
 # ── Serialisation ─────────────────────────────────────────────────────
@@ -82,8 +118,46 @@ def _artifact_summary(row: AgentArtifact) -> ArtifactSummary:
     )
 
 
+def _attachment_out(row: AgentAttachment) -> AttachmentOut:
+    return AttachmentOut(
+        id=row.id,
+        filename=row.filename,
+        contentType=row.content_type,
+        size=row.size,
+        kind="pdf" if row.kind == "pdf" else "image",
+        method=row.method if row.method in ("text", "ocr", "mixed", "none") else "none",
+        pages=row.pages,
+        pagesRead=row.pages_read,
+        confidence=row.confidence,
+        fields=row.fields or {},
+        notes=row.notes or [],
+        preview=(row.text or "")[:PREVIEW_CHARS],
+        createdAt=row.created_at,
+    )
+
+
+def _attachment_doc(row: AgentAttachment) -> dict:
+    """What agent_service reads. The file itself is added by ``_attach_files``
+    for the ones that fit the request — see ``ask``."""
+    return {
+        "id": row.id,
+        "filename": row.filename,
+        "kind": row.kind,
+        "method": row.method,
+        "pages": row.pages,
+        "pagesRead": row.pages_read,
+        "confidence": row.confidence,
+        "fields": row.fields or {},
+        "notes": row.notes or [],
+        "text": row.text or "",
+        "contentType": row.content_type,
+    }
+
+
 def _message_out(
-    row: AgentMessage, artifacts: dict[str, AgentArtifact]
+    row: AgentMessage,
+    artifacts: dict[str, AgentArtifact],
+    attachments: dict[str, AgentAttachment] | None = None,
 ) -> MessageOut:
     return MessageOut(
         id=row.id,
@@ -96,6 +170,11 @@ def _message_out(
             _artifact_summary(artifacts[aid])
             for aid in (row.artifact_ids or [])
             if aid in artifacts
+        ],
+        attachments=[
+            _attachment_out(attachments[aid])
+            for aid in (row.attachment_ids or [])
+            if attachments and aid in attachments
         ],
         createdAt=row.created_at,
     )
@@ -131,6 +210,86 @@ async def _artifact(db: DbSession, company_id: str, artifact_id: str) -> AgentAr
             status_code=status.HTTP_404_NOT_FOUND, detail="Rapor bulunamadı."
         )
     return row
+
+
+def _valid_ids(ids: list[str]) -> list[str]:
+    """Distinct, well-formed ids, in the order given.
+
+    A malformed id would reach Postgres as a UUID cast and come back a 500;
+    it is simply not an attachment this company has.
+    """
+    out: list[str] = []
+    for value in ids:
+        try:
+            canonical = str(uuid.UUID(str(value)))
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Ek bulunamadı."
+            ) from None
+        if canonical not in out:
+            out.append(canonical)
+    return out
+
+
+async def _attachments_by_id(
+    db: DbSession, company_id: str, ids: list[str], *, with_data: bool = False
+) -> dict[str, AgentAttachment]:
+    """This company's attachments — without the file bytes unless asked."""
+    if not ids:
+        return {}
+    query = select(AgentAttachment).where(
+        AgentAttachment.id.in_(ids), AgentAttachment.company_id == company_id
+    )
+    if not with_data:
+        query = query.options(defer(AgentAttachment.data))
+    return {row.id: row for row in await db.scalars(query)}
+
+
+async def _attachment_bytes(
+    db: DbSession, company_id: str, ids: list[str]
+) -> dict[str, bytes]:
+    if not ids:
+        return {}
+    rows = await db.execute(
+        select(AgentAttachment.id, AgentAttachment.data).where(
+            AgentAttachment.id.in_(ids), AgentAttachment.company_id == company_id
+        )
+    )
+    return {row.id: row.data for row in rows}
+
+
+async def _attachment(
+    db: DbSession, company_id: str, attachment_id: str
+) -> AgentAttachment:
+    [canonical] = _valid_ids([attachment_id])
+    row = await db.scalar(
+        select(AgentAttachment).where(
+            AgentAttachment.id == canonical, AgentAttachment.company_id == company_id
+        )
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ek bulunamadı."
+        )
+    return row
+
+
+def _attach_files(docs: list[dict], data: dict[str, bytes]) -> None:
+    """Give each doc whose bytes are in ``data`` the file itself, ready for
+    the model. Runs in a worker thread: resizing a 12 MP photo is CPU."""
+    for doc in docs:
+        content = data.get(doc["id"])
+        if content is None:
+            continue
+        mime, payload = document_reader.for_model(content, doc["contentType"])
+        doc["file"] = llm.FilePart(name=doc["filename"], mime=mime, data=payload)
+
+
+def _safe_filename(name: str | None) -> str:
+    """The last path segment, trimmed. Browsers on Windows have sent the
+    whole C:\\ path in the past."""
+    base = re.split(r"[\\/]", (name or "").strip())[-1].strip()
+    return (base or "belge")[:255]
 
 
 # ── Capabilities ──────────────────────────────────────────────────────
@@ -224,9 +383,21 @@ async def read_conversation(
         )
     }
 
+    attachments = {
+        a.id: a
+        for a in await db.scalars(
+            select(AgentAttachment)
+            .where(
+                AgentAttachment.conversation_id == row.id,
+                AgentAttachment.company_id == company.id,
+            )
+            .options(defer(AgentAttachment.data))
+        )
+    }
+
     return ConversationDetail(
         **_conversation_out(row).model_dump(),
-        messages=[_message_out(m, artifacts) for m in row.messages],
+        messages=[_message_out(m, artifacts, attachments) for m in row.messages],
     )
 
 
@@ -279,30 +450,91 @@ async def ask(
     conversation = await _conversation(db, company.id, conversation_id)
     question = body.message.strip()
 
-    history = [
-        {"role": m.role, "content": m.content}
-        for m in await db.scalars(
+    # Files for this turn: this company's, and not already sent with an
+    # earlier message — an id is a one-way ticket into one question.
+    wanted = _valid_ids(body.attachmentIds)
+    found = await _attachments_by_id(db, company.id, wanted, with_data=True)
+    if len(found) != len(wanted):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ek bulunamadı."
+        )
+    attachments = [found[aid] for aid in wanted]
+    if any(a.message_id is not None for a in attachments):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Bu ek zaten gönderildi."
+        )
+    if not question and not attachments:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Boş mesaj gönderilemez.",
+        )
+
+    earlier = list(
+        await db.scalars(
             select(AgentMessage)
             .where(AgentMessage.conversation_id == conversation.id)
             .order_by(AgentMessage.created_at)
         )
-    ]
+    )
+    # The files go to the model as files, within one request budget: this
+    # question's first, then earlier questions' newest first, so a follow-up
+    # ("and the VAT on that one?") still has the document in front of it.
+    # Whatever does not fit goes as its extracted text.
+    budget = agent_service.MODEL_FILES_BYTES
+    carried: dict[str, bytes] = {}
+    for attachment in attachments:
+        if attachment.size <= budget:
+            budget -= attachment.size
+            carried[attachment.id] = attachment.data
+
+    window = earlier[-agent_service.MAX_HISTORY_TURNS * 2 :]
+    replay = await _attachments_by_id(
+        db, company.id, [aid for m in window for aid in (m.attachment_ids or [])]
+    )
+    replay_ids = []
+    for m in reversed(window):
+        for aid in m.attachment_ids or []:
+            row = replay.get(aid)
+            if row is not None and row.size <= budget:
+                budget -= row.size
+                replay_ids.append(aid)
+    carried.update(await _attachment_bytes(db, company.id, replay_ids))
+
+    current_docs = [_attachment_doc(a) for a in attachments]
+    history = []
+    for m in window:
+        entry = {"role": m.role, "content": m.content}
+        sent = [replay[aid] for aid in (m.attachment_ids or []) if aid in replay]
+        if m.role == "user" and sent:
+            entry["attachments"] = [_attachment_doc(a) for a in sent]
+        history.append(entry)
+    await asyncio.to_thread(
+        _attach_files,
+        current_docs + [d for e in history for d in e.get("attachments", [])],
+        carried,
+    )
 
     user_message = AgentMessage(
         company_id=company.id,
         conversation_id=conversation.id,
         role="user",
         content=question,
+        attachment_ids=[a.id for a in attachments],
     )
     db.add(user_message)
     await db.flush()
+
+    for attachment in attachments:
+        attachment.conversation_id = conversation.id
+        attachment.message_id = user_message.id
+        db.add(attachment)
 
     workspace = await load_workspace(db, company)
 
     # Blocking: urllib plus, on a tool-using turn, Prophet. Off the event loop
     # or every other request waits behind this one.
     turn = await asyncio.to_thread(
-        agent_service.run_turn, question, history, workspace
+        agent_service.run_turn, question, history, workspace, current_docs
     )
 
     assistant_message = AgentMessage(
@@ -340,7 +572,9 @@ async def ask(
 
     # An untouched thread takes its name from the first thing asked of it.
     if conversation.message_count == 0 and conversation.title in {"", "Yeni sohbet"}:
-        conversation.title = agent_service.title_for(question)
+        conversation.title = agent_service.title_for(
+            question or (attachments[0].filename if attachments else "")
+        )
     conversation.message_count += 2
     conversation.last_message_at = dt.datetime.now(dt.timezone.utc)
     db.add(conversation)
@@ -348,9 +582,117 @@ async def ask(
 
     return AskResponse(
         conversation=_conversation_out(conversation),
-        userMessage=_message_out(user_message, {}),
+        userMessage=_message_out(user_message, {}, {a.id: a for a in attachments}),
         message=_message_out(assistant_message, stored_artifacts),
     )
+
+
+# ── Attachments ───────────────────────────────────────────────────────
+
+
+@router.post(
+    "/attachments", response_model=AttachmentOut, status_code=status.HTTP_201_CREATED
+)
+async def upload_attachment(
+    db: DbSession, company: CurrentCompany, file: UploadFile = File(...)
+) -> AttachmentOut:
+    """Store a photo or PDF for the next question.
+
+    The file itself is what the model reads when the question is asked. Its
+    text and invoice fields are extracted here too, while the user is still
+    typing, as the backup for an offline answer or a model that refuses
+    files.
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Boş dosya.")
+    if len(content) > MAX_ATTACHMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Dosya 10 MB sınırını aşıyor.",
+        )
+
+    # The model reads the file itself; the text extracted here is the backup
+    # (an offline answer, a model that refuses files). So a failed extraction
+    # stores the file anyway, and only a file nobody could open is refused.
+    try:
+        read = await asyncio.to_thread(
+            document_reader.read_document, content, strict=False
+        )
+    except document_reader.DocumentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    # Sweep this company's uploads that were never sent.
+    await db.execute(
+        delete(AgentAttachment).where(
+            AgentAttachment.company_id == company.id,
+            AgentAttachment.message_id.is_(None),
+            AgentAttachment.created_at < dt.datetime.now(dt.timezone.utc) - ORPHAN_TTL,
+        )
+    )
+
+    row = AgentAttachment(
+        company_id=company.id,
+        filename=_safe_filename(file.filename),
+        content_type=read.content_type,
+        size=len(content),
+        kind=read.kind,
+        method=read.method,
+        pages=read.pages,
+        pages_read=read.pages_read,
+        confidence=read.confidence,
+        text=read.text[:MAX_STORED_TEXT],
+        fields=read.fields(),
+        notes=read.notes,
+        data=content,
+    )
+    db.add(row)
+    await db.flush()
+    await db.refresh(row, attribute_names=["created_at"])
+    return _attachment_out(row)
+
+
+@router.get("/attachments/{attachment_id}/file")
+async def attachment_file(
+    db: DbSession, company: CurrentCompany, attachment_id: str = Path(...)
+) -> Response:
+    """The file itself, for the preview. Fetched with the auth header and
+    turned into a blob by the page, like the report PDF — never a URL with
+    the token in it."""
+    row = await _attachment(db, company.id, attachment_id)
+    return Response(
+        content=row.data,
+        # Sniffed from the bytes on upload, never taken from the client.
+        media_type=row.content_type,
+        headers={
+            "Content-Disposition": (
+                f"inline; filename*=UTF-8''{urllib.parse.quote(row.filename)}"
+            ),
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.delete(
+    "/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_attachment(
+    db: DbSession, company: CurrentCompany, attachment_id: str = Path(...)
+) -> Response:
+    """Take a file back out of the composer before sending. Once it has gone
+    with a message it is part of the thread and leaves with the thread."""
+    row = await _attachment(db, company.id, attachment_id)
+    if row.message_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Gönderilmiş bir mesajın eki silinemez.",
+        )
+    await db.delete(row)
+    await db.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ── Artifacts ─────────────────────────────────────────────────────────

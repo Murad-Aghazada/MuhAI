@@ -48,6 +48,10 @@ class OcrExtractResult(BaseModel):
     vat_amount: OcrExtractField
     raw_text: str
     needs_review: bool
+    # Mean word confidence over the page, in [0, 1] — the browser engine's
+    # own measure. None when the engine reports no confidence at all, and the
+    # client falls back to the weakest field.
+    confidence: float | None = Field(default=None, ge=0, le=1)
     # Module 1 rich extraction. Optional so existing clients keep working.
     invoice_type: str = "paper"
     parsed: ParsedInvoiceOut | None = None

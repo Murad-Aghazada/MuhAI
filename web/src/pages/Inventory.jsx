@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { BarChart3, Boxes, Loader2, Minus, Plus, Search, Timer, Trash2, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -10,6 +10,7 @@ import Badge from '../components/ui/Badge.jsx'
 import BarChart from '../components/charts/BarChart.jsx'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
+import { scrimMotion, sheetMotion } from '../components/ui/sheetMotion.js'
 
 const emptyProduct = () => ({
   name: '',
@@ -252,16 +253,19 @@ export default function Inventory() {
         </motion.section>
       </div>
 
-      {modal && (
-        <ProductModal
-          product={modal}
-          onClose={() => setModal(null)}
-          onSave={async (data) => {
-            await addItem(COLLECTIONS.products, data)
-            setModal(null)
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {modal && (
+          <ProductModal
+            key="product-sheet"
+            product={modal}
+            onClose={() => setModal(null)}
+            onSave={async (data) => {
+              await addItem(COLLECTIONS.products, data)
+              setModal(null)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -299,8 +303,12 @@ function ProductModal({ product, onClose, onSave }) {
   }
 
   return (
-    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <motion.div className="modal" initial={{ x: 28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}>
+    <motion.div
+      className="modal-scrim is-presence"
+      {...scrimMotion}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div className="modal" {...sheetMotion}>
         <div className="modal__head">
           <div className="modal__title">{t('inventory.addProduct')}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
@@ -370,6 +378,6 @@ function ProductModal({ product, onClose, onSave }) {
           </div>
         </form>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }

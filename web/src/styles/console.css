@@ -290,8 +290,21 @@
 
 /* Lime is "you are here" — the same mark the hero mock's rail carries,
    and legible peripherally in a way a recoloured glyph is not. */
-.rail__item.is-live .rail__tile { background: var(--lime); color: #242426; }
+.rail__item.is-live .rail__tile { background: transparent; color: #242426; }
 .rail__item.is-live .rail__label { color: var(--ink); }
+
+/* The lime itself is .rail__fill, one element SideRail moves from tile to
+   tile, so the icon and the badge are lifted above it. */
+.rail__fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.rail__tile > svg { position: relative; z-index: 1; }
+.rail__tile > .rail__badge { z-index: 2; }
 
 .rail__badge {
   position: absolute;
@@ -725,7 +738,8 @@
   font-weight: 400;
   letter-spacing: -0.01em;
   transition: background 220ms var(--ease), color 220ms var(--ease),
-              border-color 220ms var(--ease), opacity 140ms var(--ease);
+              border-color 220ms var(--ease), opacity 140ms var(--ease),
+              transform 120ms var(--ease);
 }
 
 .app-shell .btn::before {
@@ -1153,6 +1167,45 @@
    the drawing fills the card. */
 .app-shell .ck__svg { width: 100%; height: auto; display: block; }
 
+/* Layout. Everything else in this block only colours the pieces; these
+   rules place them, and the re-skin had dropped them. Without
+   `position: absolute` the readout card fell into the flow as a full-width
+   block under the plot, `left` did nothing, and past 58% of the width its
+   flip-left transform moved it by its own width, which was the whole card,
+   clean off the screen. The same loss squashed the legend and left the
+   interval's swatch with no size at all. */
+.ck__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 22px;
+  margin-bottom: 2px;
+}
+
+.ck__plot { position: relative; }
+
+/* The value chip hangs 2 units left of the viewBox, so no clipping. pan-y
+   rather than none: the page still scrolls under a thumb, and a sideways
+   drag reaches the cash-flow chart's pan. */
+.ck__svg {
+  overflow: visible;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.ck-legend {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.ck-legend__item { display: inline-flex; align-items: center; gap: 7px; }
+.ck-legend__mark { display: block; flex: 0 0 auto; }
+.ck-legend__band { width: 22px; height: 11px; flex: 0 0 auto; }
+
 .ck-axis-text,
 .ck-chip-text { font-family: var(--sans); font-size: 11px; }
 .ck-axis-text { fill: var(--ink-50); }
@@ -1161,16 +1214,26 @@
 .ck-legend__name { font-size: 13px; font-weight: 400; color: var(--ink-75); letter-spacing: -0.01em; }
 .ck-legend__band { border-radius: 4px; }
 
+/* Beside the crosshair, never under the pointer: pointer-events off, or it
+   would steal the move events that position it. */
 .ck-tip {
+  position: absolute;
+  top: 45%;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 132px;
+  padding: 11px 13px;
+  white-space: nowrap;
   background: var(--card);
   border: 1px solid var(--ink-07);
   border-radius: var(--r-sm);
   box-shadow: 0 2px 4px rgba(36, 36, 38, 0.05), 0 18px 44px rgba(36, 36, 38, 0.12);
 }
 
-.ck-tip__head { font-size: 12.5px; font-weight: 400; color: var(--ink-50); }
+.ck-tip__head { font-size: 12.5px; font-weight: 400; color: var(--ink-50); margin-bottom: 7px; }
+.ck-tip__row { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; margin-top: 3px; }
 .ck-tip__label { color: var(--ink-50); }
-.ck-tip__value { font-weight: 500; color: var(--ink); }
+.ck-tip__value { margin-left: auto; font-weight: 500; color: var(--ink); }
 
 .ck__reset {
   border: 1px solid var(--ink-12);

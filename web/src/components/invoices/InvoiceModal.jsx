@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { Spark } from '../../components/ui/icons.jsx'
+import { scrimMotion, sheetMotion } from '../ui/sheetMotion.js'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import { useData } from '../../context/DataContext.jsx'
 import { splitVat } from '../../lib/vat.js'
@@ -125,13 +126,12 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
   const fieldClass = (key) => (lowFields.includes(key) ? 'field field--flag' : 'field')
 
   return (
-    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <motion.div
-        className="modal modal--wide"
-        initial={{ x: 28, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}
-      >
+    <motion.div
+      className="modal-scrim is-presence"
+      {...scrimMotion}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div className="modal modal--wide" {...sheetMotion}>
         <div className="modal__head">
           <div>
             <div className="modal__title">
@@ -295,6 +295,6 @@ export default function InvoiceModal({ invoice, mode, onClose, onSave }) {
           </div>
         </form>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }

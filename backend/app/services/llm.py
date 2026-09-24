@@ -31,6 +31,7 @@ vendor only.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import urllib.error
@@ -232,6 +233,60 @@ def complete(
 
 
 @dataclass
+class FilePart:
+    """A photo or PDF the model reads itself, sent beside the words.
+
+    Both vendors take these in the same message as the question: OpenAI as
+    ``image_url`` / ``file`` content parts, Gemini as ``inline_data`` parts.
+    The bytes travel base64-encoded inside the JSON request, so callers keep
+    them small — see ``document_reader.for_model``.
+    """
+
+    name: str
+    mime: str  # image/jpeg, image/png, image/webp or application/pdf
+    data: bytes
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def _openai_content(text: str, files: list[FilePart] | None) -> str | list[dict]:
+    """A user message's ``content``: a plain string, or parts when files ride."""
+    if not files:
+        return text
+    parts: list[dict] = [{"type": "text", "text": text}]
+    for f in files:
+        if f.mime == "application/pdf":
+            parts.append(
+                {
+                    "type": "file",
+                    "file": {
+                        "filename": f.name or "belge.pdf",
+                        "file_data": f"data:application/pdf;base64,{_b64(f.data)}",
+                    },
+                }
+            )
+        else:
+            parts.append(
+                {
+                    "type": "image_url",
+                    # "high": an invoice is small print, and "low" reads it
+                    # from a 512 px thumbnail.
+                    "image_url": {"url": f"data:{f.mime};base64,{_b64(f.data)}", "detail": "high"},
+                }
+            )
+    return parts
+
+
+def _gemini_parts(text: str, files: list[FilePart] | None) -> list[dict]:
+    parts: list[dict] = [{"text": text}]
+    for f in files or []:
+        parts.append({"inline_data": {"mime_type": f.mime, "data": _b64(f.data)}})
+    return parts
+
+
+@dataclass
 class ToolCall:
     """One request from the model to run one tool."""
 
@@ -341,6 +396,7 @@ class OpenAIToolSession(ToolSession):
         *,
         temperature: float,
         timeout: int,
+        files: list[FilePart] | None = None,
     ) -> None:
         self._model = active_model()
         self._tools = _openai_tools(tools)
@@ -348,8 +404,14 @@ class OpenAIToolSession(ToolSession):
         self._timeout = timeout
         self._messages: list[dict] = [
             {"role": "system", "content": "\n".join(system)},
-            *history,
-            {"role": "user", "content": question},
+            *(
+                {
+                    "role": m.get("role", "user"),
+                    "content": _openai_content(m.get("content") or "", m.get("files")),
+                }
+                for m in history
+            ),
+            {"role": "user", "content": _openai_content(question, files)},
         ]
 
     def step(self) -> Step:
@@ -425,6 +487,7 @@ class GeminiToolSession(ToolSession):
         *,
         temperature: float,
         timeout: int,
+        files: list[FilePart] | None = None,
     ) -> None:
         self._model = active_model()
         self._timeout = timeout
@@ -436,11 +499,11 @@ class GeminiToolSession(ToolSession):
         self._contents: list[dict] = [
             {
                 "role": "model" if m.get("role") == "assistant" else "user",
-                "parts": [{"text": m.get("content") or ""}],
+                "parts": _gemini_parts(m.get("content") or "", m.get("files")),
             }
             for m in history
         ]
-        self._contents.append({"role": "user", "parts": [{"text": question}]})
+        self._contents.append({"role": "user", "parts": _gemini_parts(question, files)})
 
     def step(self) -> Step:
         body = _gemini_post(
@@ -504,19 +567,25 @@ def tool_session(
     *,
     temperature: float = 0.3,
     timeout: int = TOOL_TIMEOUT,
+    files: list[FilePart] | None = None,
 ) -> ToolSession:
     """A tool-calling transcript against whichever provider is configured.
 
     ``history`` is ``{"role": "user"|"assistant", "content": str}``, oldest
-    first — the provider-neutral shape, translated per vendor inside.
+    first — the provider-neutral shape, translated per vendor inside. A user
+    entry may also carry ``"files": [FilePart]``, and ``files`` rides with
+    the question itself: the model receives the photos and PDFs, not a
+    transcription of them.
     """
     provider = active_provider()
     if provider == PROVIDER_OPENAI:
         return OpenAIToolSession(
-            system, history, question, tools, temperature=temperature, timeout=timeout
+            system, history, question, tools,
+            temperature=temperature, timeout=timeout, files=files,
         )
     if provider == PROVIDER_GEMINI:
         return GeminiToolSession(
-            system, history, question, tools, temperature=temperature, timeout=timeout
+            system, history, question, tools,
+            temperature=temperature, timeout=timeout, files=files,
         )
     raise RuntimeError("no AI provider configured")

@@ -12,6 +12,7 @@ the caller but never resolves a company. The data itself lives next door under
 """
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
@@ -36,6 +37,7 @@ from app.schemas.compute import (
 )
 from app.schemas.ocr import OcrExtractResult
 from app.services import compute_service as agg
+from app.services import document_reader
 from app.services.chat_service import BusinessContext, get_chat_reply
 from app.services.compliance_service import InvoiceRecord, run_all_checks
 from app.services.expense_classifier import CATEGORIES, classify_expense, vendor_key
@@ -376,7 +378,11 @@ async def classify(
 async def ocr(
     caller: ComputeCaller, file: UploadFile = File(...)
 ) -> OcrExtractResult:
-    """Server-side Tesseract 5 (tur+eng) with per-field confidence."""
+    """Server-side Tesseract 5 (Turkish) with per-field and page confidence.
+
+    A PDF is read from its own text layer when it has one (every e-Fatura and
+    e-Arşiv PDF does), which is exact; only scanned pages go through OCR.
+    """
     content = await file.read()
     if not content:
         raise HTTPException(
@@ -388,7 +394,16 @@ async def ocr(
             detail="Dosya 10 MB sınırını aşıyor.",
         )
     try:
-        return scan_invoice(content)
+        # Off the event loop: a photo takes Tesseract 0.5–5 s, and run inline
+        # it froze every other request on the API for that long.
+        if document_reader.is_pdf(content):
+            read = await asyncio.to_thread(document_reader.read_document, content)
+            return read.invoice
+        return await asyncio.to_thread(scan_invoice, content)
+    except document_reader.DocumentError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except Exception as exc:  # Tesseract/Pillow failure on a bad image
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
   Boxes,
   LayoutGrid,
@@ -43,6 +44,17 @@ export default function SideRail() {
 
   const isLive = (to, end) => (end ? pathname === to : pathname.startsWith(to))
 
+  // The lime "you are here" fill is one element that moves between tiles
+  // (shared layoutId), so a click reads as travelling rather than a swap.
+  const liveFill = (
+    <motion.span
+      layoutId="rail-live"
+      className="rail__fill"
+      aria-hidden="true"
+      transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.8 }}
+    />
+  )
+
   // A modified click stays with the browser, so any destination can still be
   // opened in a new tab.
   const follow = (to) => (event) => {
@@ -66,6 +78,7 @@ export default function SideRail() {
             aria-current={isLive(to, end) ? 'page' : undefined}
           >
             <span className="rail__tile">
+              {isLive(to, end) && liveFill}
               <Icon size={19} strokeWidth={1.5} />
               {badge ? <span className="rail__badge tnum">{badge > 99 ? '99+' : badge}</span> : null}
             </span>
@@ -82,7 +95,10 @@ export default function SideRail() {
           onClick={follow('/app/settings')}
           className={`rail__item${isLive('/app/settings') ? ' is-live' : ''}`}
         >
-          <span className="rail__tile"><Settings size={19} strokeWidth={1.5} /></span>
+          <span className="rail__tile">
+            {isLive('/app/settings') && liveFill}
+            <Settings size={19} strokeWidth={1.5} />
+          </span>
           <span className="rail__label">{t('dock.settings')}</span>
         </a>
       </div>

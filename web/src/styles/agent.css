@@ -840,6 +840,129 @@
 .agent-send:hover:not(:disabled) { background: var(--ink); }
 .agent-send:disabled { opacity: 0.32; cursor: not-allowed; }
 
+/* ── Attachments ──────────────────────────────────────────────────
+   A file is a white card on the ground, the same register as the
+   report card but a size down: it is something the user brought,
+   not something the agent made. Dark still acts (the paperclip is
+   a quiet control, the send stays the one dark thing), and a file
+   being dragged over the composer lights its border lime. */
+
+.agent-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agent-files--sent { justify-content: flex-end; margin-bottom: 0; }
+
+/* The composer's row animates its height open; without the clip the chips
+   would spill over the input while it grows. */
+.agent-files.is-animated { overflow: hidden; }
+
+.agent-msg__question {
+  max-width: 82%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.agent-msg__question .agent-msg__ask { max-width: 100%; }
+
+.agent-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 280px;
+  padding: 7px 8px 7px 7px;
+  background: var(--card);
+  border: 1px solid var(--ink-12);
+  border-radius: 12px;
+}
+
+.agent-file__icon {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--pg-deep);
+  color: var(--ink-75);
+}
+
+.agent-file__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.agent-file__name {
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+button.agent-file__name { cursor: pointer; }
+button.agent-file__name:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.agent-file__meta {
+  font-size: 11.5px;
+  color: var(--ink-50);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-file__remove {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink-50);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.agent-file__remove:hover { background: var(--ink-07); color: var(--ink); }
+
+.agent-file.is-busy .agent-file__icon { color: var(--ink-50); }
+
+.agent-file.is-bad { border-color: rgba(164, 67, 58, 0.35); }
+.agent-file.is-bad .agent-file__icon { background: rgba(164, 67, 58, 0.1); color: #a4433a; }
+.agent-file.is-bad .agent-file__meta { color: #a4433a; white-space: normal; }
+
+.agent-attach {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  margin-left: -9px;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  color: var(--ink-50);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+
+.agent-attach:hover:not(:disabled) { background: var(--ink-07); color: var(--ink); }
+.agent-attach:disabled { opacity: 0.32; cursor: not-allowed; }
+
+.agent-composer.is-drop .agent-input {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--lime);
+}
+
 .agent-composer__note {
   margin-top: 9px;
   text-align: center;

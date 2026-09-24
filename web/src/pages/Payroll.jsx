@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2, PieChart, PiggyBank, Plus, Trash2, Users, X } from 'lucide-react'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -8,6 +8,7 @@ import { COLLECTIONS, addItem, removeItem } from '../lib/db.js'
 import DonutChart from '../components/charts/DonutChart.jsx'
 import PageSkeleton from '../components/ui/PageSkeleton.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
+import { scrimMotion, sheetMotion } from '../components/ui/sheetMotion.js'
 
 const emptyEmployee = () => ({
   name: '',
@@ -235,16 +236,19 @@ export default function Payroll() {
         )}
       </div>
 
-      {modal && (
-        <EmployeeModal
-          employee={modal}
-          onClose={() => setModal(null)}
-          onSave={async (data) => {
-            await addItem(COLLECTIONS.employees, data)
-            setModal(null)
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {modal && (
+          <EmployeeModal
+            key="employee-sheet"
+            employee={modal}
+            onClose={() => setModal(null)}
+            onSave={async (data) => {
+              await addItem(COLLECTIONS.employees, data)
+              setModal(null)
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -279,8 +283,12 @@ function EmployeeModal({ employee, onClose, onSave }) {
   }
 
   return (
-    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <motion.div className="modal" initial={{ x: 28, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.24, ease: [0.22, 0.8, 0.3, 1] }}>
+    <motion.div
+      className="modal-scrim is-presence"
+      {...scrimMotion}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div className="modal" {...sheetMotion}>
         <div className="modal__head">
           <div className="modal__title">{lang === 'en' ? 'Add employee' : 'Çalışan ekle'}</div>
           <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
@@ -337,6 +345,6 @@ function EmployeeModal({ employee, onClose, onSave }) {
           </div>
         </form>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }

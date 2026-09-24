@@ -23,6 +23,7 @@ import { ChevronDown, Database, FileText, WifiOff } from 'lucide-react'
 import { Spark } from '../ui/icons.jsx'
 import { useLang } from '../../i18n/LanguageContext.jsx'
 import AgentBlocks, { Prose } from './AgentBlocks.jsx'
+import AttachmentChip, { attachmentMeta, openAttachment } from './AttachmentChip.jsx'
 
 function ToolTrace({ calls }) {
   const { t } = useLang()
@@ -75,6 +76,30 @@ function ReportCard({ artifact, active, onOpen }) {
   )
 }
 
+/* The question: its files above it, then its words. A file sent on its own
+   is a whole question, so an empty bubble is not drawn under it. */
+function Question({ text, attachments }) {
+  const { t, lang } = useLang()
+  return (
+    <div className="agent-msg__question">
+      {attachments?.length > 0 && (
+        <div className="agent-files agent-files--sent">
+          {attachments.map((file) => (
+            <AttachmentChip
+              key={file.id}
+              name={file.filename}
+              kind={file.kind}
+              meta={attachmentMeta(file, t, lang)}
+              onOpen={() => openAttachment(file.id).catch(() => {})}
+            />
+          ))}
+        </div>
+      )}
+      {text ? <div className="agent-msg__ask">{text}</div> : null}
+    </div>
+  )
+}
+
 function Message({ message, activeArtifactId, onOpenArtifact }) {
   const { t } = useLang()
 
@@ -86,7 +111,7 @@ function Message({ message, activeArtifactId, onOpenArtifact }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22 }}
       >
-        <div className="agent-msg__ask">{message.content}</div>
+        <Question text={message.content} attachments={message.attachments} />
       </motion.div>
     )
   }
@@ -159,7 +184,7 @@ export default function AgentThread({
             Replaced by the real row when the turn resolves. */}
         {pending && (
           <div className="agent-msg agent-msg--user">
-            <div className="agent-msg__ask">{pending}</div>
+            <Question text={pending.text} attachments={pending.attachments} />
           </div>
         )}
 

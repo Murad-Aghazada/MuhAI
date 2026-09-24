@@ -57,9 +57,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /opt/venv /opt/venv
 
+# OMP_THREAD_LIMIT=1: Tesseract's OpenMP build spreads one page over every
+# core and spin-waits between steps, so two scans at once on a 6-vCPU box
+# fight each other. One thread per scan, and the OCR route's worker threads
+# supply the parallelism instead.
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    OMP_THREAD_LIMIT=1
 
 WORKDIR /app
 

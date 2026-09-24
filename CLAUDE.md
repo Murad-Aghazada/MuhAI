@@ -164,8 +164,8 @@ All four are git-ignored.
 ## 4. Current state
 
 **Backend** — FastAPI 0.110, SQLAlchemy 2 (async), Pydantic v2, Alembic
-through `0012_agent_conversations`. **5 routers, 34 paths / 42 operations,
-396 tests.**
+through `0013_agent_attachments`. **5 routers, 39 paths / 47 operations,
+436 tests.**
 
 - `/api/workspace/*` — company CRUD, generic collection CRUD, bulk insert,
   clear, and two atomic invoice↔ledger operations. **Six** collections now:
@@ -240,10 +240,31 @@ through `0012_agent_conversations`. **5 routers, 34 paths / 42 operations,
   a code change** — see N19 and the `BANK_*` block in `.env.example`
 - Prophet 1.1.5 forecasting on real data, moving-average fallback under 10
   points and on any Prophet failure
-- Tesseract 5 + `tesseract-ocr-tur`; per-field confidence, threshold 0.7.
+- **The agent takes photos and PDFs (2026-09-24), and the model reads the
+  file itself.** Paperclip, drag-and-drop or paste in the composer; the file
+  uploads at once to `POST /api/agent/attachments` (10 MB, five a message,
+  bytes kept in Postgres in `agent_attachments`, unsent uploads swept after
+  a day). On `ask`, the photo or PDF goes to the model **as a file**:
+  OpenAI `image_url` / `file` content parts, Gemini `inline_data`
+  (`llm.FilePart`). Photos are sent upright and capped at 2048 px
+  (`document_reader.for_model`); files are sent within a 12 MB request budget,
+  this question's first, then earlier questions' newest first, so follow-ups
+  still see the document. Text extracted on upload (a PDF's own text layer, or
+  Tesseract) is only the backup: used if the vendor refuses files (a 4xx
+  triggers one retry with the text) and for the offline answer. Verified live
+  on `gpt-6-luna` with a photo and a PDF: see N32 for what it gets wrong. The
+  agent stays read-only; it points to "Fatura yükle" to save an invoice
+- Tesseract 5 with **tessdata_best's Turkish model, vendored at
+  `backend/tessdata/tur.traineddata`** (the apt package ships the "fast"
+  one); `OCR_TESSDATA_DIR` overrides. Per-field confidence, threshold 0.7.
+  `/api/compute/ocr` also takes PDFs and reads their text layer, which is
+  exact.
   Both paths run **Turkish only at PSM 6**, with the server path also
-  preprocessing (grayscale, upscale under 1600 px, autocontrast, unsharp).
-  See N18 — the settings matter far more than the model does. The browser-side
+  preprocessing (EXIF rotation, grayscale, upscale under 1600 px,
+  autocontrast — **no sharpening**, see N18). The settings matter far more
+  than the model does. Both paths report the page's **mean word confidence**
+  as the document figure; the server's per-field scores still mark doubtful
+  fields and decide `needs_review`. The browser-side
   OCR mode is fully vendored under `web/public/tessdata`, so **neither OCR
   path needs internet** (see N13). Confidence is **measured**, not assumed, and
   the vendor is found by legal form rather than by position — see N23
@@ -366,7 +387,6 @@ the landing language.
   compute API
 - Falls back to local aggregation with a "hesaplama servisi çevrimdışı" badge
   when the API is unreachable — never a blank screen, never an invented number
-- `lib/seed.js` generates a deterministic demo dataset
 - **Banka Mutabakatı** (`pages/Bank.jsx`) shows one thing: which movements are
   already in the books and which are not, unmatched first. It fetches when a
   bank is connected and imports a CSV when one is not, and says plainly which
@@ -450,7 +470,7 @@ other signed-in screens are still unverified — see open item 1.
 | Speech says forecasting is **OLS regression** | Prophet, with a **moving-average** fallback | correct the wording |
 | S2 **PostgreSQL 15 + Redis 7** | Redis is **gone** (2026-09-13). Postgres 15 is the only stateful service | drop Redis from the slide |
 | S4 **Docker Compose, 4 services** | 3 — postgres, backend, web (plus a one-shot migrate job) | restate |
-| S18 **"13 servis geliştirildi"** | 5 routers, 34 paths / 42 operations, 396 tests. 17 routers existed until the legacy half was deleted | say "42 uç nokta, 396 test" — a small, defensible surface beats a big one you cannot explain |
+| S18 **"13 servis geliştirildi"** | 5 routers, 39 paths / 47 operations, 436 tests. 17 routers existed until the legacy half was deleted | say "47 uç nokta, 436 test" — a small, defensible surface beats a big one you cannot explain |
 | Anything claiming the assistant **"acts on"** your books | The agent reads 16 data sources and writes nothing: there is no create/update/delete tool for it to call (N29) | say "salt okunur" and mean it — it is a stronger claim than autonomy, and it is true |
 | S14 **Expo / React Native shipped** | A native Expo app runs on a real Android phone as of 2026-09-20 (`mobile/`, SDK 57, 5 screens, camera→OCR verified end to end over the LAN). Still **Expo Go only** — no EAS build, no store listing, and it has not run on iOS. | say "Expo ile native mobil uygulama" — it is now true. Do **not** say "yayında"/"mağazada": it runs through Expo Go on a development machine, not as an installable build |
 | S3/S16 **GİB / SGK / bank APIs** | **Bank**: a real, config-driven integration exists (`/api/bank`, OAuth2 + mTLS, preset per bank) — but no live credential has run through it yet, and with none configured it falls back to CSV import. **GİB / SGK**: still no external call; the tax routes read a local 2026 calendar and rate table | say "bank integration ready for the bank's API, and a CSV path that works with no internet at all". Do not claim a live GİB or SGK connection |
@@ -572,6 +592,18 @@ demoed that number before today, they demoed a literal.
   do revisit the model, re-run the benchmark rather than assuming — and
   remember any model must be baked into the image, never fetched at runtime
   (N13).
+  **2026-09-24: the server path scored 16/28 against the browser's 27/28**
+  on seven captures of the sample invoice, with the same engine and the same
+  `tur` model (both are the fast `Lfx128` network). Two causes, neither the
+  model nor the parser (the server parser on the browser's text: 27/28).
+  Pillow does not apply the EXIF Orientation tag unless asked, and phones
+  store portrait shots as landscape pixels plus that tag, so every portrait
+  photo was read sideways (0/4; tesseract.js honours the tag). And the
+  unsharp mask turned sensor noise on a dim photo into speckle: grayscale
+  alone 3/4, grayscale + unsharp 0/4. `_prepare` now calls
+  `ImageOps.exif_transpose` first and does not sharpen; 27/28 after. The
+  route runs `scan_invoice` in `asyncio.to_thread` (inline, one photo
+  froze the whole API) and the image sets `OMP_THREAD_LIMIT=1`.
 
 - **N19 — A bank connection is configuration, not code.** Turkish banks hand
   out the gateway host, the paths and the scopes *with* the credentials; they
@@ -608,6 +640,15 @@ demoed that number before today, they demoed a literal.
   wolf every run. `analytics.js` had a local `Set` named `window`; it is
   `span` now, because shadowing a browser global in a shared file is a trap
   for every future reader as well as the checker.
+  **This broke once already.** Commit `96fe445` swapped in a `web/` from
+  before the native app existed: `lib/bank.js` and `lib/invoiceDraft.js`
+  vanished, `client.js` went back to `import.meta` without
+  `configureClient` (and lost N24), and the `window` above came back. Metro
+  reported only the first missing file. All restored 2026-09-24 from
+  `ba5ccf3` and verified with `check:shared` plus `npx expo export
+  --platform android`. If `web/` is ever replaced wholesale again, run both
+  before anything else. Mobile `t()` keys also live in the web dictionary
+  (`bank.*`, `nav.bank`, `common.error`), so do not prune them as unused.
 
 - **N21 — `mobile/.npmrc` pins `legacy-peer-deps=true`, deliberately.** Expo 57
   ships `react@19.2.3` while `@expo/devtools` pulls `react-dom@19.3.0`, which
@@ -784,6 +825,41 @@ demoed that number before today, they demoed a literal.
   Tests patch at `llm.complete` / `llm._openai_post` / `llm._gemini_post`,
   not at `urlopen` — a test that reaches past the seam into the transport
   passes for one vendor and quietly stops covering the other.
+
+- **N31 — A chart re-skin must keep the layout block.** `console.css`'s
+  chart section holds two kinds of rule: skin (colour, type) and layout
+  (`.ck__plot { position: relative }`, `.ck-tip { position: absolute }`,
+  the legend's flex, the band swatch's size). The 2026-09-24 re-skin kept
+  only the skin. The readout card then fell into the flow as a full-width
+  block under the plot, and past 58% of the width `ChartTooltip`'s flip,
+  `translate(calc(-100% - 14px))`, moved it by its own width, the whole
+  card, off the screen, on both the forecast and the cash-flow chart.
+  Restored and measured from 10% to 99% of the width.
+
+- **N32 — Turkish OCR, measured, and what the model gets wrong.** On 56
+  synthetic Turkish invoices (12 fonts, four capture conditions, half held
+  out), Turkish letters read correctly: Tesseract fast 97.0%, **best 98.6%**,
+  EasyOCR 86.5%, **PaddleOCR/RapidOCR Latin 58%** (İ→I and ı→i by the
+  hundred; 0/28 vendor names exact). Do not switch to PaddleOCR for Turkish.
+  Fields on the held-out half: fast 101/136, best 107/136. Two tricks that
+  looked good on the tuning half (merging fast+best reads, trimming specks
+  off the vendor line) gave 101→104 held out, so they were not shipped. The
+  vision model reads Turkish letters and amounts well, including from a
+  photo the server extracted nothing from, but **drops a zero from long digit
+  runs**: `SGT2026000001482` → `SGT202600001482`, VKN `4830027561` →
+  `483027561`. Seen twice in four live questions. A VKN is always 10 digits
+  and a TCKN 11 — a check on that is the obvious next guard.
+
+- **N33 — Motion pass (2026-09-24).** `main.jsx` wraps the app in
+  `<MotionConfig reducedMotion="user">`; before it, only CSS animation
+  honoured the OS setting. The rail's lime tile is one `layoutId="rail-live"`
+  element (`.rail__fill`) that springs between destinations. The three side
+  sheets render inside `<AnimatePresence>` with `ui/sheetMotion.js`, and their
+  scrim carries `.is-presence`, which switches off `sheet-in` / `sheet-fade`:
+  `sheet-in` fills forwards, a filled CSS animation outranks Framer's inline
+  transform, and the exit slide would silently never show. Composer
+  attachment chips animate in and out (`animated` prop); the sent copies in
+  the thread do not.
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

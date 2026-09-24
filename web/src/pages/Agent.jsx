@@ -22,7 +22,7 @@
    ============================================================ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { PanelLeft, ShieldCheck, WifiOff } from 'lucide-react'
+import { PanelLeft, WifiOff } from 'lucide-react'
 import { Spark } from '../components/ui/icons.jsx'
 import { useLang } from '../i18n/LanguageContext.jsx'
 import { useData } from '../context/DataContext.jsx'
@@ -145,9 +145,9 @@ export default function Agent() {
 
   // ── Asking ──────────────────────────────────────────────────────
   const send = useCallback(
-    async (text) => {
+    async (text, attachments = []) => {
       setError(null)
-      setPending(text)
+      setPending({ text, attachments })
       setThinking(true)
 
       try {
@@ -160,7 +160,7 @@ export default function Agent() {
           setConversations((list) => [created, ...list])
         }
 
-        const turn = await agent.ask(conversationId, text)
+        const turn = await agent.ask(conversationId, text, attachments.map((a) => a.id))
         if (!mounted.current) return
 
         setPending(null)
@@ -259,10 +259,6 @@ export default function Agent() {
           </div>
 
           <span className="agent-bar__flags">
-            <span className="agent-flag">
-              <ShieldCheck size={13} strokeWidth={1.7} />
-              {t('agent.readOnly')}
-            </span>
             {offline ? (
               <span className="agent-flag is-warn">
                 <WifiOff size={13} strokeWidth={1.7} />

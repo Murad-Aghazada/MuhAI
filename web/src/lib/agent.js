@@ -18,7 +18,7 @@
        specific lives in `client.js`, which is what lets the shared layer
        bundle for the phone as well (N20).
    ============================================================ */
-import { ApiError, apiBaseUrl, del, get, getToken, patch, post } from './client.js'
+import { ApiError, apiBaseUrl, del, get, getToken, patch, post, request } from './client.js'
 
 const BASE = '/api/agent'
 
@@ -67,12 +67,53 @@ export function deleteConversation(id) {
  * drew can be replaced by the row that actually exists rather than living on
  * with a fabricated id.
  */
-export function ask(conversationId, message) {
+export function ask(conversationId, message, attachmentIds = []) {
   return post(
     `${BASE}/conversations/${conversationId}/ask`,
-    { message },
+    { message, attachmentIds },
     { timeout: ASK_TIMEOUT_MS },
   )
+}
+
+// ── Attachments ───────────────────────────────────────────────────────
+
+// Reading happens on upload: a text PDF is milliseconds, but a scanned one is
+// OCR'd page by page at 1-3 s each, up to five pages.
+const UPLOAD_TIMEOUT_MS = 90000
+
+/**
+ * Send a photo or PDF to be read. Resolves to the attachment: its id (which
+ * `ask` then carries), how it was read, and the invoice fields found in it.
+ * Called the moment a file is picked, so the reading overlaps the typing.
+ */
+export function uploadAttachment(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request(`${BASE}/attachments`, {
+    method: 'POST',
+    body: form,
+    isForm: true,
+    timeout: UPLOAD_TIMEOUT_MS,
+  })
+}
+
+/** Take an unsent file back out of the composer. */
+export function deleteAttachment(id) {
+  return del(`${BASE}/attachments/${id}`)
+}
+
+/**
+ * The file itself, as a blob, for the preview. Same reasoning as `fetchPdf`
+ * below: an authenticated fetch, never a URL with the token in it.
+ */
+export async function fetchAttachment(id) {
+  const response = await fetch(`${apiBaseUrl}${BASE}/attachments/${id}/file`, {
+    headers: { Authorization: `Bearer ${getToken() || ''}` },
+  })
+  if (!response.ok) {
+    throw new ApiError(`Dosya alınamadı (HTTP ${response.status}).`, { status: response.status })
+  }
+  return response.blob()
 }
 
 // ── Reports ───────────────────────────────────────────────────────────
