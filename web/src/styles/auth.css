@@ -170,7 +170,7 @@
   align-items: center;
   gap: 9px;
   font-size: 14px;
-  color: var(--ink-50);
+  color: var(--ink-75);
 }
 
 .lp-steps__item b {
@@ -180,7 +180,7 @@
   height: 24px;
   border-radius: var(--pill);
   background: var(--ink-07);
-  color: var(--ink-50);
+  color: var(--ink-75);
   font-size: 12px;
   font-weight: 500;
 }
@@ -318,7 +318,7 @@
 .lp .field__wrap textarea { font-size: 15px; letter-spacing: 0; color: var(--ink); }
 
 .lp .field__wrap input::placeholder { color: var(--ink-25); }
-.lp .field__hint { font-size: 13px; color: var(--ink-50); }
+.lp .field__hint { font-size: 13px; color: var(--ink-75); }
 .lp .field__wrap svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 /* ------------------------------------------------- the actions -- */
@@ -341,7 +341,7 @@
 .lp-auth__switch {
   padding-top: 24px;
   font-size: 14px;
-  color: var(--ink-50);
+  color: var(--ink-75);
 }
 
 .lp-auth__switch a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ink-25); }
@@ -402,7 +402,7 @@
   gap: 7px;
   font-family: inherit;
   font-size: 14px;
-  color: var(--ink-50);
+  color: var(--ink-75);
   cursor: pointer;
   transition: color 0.2s ease;
 }

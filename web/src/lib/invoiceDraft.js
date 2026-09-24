@@ -64,6 +64,10 @@ export function ocrToDraft(result) {
   return {
     ...emptyInvoice(),
     vendor: value('vendor_name') || '',
+    // The server reads the tax number into `parsed`, not into a top-level
+    // field, and this mapping used to skip it: the form's Vergi No stayed
+    // blank on every server scan. VKN first, as document_reader does.
+    taxId: result?.parsed?.vkn || result?.parsed?.tckn || '',
     number: value('invoice_number') || '',
     issueDate: value('date') || emptyInvoice().issueDate,
     amount: total,

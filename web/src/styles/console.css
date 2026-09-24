@@ -86,14 +86,18 @@
   --text-subheading: var(--ink);
   --text-secondary:  var(--ink-75);
   --text-body:       var(--ink-75);
-  --text-tertiary:   var(--ink-50);
-  --text-muted:      var(--ink-50);
+  /* 75, not 50 (2026-09-24): 50% ink on the page ground reads at about
+     3:1, below the 4.5:1 body-size text needs. Icons and input
+     placeholders that use these stay at 50%; see "Faint by design" at the
+     end of this file. */
+  --text-tertiary:   var(--ink-75);
+  --text-muted:      var(--ink-75);
   --text-inverted:   var(--on-dark);
   --text-inverted-secondary: var(--on-dark-75);
   --text-inverted-muted:     var(--on-dark-50);
 
   --ink-2: var(--ink-75);
-  --ink-3: var(--ink-50);
+  --ink-3: var(--ink-75);
   --ink-4: var(--ink-25);
   --on-ink: var(--on-dark);
 
@@ -275,7 +279,7 @@
   letter-spacing: -0.01em;
   line-height: 1.2;
   text-align: center;
-  color: var(--ink-50);
+  color: var(--ink-75);
   /* Two lines at most — a third pushes the last tile off the rail. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -498,7 +502,7 @@
 }
 
 .app-shell .topbar__avatar-name { font-size: 13.5px; font-weight: 400; color: var(--ink); }
-.app-shell .topbar__avatar-role { font-size: 11.5px; color: var(--ink-50); }
+.app-shell .topbar__avatar-role { font-size: 11.5px; color: var(--ink-75); }
 
 /* ---------------------------------------------- language flags --
    The same two drawn flags the landing nav carries. They are
@@ -550,7 +554,7 @@
   color: var(--ink);
 }
 
-.app-shell .page-eyebrow { color: var(--ink-50); margin-bottom: 10px; }
+.app-shell .page-eyebrow { color: var(--ink-75); margin-bottom: 10px; }
 .app-shell .page-eyebrow .label,
 .app-shell .label,
 .app-shell .eyebrow {
@@ -558,11 +562,11 @@
   font-size: 13px;
   font-weight: 400;
   letter-spacing: -0.01em;
-  color: var(--ink-50);
+  color: var(--ink-75);
 }
 
 .app-shell .page-eyebrow svg { color: var(--ink-50); }
-.app-shell .page-sub { font-size: 14px; letter-spacing: -0.01em; color: var(--ink-50); }
+.app-shell .page-sub { font-size: 14px; letter-spacing: -0.01em; color: var(--ink-75); }
 
 /* ============================================================
    RHYTHM
@@ -655,7 +659,7 @@
 }
 
 .app-shell .panel-title svg { color: var(--ink-50); opacity: 1; }
-.app-shell .panel-sub { font-size: 13px; font-weight: 400; color: var(--ink-50); letter-spacing: -0.01em; }
+.app-shell .panel-sub { font-size: 13px; font-weight: 400; color: var(--ink-75); letter-spacing: -0.01em; }
 .app-shell .divider { background: var(--ink-07); }
 
 /* ---------------------------------------------------- figures -- */
@@ -672,7 +676,7 @@
   color: var(--ink-50);
 }
 
-.app-shell .stat-card__label { font-size: 13px; font-weight: 400; color: var(--ink-50); letter-spacing: -0.01em; }
+.app-shell .stat-card__label { font-size: 13px; font-weight: 400; color: var(--ink-75); letter-spacing: -0.01em; }
 
 /* The mock's figure: 34px, tracked -0.03em, tabular so it does not
    twitch as the digits change. */
@@ -790,7 +794,7 @@
 .app-shell .btn--ghost::before { background: var(--pg); }
 .app-shell .btn--ghost:not(:disabled):hover { background: var(--card); border-color: var(--ink-25); color: var(--ink); }
 
-.app-shell .btn--quiet { background: none; border-color: transparent; color: var(--ink-50); padding: 0 12px; }
+.app-shell .btn--quiet { background: none; border-color: transparent; color: var(--ink-75); padding: 0 12px; }
 .app-shell .btn--quiet::before { background: var(--pg); }
 .app-shell .btn--quiet:not(:disabled):hover { background: none; color: var(--ink); }
 
@@ -848,7 +852,7 @@
   border: 0;
   border-radius: var(--pill);
   background: none;
-  color: var(--ink-50);
+  color: var(--ink-75);
   font-family: var(--sans);
   font-size: 13px;
   font-weight: 400;
@@ -899,7 +903,7 @@
 }
 
 .app-shell .field__label { font-size: 13.5px; font-weight: 400; letter-spacing: -0.01em; color: var(--ink-75); }
-.app-shell .field__hint { font-size: 12.5px; color: var(--ink-50); }
+.app-shell .field__hint { font-size: 12.5px; color: var(--ink-75); }
 .app-shell .checkbox-row { background: var(--card); border-color: var(--ink-12); border-radius: var(--r-sm); }
 .app-shell .checkbox-row input { accent-color: var(--dark); }
 
@@ -926,7 +930,7 @@
   font-size: 12.5px;
   font-weight: 400;
   letter-spacing: -0.01em;
-  color: var(--ink-50);
+  color: var(--ink-75);
   padding: 12px;
 }
 
@@ -992,7 +996,7 @@
 .app-shell .popover__row { border-radius: var(--r-xs); padding: 9px 11px; }
 .app-shell .popover__row:hover { background: var(--pg); }
 .app-shell .popover__title { font-size: 13.5px; font-weight: 400; }
-.app-shell .popover__meta { font-size: 12.5px; color: var(--ink-50); }
+.app-shell .popover__meta { font-size: 12.5px; color: var(--ink-75); }
 
 /* ============================================================
    SUMMARY STRIP  ·  TODAY STRIP  ·  NOTICES
@@ -1014,7 +1018,7 @@
   padding: 16px 18px;
 }
 
-.app-shell .mini-stats__label { font-size: 13px; color: var(--ink-50); letter-spacing: -0.01em; }
+.app-shell .mini-stats__label { font-size: 13px; color: var(--ink-75); letter-spacing: -0.01em; }
 .app-shell .mini-stats__value--pos { color: var(--ok); }
 .app-shell .mini-stats__value--neg { color: var(--stop); }
 
@@ -1208,7 +1212,7 @@
 
 .ck-axis-text,
 .ck-chip-text { font-family: var(--sans); font-size: 11px; }
-.ck-axis-text { fill: var(--ink-50); }
+.ck-axis-text { fill: var(--ink-75); }
 .ck-chip-text { fill: #fff; }
 
 .ck-legend__name { font-size: 13px; font-weight: 400; color: var(--ink-75); letter-spacing: -0.01em; }
@@ -1230,9 +1234,9 @@
   box-shadow: 0 2px 4px rgba(36, 36, 38, 0.05), 0 18px 44px rgba(36, 36, 38, 0.12);
 }
 
-.ck-tip__head { font-size: 12.5px; font-weight: 400; color: var(--ink-50); margin-bottom: 7px; }
+.ck-tip__head { font-size: 12.5px; font-weight: 400; color: var(--ink-75); margin-bottom: 7px; }
 .ck-tip__row { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; margin-top: 3px; }
-.ck-tip__label { color: var(--ink-50); }
+.ck-tip__label { color: var(--ink-75); }
 .ck-tip__value { margin-left: auto; font-weight: 500; color: var(--ink); }
 
 .ck__reset {
@@ -1242,13 +1246,13 @@
   padding: 4px 12px;
   font-family: var(--sans);
   font-size: 12px;
-  color: var(--ink-50);
+  color: var(--ink-75);
   cursor: pointer;
 }
 
 .ck__reset:hover { color: var(--ink); border-color: var(--ink-25); }
 
-.app-shell .chart-empty { background: var(--pg); border-radius: var(--r-sm); font-size: 13px; color: var(--ink-50); }
+.app-shell .chart-empty { background: var(--pg); border-radius: var(--r-sm); font-size: 13px; color: var(--ink-75); }
 
 .app-shell .legend__left { color: var(--ink-75); }
 .app-shell .legend__swatch { border-radius: 3px; }
@@ -1257,8 +1261,8 @@
 .app-shell .score-cats__bar { background: var(--pg); }
 .app-shell .score-cats__label { color: var(--ink-75); }
 .app-shell .score-cats__val { font-weight: 500; }
-.app-shell .score-reco { border-top-color: var(--ink-07); color: var(--ink-50); font-size: 13px; }
-.app-shell .gauge__label { color: var(--ink-50); }
+.app-shell .score-reco { border-top-color: var(--ink-07); color: var(--ink-75); font-size: 13px; }
+.app-shell .gauge__label { color: var(--ink-75); }
 
 /* ============================================================
    INSIGHT CARD
@@ -1313,7 +1317,7 @@
 .app-shell .empty-state { border-radius: var(--r-tray); padding: 48px 28px; }
 .app-shell .empty-state__icon { border-radius: var(--r-md); background: var(--pg); color: var(--ink-50); }
 .app-shell .empty-state h2 { font-size: 21px; }
-.app-shell .empty-state p { color: var(--ink-50); font-size: 14px; }
+.app-shell .empty-state p { color: var(--ink-75); font-size: 14px; }
 
 .app-shell .skel {
   border-radius: var(--r-sm);
@@ -1372,3 +1376,18 @@
 @media (max-width: 600px) {
   .app-shell .panel { padding: 16px; }
 }
+
+/* ============================================================
+   FAINT BY DESIGN
+
+   Secondary *text* moved from 50% to 75% ink on 2026-09-24 (it read at
+   about 3:1 on the page ground). These are the users of the repointed
+   tokens that are not text to read, pinned back to 50% so they keep
+   their weight: icons, and placeholders, which have to stay lighter than
+   what is typed over them.
+   ============================================================ */
+
+.app-shell .popover__row svg,
+.app-shell .search-inline,
+.app-shell .field__wrap input::placeholder,
+.app-shell .field__wrap textarea::placeholder { color: var(--ink-50); }

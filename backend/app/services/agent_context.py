@@ -25,7 +25,7 @@ from sqlalchemy import nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.company import Company
-from app.schemas.compute import BusinessSnapshot
+from app.schemas.compute import ADJUSTMENT_CATEGORY, BusinessSnapshot
 from app.services import workspace as ws
 
 # Movements older than this cannot influence any figure the agent reports: the
@@ -99,6 +99,13 @@ def _num(value: Any) -> float:
         return 0.0
 
 
+def _movement(t: dict) -> float:
+    """A movement's amount the way web/src/lib/analytics.js posts it: made
+    positive, except a dashboard correction, whose sign is the correction."""
+    amount = _num(t.get("amount"))
+    return amount if t.get("category") == ADJUSTMENT_CATEGORY else abs(amount)
+
+
 def _date(value: Any) -> dt.date | None:
     if not value:
         return None
@@ -138,7 +145,7 @@ def cash_balance(workspace: Workspace) -> float:
     opening = _num(workspace.company.get("cashBalance"))
     net = 0.0
     for t in workspace.transactions:
-        amount = abs(_num(t.get("amount")))
+        amount = _movement(t)
         net += amount if t.get("type") == "income" else -amount
     return round(opening + net, 2)
 
@@ -159,7 +166,7 @@ def build_snapshot(workspace: Workspace) -> BusinessSnapshot:
         transactions.append(
             {
                 "date": date,
-                "amount": abs(_num(t.get("amount"))),
+                "amount": _movement(t),
                 "type": "income" if t.get("type") == "income" else "expense",
                 "category": t.get("category") or None,
                 "description": t.get("description") or None,

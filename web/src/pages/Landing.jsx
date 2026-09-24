@@ -551,7 +551,7 @@ function ReadMock({ en }) {
       <div className="lp-brk" style={{ paddingTop: 14 }}>
         {f.map(([k, v]) => (
           <div className="lp-brk__row" key={k}>
-            <span style={{ color: 'var(--ink-50)' }}>{k}</span>
+            <span style={{ color: 'var(--ink-75)' }}>{k}</span>
             <b style={{ marginLeft: 'auto', minWidth: 0 }}>{v}</b>
           </div>
         ))}
@@ -677,7 +677,7 @@ function SyncMock({ en }) {
       <Float style={{ borderColor: 'rgba(36,36,38,.1)' }}>
         <div className="lp-panel__top">
           <span className="lp-tag lp-tag--ok">{en ? 'Incoming' : 'Gelen'}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-50)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-75)' }}>
             {en ? '1 min ago' : '1 dk önce'}
           </span>
         </div>
@@ -686,7 +686,7 @@ function SyncMock({ en }) {
           <Count to={14820} on={on} />
         </div>
         <div style={{ height: 1, background: 'var(--ink-07)', marginTop: 12 }} />
-        <div style={{ fontSize: 13, color: 'var(--ink-50)', paddingTop: 10 }}>
+        <div style={{ fontSize: 13, color: 'var(--ink-75)', paddingTop: 10 }}>
           {en ? 'Matched to invoice #002-12' : '#002-12 faturasıyla eşleşti'}
         </div>
       </Float>
@@ -749,7 +749,7 @@ function InvMock({ en }) {
       {r.map(([no, who, amt, tone, label]) => (
         <Float key={no} style={{ borderColor: 'rgba(36,36,38,.1)' }}>
           <div className="lp-panel__top">
-            <span style={{ fontSize: 12, color: 'var(--ink-50)' }}>{no}</span>
+            <span style={{ fontSize: 12, color: 'var(--ink-75)' }}>{no}</span>
             <span className={'lp-tag lp-tag--' + tone} style={{ marginLeft: 'auto' }}>
               {label}
             </span>
@@ -777,7 +777,7 @@ function DueMock({ en }) {
       <div style={{ fontSize: 15, letterSpacing: '-0.02em' }}>
         <Count to={amount} on={on} pre="₺" />
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-50)', paddingTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--ink-75)', paddingTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
     </Float>
   )
   return (
@@ -790,7 +790,7 @@ function DueMock({ en }) {
         <div style={{ fontSize: 22, letterSpacing: '-0.02em' }}>
           <Count to={4940} on={on} pre="₺" />
         </div>
-        <div style={{ fontSize: 12, color: 'var(--ink-50)', paddingTop: 2 }}>{en ? 'VAT · 26 Dec' : 'KDV · 26 Ara'}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-75)', paddingTop: 2 }}>{en ? 'VAT · 26 Dec' : 'KDV · 26 Ara'}</div>
       </Float>
       {side(en ? 'Payroll tax' : 'SGK', 2180, 'b')}
     </div>
@@ -807,7 +807,7 @@ function AlertMock({ en }) {
           </span>
           <div style={{ minWidth: 0, textAlign: 'left' }}>
             <div style={{ fontSize: 14 }}>{en ? 'Duplicate invoice' : 'Mükerrer fatura'}</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-50)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-75)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               #002-12 · ₺14.820
             </div>
           </div>

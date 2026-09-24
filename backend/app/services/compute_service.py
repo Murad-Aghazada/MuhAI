@@ -101,7 +101,14 @@ def expense_breakdown(
         category = t.category or classify_expense(t.description, t.vendor)
         totals[category] += float(t.amount)
 
-    ordered = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    # Only what a chart can draw. A correction that lowered the month's
+    # expenses leaves a negative bucket, and a slice cannot be negative; the
+    # dashboard reconciles its donut against the expense total instead.
+    ordered = sorted(
+        ((k, v) for k, v in totals.items() if round(v, 2) > 0),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )
     return [{"key": k, "value": round(v, 2)} for k, v in ordered]
 
 

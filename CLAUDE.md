@@ -254,15 +254,16 @@ through `0013_agent_attachments`. **5 routers, 39 paths / 47 operations,
   triggers one retry with the text) and for the offline answer. Verified live
   on `gpt-6-luna` with a photo and a PDF: see N32 for what it gets wrong. The
   agent stays read-only; it points to "Fatura yükle" to save an invoice
-- Tesseract 5 with **tessdata_best's Turkish model, vendored at
-  `backend/tessdata/tur.traineddata`** (the apt package ships the "fast"
-  one); `OCR_TESSDATA_DIR` overrides. Per-field confidence, threshold 0.7.
+- Tesseract 5, and **since 2026-09-24 the server reads exactly like the
+  browser (N36)**: the browser's own Turkish model, vendored unzipped at
+  `backend/tessdata_browser/tur.traineddata`, OEM 1, PSM 6, and the photo
+  read as it is apart from EXIF rotation. tessdata_best's larger model is
+  still at `backend/tessdata` (`OCR_TESSDATA_DIR=tessdata`) and the old
+  clean-up is `OCR_PREPROCESS=true`. Per-field confidence, threshold 0.7.
   `/api/compute/ocr` also takes PDFs and reads their text layer, which is
   exact.
-  Both paths run **Turkish only at PSM 6**, with the server path also
-  preprocessing (EXIF rotation, grayscale, upscale under 1600 px,
-  autocontrast — **no sharpening**, see N18). The settings matter far more
-  than the model does. Both paths report the page's **mean word confidence**
+  Both paths run **Turkish only at PSM 6**, and never sharpen (N18). The
+  settings matter far more than the model does. Both paths report the page's **mean word confidence**
   as the document figure; the server's per-field scores still mark doubtful
   fields and decide `needs_review`. The browser-side
   OCR mode is fully vendored under `web/public/tessdata`, so **neither OCR
@@ -859,7 +860,73 @@ demoed that number before today, they demoed a literal.
   `sheet-in` fills forwards, a filled CSS animation outranks Framer's inline
   transform, and the exit slide would silently never show. Composer
   attachment chips animate in and out (`animated` prop); the sent copies in
-  the thread do not.
+  the thread do not. The agent's chat list is **always mounted** now and
+  slides: its grid column goes to `0px` (never removed, since a transition
+  needs the same number of tracks) while the rail keeps its width and moves
+  by `translateX(-100%)` on the same 260ms curve, so its edge rides the
+  column's; `visibility` hides it only after it has left. The ≤720px block
+  must keep overriding `.is-rail-closed` to one column, or the chat lands in
+  the 0px track on a phone. **Every tab opens at the top:** the document is
+  what scrolls, so `AppLayout` resets it in `AnimatePresence`'s
+  `onExitComplete` (after the old page has faded, before the new one shows)
+  with `behavior: 'instant'`, because `index.css` sets `html { scroll-behavior:
+  smooth }`. It also sets `history.scrollRestoration = 'manual'` while the
+  console is mounted, or back/forward jumps the fading page first.
+
+- **N34 — Login guess limit (2026-09-24).** `app/core/login_throttle.py`,
+  called first thing in `/api/auth/login`: 5 attempts per account+IP, 20 per
+  account from anywhere, 50 per IP, over a sliding 15 minutes, then a 429
+  with `Retry-After` and a Turkish message the login form already shows.
+  The account-wide cap is the one that holds in production, because the IP
+  there is client-controlled: nginx sends `$proxy_add_x_forwarded_for` and
+  uvicorn runs `--forwarded-allow-ips=*`, which takes the first entry.
+  Setting `X-Forwarded-For $remote_addr` in `web/nginx.conf` would make the
+  IP counters trustworthy too. In-memory per worker, so a restart clears it
+  and two workers double the ceilings.
+
+- **N35 — Dashboard corrections (2026-09-24).** The gear on the Aylık Gelir /
+  Aylık Gider rows (`components/dashboard/FigureCorrection.jsx`) never
+  overwrites a figure. It saves the difference between the records' total and
+  the typed amount as **one transaction in category `adjustment`**, dated
+  today, **negative when the figure goes down**, and replaces rather than
+  stacks it on a second save; extra keys `correctedTo/At/By` are the audit
+  trail. Tax is not editable: it is derived from the two and follows them.
+  **A correction is the only movement whose sign is kept, and five places
+  must agree on that:** `TxnIn` (negative allowed only for `adjustment`),
+  `analytics.buildSnapshot` and `agent_context._movement` (keep its sign,
+  `abs()` everything else), and both `expense_breakdown`s (drop buckets that
+  are not positive, since a donut slice cannot be negative). The dashboard's
+  donut centre is `kpis.expense` and a legend line reconciles a negative
+  correction. Pinned by `tests/test_corrections.py`. A correction dated today
+  also moves cash balance and shows as one day's movement in the forecast
+  history.
+
+- **N36 — The server OCR reads like the browser (2026-09-24).** Emin found
+  the in-browser scan more accurate on his own invoices and asked for the
+  server to copy it; asked to choose, he took **reading only**, so the
+  server's field rules (dates, VKN/TCKN check, per-field review flags) stay.
+  Copied: the model (`backend/tessdata_browser`, byte-identical to
+  `web/public/tessdata/tur.traineddata.gz` unzipped, pinned by a test), OEM 1
+  (`createWorker('tur', 1)`), PSM 6, and no preprocessing beyond EXIF
+  rotation (tesseract.js honours the tag too). It is the *smaller* network
+  (36 px / 128 wide against best's 48 / 192), which on the synthetic
+  benchmark read 101/136 held-out fields against 107; on Emin's Türk Telekom
+  screenshot the server's text had been the better one. So both switches
+  stay one setting away: `OCR_TESSDATA_DIR=tessdata`, `OCR_PREPROCESS=true`.
+  Tesseract is not installed on the dev PC, so this was verified by tests
+  and settings, not by a live server scan.
+
+- **N37 — Secondary text is 75% ink, not 50% (2026-09-24).** Emin found the
+  50% grey hard to read (about 3:1 on `#ebeff5`; 75% is about 6.3:1). Every
+  text rule that used `--ink-50` moved to `--ink-75` (77 rules across
+  console / agent / pages / auth / landing CSS, plus 7 inline styles in
+  Landing.jsx), and inside `.app-shell` the aliases `--text-tertiary`,
+  `--text-muted` and `--ink-3` now point at `--ink-75`. **50% is kept for
+  icons and placeholders on purpose**; the aliased ones are pinned back in
+  the "Faint by design" block at the end of `console.css`. Outside the
+  console those aliases are Repilay slates and were left alone. New
+  secondary text: use `--ink-75`. Not touched: 25% text such as the
+  composer's note (`.agent-composer__note`).
 
 The 2026-09-01 data-loss recovery is history now; `docs/RECOVERY.md` was
 deleted in ca3f72f. The dump that survived it is `db_backup/`, and the

@@ -5,8 +5,12 @@ import { useReveal } from '../../lib/useReveal.js'
 /**
  * Animated donut. Segments sweep in clockwise; hovering a segment
  * lifts it and shows its share in the center.
+ *
+ * `centerValue` overrides the figure in the middle, for a total that the
+ * slices cannot show (a correction that lowered it); the arcs are still
+ * drawn as shares of the slices.
  */
-export default function DonutChart({ data, size = 200, thickness = 26, centerLabel, formatValue = (v) => v }) {
+export default function DonutChart({ data, size = 200, thickness = 26, centerLabel, centerValue, formatValue = (v) => v }) {
   const [ref, inView] = useReveal({ once: true, margin: '-40px' })
   const [hover, setHover] = useState(null)
 
@@ -77,7 +81,7 @@ export default function DonutChart({ data, size = 200, thickness = 26, centerLab
         ) : (
           <>
             <span className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600 }}>
-              {formatValue(total)}
+              {formatValue(centerValue ?? total)}
             </span>
             <span style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{centerLabel}</span>
           </>

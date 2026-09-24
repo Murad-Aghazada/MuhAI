@@ -13,10 +13,13 @@ Firebase ID token for a Muhai session — was deleted on 2026-09-24 along with
 the Firebase SDK it needed in the browser; recover it from commit 4f1d785 if
 a federated sign-in is ever wanted again.
 """
-from fastapi import APIRouter, HTTPException, Response, status
+import math
+
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
+from app.core import login_throttle
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.models.company import Company
 from app.db.models.user import User
@@ -88,7 +91,23 @@ async def register(payload: UserRegister, db: DbSession) -> Token:
 
 
 @router.post("/login", response_model=Token)
-async def login(payload: UserLogin, db: DbSession) -> Token:
+async def login(payload: UserLogin, db: DbSession, request: Request) -> Token:
+    # Checked before the database and bcrypt, so a refused guess costs the
+    # server nothing. An unknown address is counted like a known one: a
+    # different answer would tell a guesser which accounts exist.
+    ip = request.client.host if request.client else "unknown"
+    wait = login_throttle.begin_attempt(payload.email, ip)
+    if wait:
+        minutes = math.ceil(wait / 60)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Çok fazla hatalı giriş denemesi. "
+                f"{minutes} dakika sonra tekrar deneyin."
+            ),
+            headers={"Retry-After": str(wait)},
+        )
+
     user = await db.scalar(select(User).where(User.email == payload.email))
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
@@ -96,6 +115,7 @@ async def login(payload: UserLogin, db: DbSession) -> Token:
             detail="E-posta veya şifre hatalı.",
         )
 
+    login_throttle.succeeded(payload.email, ip)
     user_out, company_out = await _session(db, user)
     return Token(
         access_token=create_access_token(user.id),

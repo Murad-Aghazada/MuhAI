@@ -1,11 +1,28 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import SideRail from './SideRail.jsx'
 import Topbar from './Topbar.jsx'
 import { DataProvider } from '../../context/DataContext.jsx'
 
+// The document is what scrolls, so without this a new tab opened at the
+// previous tab's scroll position. Called once the old page has faded out and
+// before the new one appears, so the jump is never seen; "instant" because
+// index.css makes html scroll smoothly, which would glide up instead.
+const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+
 export default function AppLayout() {
   const location = useLocation()
+
+  // Back and forward too: left to the browser, it restores the old position
+  // on the page that is still fading out, a visible jump before ours.
+  useEffect(() => {
+    const previous = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    return () => {
+      window.history.scrollRestoration = previous
+    }
+  }, [])
 
   return (
     <DataProvider>
@@ -18,7 +35,7 @@ export default function AppLayout() {
 
         <div className="main-col">
           <Topbar />
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" onExitComplete={toTop}>
             <motion.main
               key={location.pathname}
               initial={{ opacity: 0, y: 6 }}

@@ -9,6 +9,8 @@ Pure functions only — no Tesseract, so they run anywhere.
 """
 import io
 
+import pytest
+
 from app.services import ocr_service
 from app.services.ocr_service import (
     OcrEngine,
@@ -135,6 +137,27 @@ def test_an_image_without_exif_keeps_its_orientation():
     assert (width, height) == (2000, 1000)
 
 
+def test_by_default_the_page_is_read_as_it_is_like_the_browser():
+    """No grayscale, no upscale, no contrast stretch: tesseract.js hands the
+    pixels over untouched, and the server now does the same."""
+    from PIL import Image
+
+    small = Image.new("RGB", (800, 600), (200, 180, 160))
+    prepared = TesseractEngine._prepare(small)
+    assert prepared.mode == "RGB"
+    assert prepared.size == (800, 600)
+    assert prepared.getpixel((0, 0)) == (200, 180, 160)
+
+
+def test_the_old_cleanup_is_one_setting_away(monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(ocr_service.settings, "OCR_PREPROCESS", True)
+    prepared = TesseractEngine._prepare(Image.new("RGB", (800, 600), "white"))
+    assert prepared.mode == "L"
+    assert prepared.size[0] == 1600
+
+
 # ── Page confidence ───────────────────────────────────────────────────
 def test_page_confidence_is_the_mean_over_words_not_lines():
     """Three words at 0.9 and one at 0.3 is a page read at 0.75. A mean of
@@ -194,23 +217,50 @@ def test_an_engine_without_confidence_reports_none(monkeypatch):
 
 
 # ── Model ─────────────────────────────────────────────────────────────
-def test_the_vendored_turkish_model_is_the_best_one():
-    """tessdata_best, not the fast model apt installs: its network reads a
-    48 px line through a 192-wide final layer (fast: 36 px, 128)."""
+def test_the_default_model_is_the_one_the_browser_loads():
+    """backend/tessdata_browser is web/public/tessdata's tur model, unzipped:
+    the small network, 36 px lines through a 128-wide final layer."""
+    model = ocr_service._BROWSER_TESSDATA / "tur.traineddata"
+    assert model.is_file()
+    assert b"[1,36,0,1Ct3,3,16Mp3,3Lfys48Lfx96Lrx96Lfx128O1c1]" in model.read_bytes()
+
+
+def test_the_server_model_is_byte_for_byte_the_browsers():
+    """Skipped inside the container, which carries the backend only."""
+    import gzip
+    from pathlib import Path
+
+    web = Path(ocr_service._BACKEND_DIR).parent / "web" / "public" / "tessdata" / "tur.traineddata.gz"
+    if not web.is_file():
+        pytest.skip("web/ is not beside the backend here")
+    server = ocr_service._BROWSER_TESSDATA / "tur.traineddata"
+    assert gzip.decompress(web.read_bytes()) == server.read_bytes()
+
+
+def test_the_previous_model_is_still_vendored():
+    """tessdata_best, kept in backend/tessdata so OCR_TESSDATA_DIR=tessdata
+    brings it back: 48 px lines through a 192-wide final layer."""
     model = ocr_service._VENDORED_TESSDATA / "tur.traineddata"
     assert model.is_file()
     assert b"[1,48,0,1Ct3,3,16Mp3,3Lfys64Lfx96Lrx96Lfx192O1c1]" in model.read_bytes()
 
 
-def test_tesseract_is_pointed_at_the_vendored_model(monkeypatch):
+def test_tesseract_is_set_up_like_the_browser(monkeypatch):
     monkeypatch.setattr(ocr_service.settings, "OCR_LANG", "tur")
     monkeypatch.setattr(ocr_service.settings, "OCR_TESSDATA_DIR", "")
     config = ocr_service.tesseract_config()
-    assert config.startswith("--psm 6 --tessdata-dir ")
+    # OEM 1 and PSM 6: createWorker('tur', 1) and tessedit_pageseg_mode 6.
+    assert config.startswith("--oem 1 --psm 6 --tessdata-dir ")
     # Quoted, forward slashes: pytesseract shlex-splits this string, and the
     # repo can live under a folder with a space in its name.
-    folder = ocr_service._VENDORED_TESSDATA.as_posix()
+    folder = ocr_service._BROWSER_TESSDATA.as_posix()
     assert f'"{folder}"' in config
+
+
+def test_a_relative_model_folder_is_taken_from_the_backend(monkeypatch):
+    monkeypatch.setattr(ocr_service.settings, "OCR_LANG", "tur")
+    monkeypatch.setattr(ocr_service.settings, "OCR_TESSDATA_DIR", "tessdata")
+    assert ocr_service.tessdata_dir() == ocr_service._VENDORED_TESSDATA
 
 
 def test_a_language_the_folder_lacks_falls_back_to_the_system(monkeypatch):
@@ -219,7 +269,7 @@ def test_a_language_the_folder_lacks_falls_back_to_the_system(monkeypatch):
     monkeypatch.setattr(ocr_service.settings, "OCR_LANG", "tur+eng")
     monkeypatch.setattr(ocr_service.settings, "OCR_TESSDATA_DIR", "")
     assert ocr_service.tessdata_dir() is None
-    assert ocr_service.tesseract_config() == "--psm 6"
+    assert ocr_service.tesseract_config() == "--oem 1 --psm 6"
 
 
 def test_the_engine_passes_the_model_to_tesseract(monkeypatch):

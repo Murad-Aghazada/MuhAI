@@ -95,16 +95,27 @@ class OcrEngine(ABC):
 # number attached. PSM 6 ("one uniform block") keeps each row intact, which is
 # what the field extraction needs. Measured on the sample invoice across four
 # simulated capture conditions: 28/32 fields against 26/32 for PSM 3.
-_TESSERACT_CONFIG = "--psm 6"
+# OEM 1 (the LSTM engine alone) is what the browser asks for too:
+# `createWorker('tur', 1)` in web/src/lib/ocr.js.
+_TESSERACT_CONFIG = "--oem 1 --psm 6"
 
-# tessdata_best's Turkish model ships in the repo (backend/tessdata), because
-# the one apt installs is tessdata_fast. Measured 2026-09-24 on Turkish
-# invoices in twelve fonts, four capture conditions each, half of them held
-# out: best read 107/136 fields against 101/136 on the held-out half, and
-# 98.6% of ç ğ ı İ ö ş ü against 97.0% on the other. It costs about twice
-# the time — 1.2 s a page instead of 0.6. PaddleOCR's Latin model and
-# EasyOCR were measured too and were worse on Turkish letters (58% and 86%).
-_VENDORED_TESSDATA = Path(__file__).resolve().parents[2] / "tessdata"
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+
+# The default model, since 2026-09-24: the Turkish model tesseract.js loads in
+# the browser (web/public/tessdata/tur.traineddata.gz, unzipped). Emin found
+# the in-browser scan the more accurate of the two on his own invoices and
+# asked for the server to read the way it does, so both modes now share the
+# model and the "read the image as it is" preparation below. Its network is
+# the smaller one (36 px lines, a 128-wide last layer).
+_BROWSER_TESSDATA = _BACKEND_DIR / "tessdata_browser"
+
+# The server's previous model, kept: tessdata_best's Turkish model (48 px,
+# 192 wide). Measured on synthetic Turkish invoices in twelve fonts, four
+# capture conditions each, half held out: 107/136 fields against 101/136 for
+# the small network, 98.6% of ç ğ ı İ ö ş ü against 97.0%, at twice the time
+# (1.2 s a page against 0.6). OCR_TESSDATA_DIR=tessdata selects it again.
+# PaddleOCR's Latin model and EasyOCR were worse on Turkish letters (58%, 86%).
+_VENDORED_TESSDATA = _BACKEND_DIR / "tessdata"
 
 
 def tessdata_dir() -> Path | None:
@@ -117,8 +128,11 @@ def tessdata_dir() -> Path | None:
     folder = (
         Path(settings.OCR_TESSDATA_DIR)
         if settings.OCR_TESSDATA_DIR
-        else _VENDORED_TESSDATA
+        else _BROWSER_TESSDATA
     )
+    if not folder.is_absolute():
+        # Relative to the backend, not to wherever uvicorn was started.
+        folder = _BACKEND_DIR / folder
     langs = [lang for lang in settings.OCR_LANG.split("+") if lang]
     if langs and all((folder / f"{lang}.traineddata").is_file() for lang in langs):
         return folder
@@ -135,31 +149,28 @@ def tesseract_config() -> str:
 
 # Tesseract's LSTM wants roughly 30 px of x-height. Below that its accuracy
 # collapses regardless of which model is loaded, and a photo taken from across
-# a desk lands well under it — upscaling is what rescues those, not a bigger
-# traineddata file.
+# a desk lands well under it — upscaling is what rescued those, not a bigger
+# traineddata file. Used only with OCR_PREPROCESS on.
 _MIN_WIDTH_PX = 1600
 
 
 class TesseractEngine(OcrEngine):
     @staticmethod
     def _prepare(image):
-        """Normalise a photographed document into something Tesseract reads.
+        """The page as Tesseract gets it: upright, and otherwise as it is.
 
-        Upright, grayscale, upscale if small, stretch contrast. On a clean scan
-        this changes nothing; on a distant photo the upscale is what rescues
-        it.
+        That is what the browser does. tesseract.js honours a phone's EXIF
+        Orientation tag and hands the pixels over untouched, leaving grayscale
+        and binarisation to Tesseract itself; a phone stores a portrait shot
+        as landscape pixels plus that tag, and Pillow ignores it unless asked
+        (before it was asked, portrait photos read 0/4 fields here against 4/4
+        in the browser).
 
-        Two things this deliberately does not do any more, both measured on
-        `sample-invoice.png` against the browser path (2026-09-24):
-
-        * **Trust the pixel order.** A phone stores a portrait shot as
-          landscape pixels plus an EXIF Orientation tag. tesseract.js honours
-          the tag; Pillow does not unless asked, so every portrait photo was
-          read sideways here — 0/4 fields against 4/4 in the browser.
-        * **Sharpen.** An unsharp mask turns sensor noise into speckle that
-          Tesseract's binarisation keeps as ink. On a dim photo it took the
-          read from 3/4 fields to 0/4 by itself; on a clean one it only ever
-          cost a few points of confidence.
+        ``OCR_PREPROCESS`` brings back the server's own clean-up from before
+        2026-09-24: grayscale, upscale if narrower than 1600 px, stretch the
+        contrast. Never sharpen, with or without it: an unsharp mask turns
+        sensor noise into speckle that binarisation keeps as ink, and on a dim
+        photo it took the read from 3/4 fields to 0/4 by itself.
         """
         from PIL import Image, ImageOps
 
@@ -167,6 +178,8 @@ class TesseractEngine(OcrEngine):
             image = ImageOps.exif_transpose(image)
         except Exception:  # malformed EXIF — read the pixels as stored
             pass
+        if not settings.OCR_PREPROCESS:
+            return image
         image = image.convert("L")
         width, height = image.size
         if width < _MIN_WIDTH_PX:

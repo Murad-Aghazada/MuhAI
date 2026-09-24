@@ -9,20 +9,33 @@ from __future__ import annotations
 import datetime as dt
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ── Shared input records (mirrors of the workspace documents) ──────────
+
+
+# A dashboard correction ("this month's income is really X") is stored as a
+# movement of the difference, in this category. Lowering a figure makes that
+# difference negative, so a correction is the one movement allowed below
+# zero; everything else still has to be a plain amount.
+ADJUSTMENT_CATEGORY = "adjustment"
 
 
 class TxnIn(BaseModel):
     """One income/expense movement."""
 
     date: dt.date
-    amount: float = Field(ge=0)
+    amount: float
     type: Literal["income", "expense"]
     category: str | None = None
     description: str | None = None
     vendor: str | None = None
+
+    @model_validator(mode="after")
+    def _negative_only_as_correction(self) -> "TxnIn":
+        if self.amount < 0 and self.category != ADJUSTMENT_CATEGORY:
+            raise ValueError("amount must be >= 0 unless the movement is a correction")
+        return self
 
 
 class InvoiceIn(BaseModel):

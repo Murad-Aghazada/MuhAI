@@ -87,6 +87,62 @@
 .figure-delta.is-bad { color: var(--stop); }
 .figure-delta small { margin-left: 3px; font-weight: 400; color: var(--ink-3); }
 
+/* ---- Correcting a figure (components/dashboard/FigureCorrection.jsx) ----
+   The gear column is kept on every row once any row has a gear, so the
+   values stay in one column. The gear sits on a soft tile at full strength
+   so it reads as a button without hovering, darkens on hover and while its
+   editor is open, and turns a little as the editor opens. */
+.figure-rows.has-edit .figure-row { grid-template-columns: auto minmax(0, 1fr) auto auto 30px; }
+
+.figure-row__edit {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-sm, 8px);
+  background: var(--pg);
+  color: var(--ink-75);
+  cursor: pointer;
+  transition: background 140ms var(--ease), color 140ms var(--ease);
+}
+
+span.figure-row__edit { background: none; cursor: default; }
+.figure-row__edit svg { transition: transform 260ms var(--ease); }
+
+.figure-row__edit:hover,
+.figure-row__edit:focus-visible,
+.figure-row__edit[aria-expanded='true'] { background: var(--ink-12); color: var(--ink); }
+.figure-row__edit[aria-expanded='true'] svg { transform: rotate(60deg); }
+
+/* Spans the row. The negative margin cancels the row's gap while the editor
+   is shut, so opening it grows from nothing rather than from a 12px jump. */
+.figure-row__editor { grid-column: 1 / -1; overflow: hidden; margin-top: -12px; }
+
+.figure-fix { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 4px; }
+.figure-fix__unit { color: var(--ink-75); font-size: 14px; }
+.figure-fix input { font-variant-numeric: tabular-nums; }
+.figure-fix__note { font-size: 12.5px; line-height: 1.45; color: var(--ink-75); }
+.figure-fix__note.is-bad { color: var(--stop); }
+.figure-fix__existing { font-size: 12.5px; line-height: 1.45; color: var(--ink-75); }
+
+.figure-fix__undo {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.figure-fix__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+
+/* The legend line for a correction the donut cannot draw: an open swatch,
+   because there is no slice of that colour to match. */
+.legend__swatch--open { background: transparent; border: 1.5px dashed var(--ink-25); }
+
 @media (max-width: 900px) {
   .figures { grid-template-columns: minmax(0, 1fr); }
   .figure-rows { border-left: none; border-top: 1px solid var(--rule); }
@@ -97,6 +153,7 @@
   .figure-hero, .figure-row { padding-left: 16px; padding-right: 16px; }
   .figure-hero__trend { margin-left: -16px; margin-right: -16px; }
   .figure-row { gap: 8px; }
+  .figure-row__editor { margin-top: -8px; }
   .figure-row .figure-delta small { display: none; }
 }
 

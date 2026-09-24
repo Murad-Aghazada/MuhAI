@@ -11,6 +11,12 @@
 
 export const MONTHS_BACK = 12
 
+/* A correction set from the dashboard ("this month's income is really X") is
+   saved as a movement of the difference in this category, negative when the
+   figure went down. It is the only movement whose sign is kept; the server's
+   input check (schemas/compute.py) allows exactly this one. */
+export const ADJUSTMENT = 'adjustment'
+
 const round2 = (n) => Math.round(n * 100) / 100
 export const monthKey = (isoDate) => String(isoDate || '').slice(0, 7)
 export const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -84,8 +90,11 @@ export function expenseBreakdown(transactions = [], date = new Date(), months = 
     const key = t.category || 'other'
     totals.set(key, (totals.get(key) || 0) + (Number(t.amount) || 0))
   }
+  // Only what a chart can draw: a correction that lowered the month leaves a
+  // negative bucket. Same rule as compute_service.expense_breakdown.
   return [...totals.entries()]
     .map(([key, value]) => ({ key, value: round2(value) }))
+    .filter((row) => row.value > 0)
     .sort((a, b) => b.value - a.value)
 }
 
@@ -195,7 +204,7 @@ export function buildSnapshot({
       .filter((t) => t.date && t.date >= horizonStart && t.date <= date)
       .map((t) => ({
         date: t.date,
-        amount: Math.abs(Number(t.amount) || 0),
+        amount: t.category === ADJUSTMENT ? Number(t.amount) || 0 : Math.abs(Number(t.amount) || 0),
         type: t.type === 'income' ? 'income' : 'expense',
         category: t.category || null,
         description: t.description || null,

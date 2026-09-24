@@ -228,17 +228,17 @@ export default function Agent() {
         showArtifact ? ' is-split' : ''
       }`}
     >
-      {railOpen && (
-        <ConversationRail
-          conversations={conversations}
-          activeId={activeId}
-          onOpen={openConversation}
-          onNew={startNew}
-          onRename={rename}
-          onPin={pin}
-          onDelete={remove}
-        />
-      )}
+      {/* Always mounted: closing it slides it out (agent.css, "the rail
+          slides"), which a component that unmounts on close cannot do. */}
+      <ConversationRail
+        conversations={conversations}
+        activeId={activeId}
+        onOpen={openConversation}
+        onNew={startNew}
+        onRename={rename}
+        onPin={pin}
+        onDelete={remove}
+      />
 
       <main className="agent-main">
         <header className="agent-bar">

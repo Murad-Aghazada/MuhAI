@@ -26,6 +26,7 @@ import { useData } from '../context/DataContext.jsx'
 import { formatCurrency, formatDate, MONTHS } from '../lib/format.js'
 import { isOverdue } from '../lib/analytics.js'
 import { FigureBand } from '../components/ui/Figures.jsx'
+import FigureCorrection from '../components/dashboard/FigureCorrection.jsx'
 import Badge from '../components/ui/Badge.jsx'
 import TrendChart from '../components/charts/TrendChart.jsx'
 import DonutChart from '../components/charts/DonutChart.jsx'
@@ -100,6 +101,9 @@ export default function Dashboard() {
   const { dashboard, score, forecast, compliance, invoices, loading, isEmpty, apiOnline, computing, refresh } = useData()
 
   const [range, setRange] = useState('m12')
+  // Which figure's correction editor is open: 'income', 'expense' or null.
+  const [editing, setEditing] = useState(null)
+  const toggleEdit = (kind) => setEditing((open) => (open === kind ? null : kind))
 
   const cur = (v, o) => formatCurrency(v, lang, o)
   const compact = (v) => formatCurrency(v, lang, { compact: true })
@@ -132,13 +136,30 @@ export default function Dashboard() {
         positive: kpis.profit_delta >= 0,
         spark: monthly.map((m) => m.profit),
       },
+      // Income and expense can be corrected (see FigureCorrection); the tax
+      // row cannot, because it is worked out from those two and follows them.
       rows: [
-        { icon: Banknote, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: kpis.revenue_delta, positive: kpis.revenue_delta >= 0 },
-        { icon: Receipt, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: kpis.expense_delta, positive: kpis.expense_delta <= 0 },
-        { icon: Landmark, label: t('dashboard.kpiTax'), value: kpis.tax, delta: kpis.tax_delta, positive: kpis.tax_delta <= 0 },
+        {
+          icon: Banknote, label: t('dashboard.kpiRevenue'), value: kpis.revenue, delta: kpis.revenue_delta, positive: kpis.revenue_delta >= 0,
+          onEdit: () => toggleEdit('income'),
+          editing: editing === 'income',
+          editLabel: t('dashboard.correction.edit_income'),
+          editor: <FigureCorrection kind="income" onDone={() => setEditing(null)} />,
+        },
+        {
+          icon: Receipt, label: t('dashboard.kpiExpense'), value: kpis.expense, delta: kpis.expense_delta, positive: kpis.expense_delta <= 0,
+          onEdit: () => toggleEdit('expense'),
+          editing: editing === 'expense',
+          editLabel: t('dashboard.correction.edit_expense'),
+          editor: <FigureCorrection kind="expense" onDone={() => setEditing(null)} />,
+        },
+        {
+          icon: Landmark, label: t('dashboard.kpiTax'), value: kpis.tax, delta: kpis.tax_delta, positive: kpis.tax_delta <= 0,
+          hint: t('dashboard.correction.taxHint'),
+        },
       ],
     }
-  }, [kpis, monthly, t])
+  }, [kpis, monthly, t, editing])
 
   // Only the largest categories get their own slice, but the tail is rolled
   // into "other" rather than dropped — the donut's centre is labelled as the
@@ -158,6 +179,14 @@ export default function Dashboard() {
       color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
     }))
   }, [dashboard?.expense_breakdown, t])
+
+  // The donut's centre is the month's expense figure, the one on the row
+  // above. A correction that lowered it has no slice to draw (a slice cannot
+  // be negative), so the legend carries it as a line of its own and the
+  // lines still add up to the centre.
+  const sliceTotal = donutData.reduce((s, d) => s + d.value, 0)
+  const expenseTotal = kpis?.expense ?? sliceTotal
+  const unassigned = Math.round((expenseTotal - sliceTotal) * 100) / 100
 
   // Alerts name an invoice by id; the row shows its number so the user knows
   // which document is meant before clicking through.
@@ -403,7 +432,7 @@ export default function Dashboard() {
             </div>
             {donutData.length ? (
               <>
-                <DonutChart data={donutData} centerLabel={t('dashboard.kpiExpense')} formatValue={compact} />
+                <DonutChart data={donutData} centerLabel={t('dashboard.kpiExpense')} centerValue={expenseTotal} formatValue={compact} />
                 <div className="legend" style={{ marginTop: 22 }}>
                   {donutData.map((d) => (
                     <div className="legend__row" key={d.key}>
@@ -414,6 +443,15 @@ export default function Dashboard() {
                       <span className="legend__val">{cur(d.value)}</span>
                     </div>
                   ))}
+                  {Math.abs(unassigned) >= 0.5 ? (
+                    <div className="legend__row" key="correction">
+                      <span className="legend__left">
+                        <span className="legend__swatch legend__swatch--open" />
+                        {t('dashboard.cat.adjustment')}
+                      </span>
+                      <span className="legend__val">{unassigned < 0 ? '−' : '+'}{cur(Math.abs(unassigned))}</span>
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : (

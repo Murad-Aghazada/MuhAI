@@ -36,12 +36,18 @@ class Settings(BaseSettings):
     # measured 27/32 against 28/32 for "tur" alone. Set OCR_LANG="tur+eng" if a
     # company genuinely receives English documents.
     OCR_LANG: str = "tur"
-    # Where the language models live. Empty means backend/tessdata, which
-    # carries tessdata_best's Turkish model: Debian's tesseract-ocr-tur is the
-    # small "fast" one, and on held-out Turkish invoices best read 107/136
-    # fields against 101/136. Any language in OCR_LANG that is not in this
-    # folder falls back to the system's tessdata.
+    # Where the language models live. Empty means backend/tessdata_browser:
+    # the very Turkish model the in-browser scan loads (web/public/tessdata),
+    # so both scan modes read with the same model (2026-09-24). backend/tessdata
+    # still carries tessdata_best's larger model; set OCR_TESSDATA_DIR=tessdata
+    # to go back to it (on synthetic invoices it read 107/136 held-out fields
+    # against 101/136). A relative path is taken from the backend folder. Any
+    # language in OCR_LANG that the folder lacks falls back to the system's.
     OCR_TESSDATA_DIR: str = ""
+    # The browser reads a photo as it is; so does the server, by default.
+    # True restores the server's old clean-up before reading: grayscale,
+    # upscale anything narrower than 1600 px, stretch the contrast.
+    OCR_PREPROCESS: bool = False
 
     # ── AI provider ────────────────────────────────────────────────────
     # Which vendor answers the assistant and the agent. Empty auto-selects:

@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { TrendingDown, TrendingUp } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Settings2, TrendingDown, TrendingUp } from 'lucide-react'
 import AnimatedNumber from './AnimatedNumber.jsx'
 
 /**
@@ -29,7 +29,15 @@ function Delta({ value, label, positive, className = '' }) {
   )
 }
 
+/**
+ * A row may carry `onEdit` (shows a gear), `editing` and `editor` (what opens
+ * under it), `editLabel` (the gear's accessible name) and `hint` (a title on
+ * the label). When any row has a gear, every row keeps the gear's column, so
+ * the values still line up.
+ */
 export function FigureBand({ hero, rows, format, vsLabel }) {
+  const editable = rows.some((r) => r.onEdit)
+
   return (
     <motion.section
       className="panel figures"
@@ -52,13 +60,43 @@ export function FigureBand({ hero, rows, format, vsLabel }) {
         <Delta value={hero.delta} positive={hero.positive} label={vsLabel} />
       </div>
 
-      <ol className="figure-rows">
+      <ol className={`figure-rows${editable ? ' has-edit' : ''}`}>
         {rows.map((r) => (
-          <li className="figure-row" key={r.label}>
+          <li className={`figure-row${r.editing ? ' is-editing' : ''}`} key={r.label}>
             {r.icon ? <r.icon size={14} strokeWidth={1.5} className="figure-row__icon" /> : null}
-            <span className="figure-row__label label">{r.label}</span>
+            <span className="figure-row__label label" title={r.hint}>{r.label}</span>
             <span className="figure-row__value num">{format(r.value)}</span>
             <Delta value={r.delta} positive={r.positive} className="figure-row__delta" />
+            {editable ? (
+              r.onEdit ? (
+                <button
+                  type="button"
+                  className="figure-row__edit"
+                  onClick={r.onEdit}
+                  aria-expanded={Boolean(r.editing)}
+                  aria-label={r.editLabel}
+                  title={r.editLabel}
+                >
+                  <Settings2 size={15} strokeWidth={1.9} />
+                </button>
+              ) : (
+                <span className="figure-row__edit" aria-hidden="true" />
+              )
+            ) : null}
+            <AnimatePresence initial={false}>
+              {r.editing && r.editor ? (
+                <motion.div
+                  key="editor"
+                  className="figure-row__editor"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: [0.22, 0.8, 0.3, 1] }}
+                >
+                  {r.editor}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </li>
         ))}
       </ol>
