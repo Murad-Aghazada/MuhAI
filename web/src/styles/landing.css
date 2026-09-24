@@ -1672,6 +1672,9 @@
 
 @media (max-width: 1024px) {
   .lp-nav__links { display: none; }
+  /* the links' auto margins were what pushed this group to the far
+     edge; with them hidden it takes that job over */
+  .lp-nav__right { margin-left: auto; }
   .lp-burger { display: grid; }
   .lp-nav__login { display: none; }
 
